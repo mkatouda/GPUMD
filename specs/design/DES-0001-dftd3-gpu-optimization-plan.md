@@ -118,6 +118,24 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
 - Gate: neighbor-list kernel time at N=648 (12/6) reduced by >= 2x; accuracy criteria met;
   memory use not larger than baseline. Else drop.
 
+### Phase 2': re-evaluation of the factorized C6 weights on top of Phases 3 and 4 (draft 2026-11-03)
+- Precondition: Phases 3 and 4 merged and verified (accuracy tests, `dftd3_*` regression at
+  rtol 1e-5 / atol 1e-12, `--suite full` against a `master` baseline, nsys re-measurement).
+- Why: the Phase 2 prototype gave 1.04x on Cu 4,000 only because the large-box kernel was bound by
+  thread count and cell-list traversal. After Phase 3 the force kernel is 0.44 ms (Cu 4,000) and
+  0.79 ms (water 5,184), so the per-pair exp work may be a larger share. The prototype patch
+  (`phase2.patch`) cannot be applied mechanically: Phase 3 rewrote the large-box kernels.
+  The small-box part (1.22-1.27x) is expected to apply.
+- Stage 1 (cheap diagnostic, no code): with nsys, take the share of the force kernel time spent in
+  the C6 double loop for Cu 4,000, water 5,184 and water 648 (e.g. by timing a build with the
+  C6 weights replaced by a constant; scratch only, results not used). Gate: if the C6 loop is
+  < 15% of the force kernel in all three, stop and keep Phase 2 dropped.
+- Stage 2: re-implement the per-atom weights (`cn_weight`, `cn_dweight`, computed in the CN
+  kernels) on the merged code for both paths. Gate (as before): accuracy criteria met and
+  force kernel >= 1.2x on Cu 4,000 versus the merged baseline; otherwise drop.
+- Stage 3: accuracy (reference test, `dftd3_*` regression, num_sub forced 1..16 comparison) and the
+  memory cost of two N x max_cn float arrays (report the increase).
+
 ### Phase 5: conditional extras (causes C, E; only if still justified after Phases 2-4)
 - C: half neighbor list (needs atomics; keep only if measured faster).
 - E: run D3 on a second stream concurrently with NEP (only if D3 is latency-bound at small N).
