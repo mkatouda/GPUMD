@@ -127,7 +127,9 @@ Measured 2026-11-02 on RTX A6000 (sm_86), CUDA from `/usr/local/cuda`, built wit
 `make CUDA_ARCH="-arch=sm_86" -j4` (this machine is sm_86, not sm_89):
 
 - `pytest -m "not slow"` in `tests_pytest/`: 738 passed, 480 skipped, 0 failed (about 10 min).
-  Python deps are not installed system-wide; use a venv with `ase calorine numpy pytest hypothesis`.
+  Python deps are not installed system-wide; use the conda env
+  `/home/katouda/miniforge3/envs/py312-gpumd` (`ase calorine numpy pytest hypothesis`), e.g.
+  `/home/katouda/miniforge3/envs/py312-gpumd/bin/python -m pytest -m "not slow" -q`.
 - `run_regression.py --suite full`, once with the SAME binary as baseline and candidate and
   once with a `master` build (`3b2c8db8`, identical `src/` to `develop`) as baseline:
   both gave 218 passed, 37 failed, relations 25/25 passed, and exactly the same 37
