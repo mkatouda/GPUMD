@@ -37,3 +37,5 @@ Tips
 * The user is responsible for not double counting the dispersion correction, i.e., it is not a good idea to add the DFT-D3 correction to a NEP model that has been trained against a dataset containing dispersion correction (no matter what flavor it is).
 
 * Currently cannot use DFT-D3 for the multi-GPU version of NEP.
+
+* :ref:`dftd3 <kw_dftd3>` and :ref:`dftd2 <kw_dftd2>` are mutually exclusive: specifying both is an input error.

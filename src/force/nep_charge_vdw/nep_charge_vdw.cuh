@@ -14,6 +14,7 @@
 */
 
 #pragma once
+#include "force/dftd2.cuh"
 #include "force/ewald.cuh"
 #include "force/neighbor.cuh"
 #include "force/potential.cuh"
@@ -155,6 +156,8 @@ private:
   Ewald ewald;
   PPPM_VDW pppm;
   NeighborManager neighbor_manager;
+  DFTD2 dftd2;
+  bool has_dftd2 = false;
 
   void update_potential(float* parameters, ANN& ann);
 

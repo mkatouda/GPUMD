@@ -154,6 +154,12 @@ Bibliography
    | Phys. Rev. B **103**, 205421 (2021)
    | DOI: `10.1103/PhysRevB.103.205421 <https://doi.org/10.1103/PhysRevB.103.205421>`_
 
+.. [Grimme2006]
+   | Stefan Grimme
+   | *Semiempirical GGA-type density functional constructed with a long-range dispersion correction*
+   | Journal of Computational Chemistry **27**, 1787 (2006)
+   | DOI: `10.1002/jcc.20495 <https://doi.org/10.1002/jcc.20495>`_
+
 .. [Grimme2010]
    | Stefan Grimme, Jens Antony, Stephan Ehrlich, and Helge Krieg
    | *A consistent and accurate ab initio parametrization of density functional dispersion correction (DFT-D) for the 94 elements H-Pu*

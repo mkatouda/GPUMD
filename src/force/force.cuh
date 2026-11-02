@@ -88,6 +88,16 @@ public:
   void advance_temperature();
   int get_number_of_potentials() const;
   Potential& get_potential(const int index);
+  // true if at least one potential is defined and all of them are NEP-type (dftd2 capable)
+  bool all_potentials_are_nep() const
+  {
+#ifdef GPUMD_WPE_ENABLED
+    return false;
+#else
+    return !potentials.empty() && !has_non_nep;
+#endif
+  }
+  bool has_any_potential() const { return !potentials.empty(); }
 
 private:
 #ifdef GPUMD_WPE_ENABLED

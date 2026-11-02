@@ -69,6 +69,20 @@ void NEP::initialize_dftd3(const RunInput& run_input)
   }
 }
 
+void NEP::initialize_dftd2(const RunInput& run_input)
+{
+  has_dftd2 = false;
+  double s6, rc;
+  if (DFTD2::find_in_run_input(run_input, s6, rc)) {
+    has_dftd2 = true;
+    std::vector<int> atomic_numbers(paramb.num_types);
+    for (int n = 0; n < paramb.num_types; ++n) {
+      atomic_numbers[n] = zbl.atomic_numbers[n];
+    }
+    dftd2.initialize(s6, rc, atomic_numbers);
+  }
+}
+
 NEP::NEP(const char* file_potential, const int num_atoms, const RunInput& run_input)
 {
   NEP_Model_Input input(file_potential);
@@ -349,6 +363,7 @@ NEP::NEP(const char* file_potential, const int num_atoms, const RunInput& run_in
   nep_data.cpu_NN_angular.resize(num_atoms);
 
   initialize_dftd3(run_input);
+  initialize_dftd2(run_input);
 }
 
 NEP::~NEP(void)
@@ -1251,6 +1266,10 @@ void NEP::compute(
     dftd3.compute(
       box, type, position_per_atom, potential_per_atom, force_per_atom, virial_per_atom);
   }
+  if (has_dftd2) {
+    dftd2.compute(
+      box, type, position_per_atom, potential_per_atom, force_per_atom, virial_per_atom);
+  }
 }
 
 static __global__ void find_descriptor(
@@ -1715,6 +1734,10 @@ void NEP::compute(
 
   if (has_dftd3) {
     dftd3.compute(
+      box, type, position_per_atom, potential_per_atom, force_per_atom, virial_per_atom);
+  }
+  if (has_dftd2) {
+    dftd2.compute(
       box, type, position_per_atom, potential_per_atom, force_per_atom, virial_per_atom);
   }
 }

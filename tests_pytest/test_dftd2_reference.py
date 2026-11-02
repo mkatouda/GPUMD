@@ -23,10 +23,11 @@ Tolerances (fixed BEFORE any GPU measurement; never to be loosened to make a tes
   force component, virial 5e-9 of the largest virial component.  Observed on 2026-11-03: <= 3.2e-11,
   1.2e-9, 3.8e-11 (periodic cases show a ~1e-9 force residual of the oracle itself, cause not found).
 - reference self-consistency: finite-difference force / strain virial relative 1e-7.
-- GPU vs reference: DR-002 AC-1 caps (energy and virial relative 2e-6 of |E_ref| and max|W_ref|;
-  force 1e-5 of the largest reference force component), but never below the float run-to-run
-  noise floors used by test_dftd3_reference.py (energy 2e-6 eV, force 1e-6 eV/A, virial 2e-5 eV)
-  because the D2 part is obtained as a difference of two float NEP runs.
+- GPU vs reference: exactly the DR-002 AC-1 values (energy and virial relative 2e-6 of |E_ref| and
+  max|W_ref|; force 1e-5 of the largest reference force component), with no absolute floors.  The D2 part
+  is obtained as a difference of two float NEP runs, so s6 is chosen large (75) to make the D2 signal much
+  larger than the float run-to-run noise of NEP.  Observed (s6 = 0.75, 2026-11-03): relative errors
+  <= 3.8e-8 (energy), <= 5.6e-8 (virial), <= 1.1e-6 (force, of the largest component).
 """
 import importlib.util
 import json
@@ -263,15 +264,15 @@ def test_reference_rejects_elements_beyond_z86():
 # ---------------------------------------------------------------------------------------------
 # 2. GPU: D2 contribution vs the reference
 # ---------------------------------------------------------------------------------------------
+S6_GPU = 75.0      # large: D2 signal >> float noise of the NEP difference, so no absolute floors needed
 GPU_CASES = {   # name: (s6, rc, description)
-    'dimer': (0.75, 12.0, 'non-periodic dimer'),
-    'benzene_dimer': (0.75, 12.0, 'non-periodic benzene dimer'),
-    'graphite': (0.75, 12.0, 'hexagonal cell'),
-    'water27': (0.75, 12.0, 'cubic cell, rc > box'),
-    'water27_tri': (1.25, 12.0, 'triclinic cell'),
-    'water_large': (0.75, 12.0, '2187 atoms'),
+    'dimer': (S6_GPU, 12.0, 'non-periodic dimer'),
+    'benzene_dimer': (S6_GPU, 12.0, 'non-periodic benzene dimer'),
+    'graphite': (S6_GPU, 12.0, 'hexagonal cell'),
+    'water27': (S6_GPU, 12.0, 'cubic cell, rc > box'),
+    'water27_tri': (S6_GPU, 12.0, 'triclinic cell'),
+    'water_large': (S6_GPU, 12.0, '2187 atoms'),
 }
-FLOORS = dict(energy=2e-6, force=1e-6, virial=2e-5)     # eV, eV/A, eV (float run-to-run noise)
 REL_CAP_EV = 2e-6
 REL_CAP_F = 1e-5
 
@@ -293,20 +294,104 @@ def _run(workdir, atoms, dftd2_line):
     return energy, forces, virial
 
 
+def _check_against_reference(tmp_path, atoms, s6, rc):
+    """AC-1: (run with dftd2) - (run without) equals the reference; relative caps only, no floors."""
+    E_ref, F_ref, W_ref = ref.energy_forces_virial(atoms, s6, rc)
+    e0, f0, v0 = _run(tmp_path / 'noD2', atoms, None)
+    e1, f1, v1 = _run(tmp_path / 'D2', atoms, f'dftd2 {s6} {rc}')
+    tol_e = REL_CAP_EV * abs(E_ref)
+    tol_f = REL_CAP_F * np.abs(F_ref).max()
+    tol_v = REL_CAP_EV * np.abs(W_ref).max()
+    assert abs((e1 - e0) - E_ref) <= tol_e, f'energy error {abs((e1 - e0) - E_ref):.3e} eV (tol {tol_e:.1e})'
+    err_f = np.abs((f1 - f0) - F_ref).max()
+    assert err_f <= tol_f, 'force error %.3e eV/A (tol %.1e)' % (err_f, tol_f)
+    err_v = np.abs((v1 - v0) - W_ref).max()
+    assert err_v <= tol_v, 'virial error %.3e eV (tol %.1e)' % (err_v, tol_v)
+
+
 @pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
 @pytest.mark.parametrize('name', list(GPU_CASES))
 def test_dftd2_matches_reference(name, tmp_path):
     s6, rc, _ = GPU_CASES[name]
-    atoms = structure(name)
-    E_ref, F_ref, W_ref = ref.energy_forces_virial(atoms, s6, rc)
-    e0, f0, v0 = _run(tmp_path / 'noD2', atoms, None)
-    e1, f1, v1 = _run(tmp_path / 'D2', atoms, f'dftd2 {s6} {rc}')
-    tol_e = max(REL_CAP_EV * abs(E_ref), FLOORS['energy'])
-    tol_f = max(REL_CAP_F * np.abs(F_ref).max(), FLOORS['force'])
-    tol_v = max(REL_CAP_EV * np.abs(W_ref).max(), FLOORS['virial'])
-    assert abs((e1 - e0) - E_ref) <= tol_e, f'energy error {abs((e1 - e0) - E_ref):.3e} eV'
-    assert np.abs((f1 - f0) - F_ref).max() <= tol_f, 'force error %.3e eV/A' % np.abs((f1 - f0) - F_ref).max()
-    assert np.abs((v1 - v0) - W_ref).max() <= tol_v, 'virial error %.3e eV' % np.abs((v1 - v0) - W_ref).max()
+    _check_against_reference(tmp_path, structure(name), s6, rc)
+
+
+def _tri_many_cells():      # triclinic, 3 cells per direction (n >= 2 for rc = 12)
+    return structure('water27_tri').repeat((2, 2, 2))
+
+
+def _open_cluster():        # non-periodic, extent (~19 A) larger than rc/2 -> several cells (n > 1)
+    atoms = structure('water27').repeat((2, 2, 2))
+    atoms.pbc = False
+    return atoms
+
+
+def _slab():                # mixed boundary conditions: periodic in x, y; open in z
+    atoms = structure('water27').repeat((2, 2, 2))
+    atoms.pbc = [True, True, False]
+    return atoms
+
+
+def _permuted():
+    atoms = structure('water27_tri')
+    perm = np.random.default_rng(11).permutation(len(atoms))
+    return atoms[perm]
+
+
+def _huge_coordinates():    # integer multiples of the lattice vectors added to all positions
+    atoms = structure('water27_tri')
+    cell = atoms.cell.array
+    atoms.positions += 100 * cell[0] - 75 * cell[1] + 40 * cell[2]
+    return atoms
+
+
+GPU_DERIVED_CASES = {   # name: (builder, rc, description)
+    'tri_many_cells': (_tri_many_cells, 12.0, 'triclinic cell with n >= 2 cells in each direction'),
+    'open_cluster': (_open_cluster, 12.0, 'non-periodic cluster larger than rc/2'),
+    'slab_ttf': (_slab, 12.0, 'mixed PBC (T T F)'),
+    'permuted_order': (_permuted, 12.0, 'atom order permuted'),
+    'huge_coordinates': (_huge_coordinates, 12.0, 'positions shifted by large integer lattice multiples'),
+}
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize('name', list(GPU_DERIVED_CASES))
+def test_dftd2_matches_reference_geometry_variants(name, tmp_path):
+    builder, rc, _ = GPU_DERIVED_CASES[name]
+    _check_against_reference(tmp_path, builder(), S6_GPU, rc)
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd2_goes_to_zero_at_the_cutoff(tmp_path):
+    """rc = 15.3 is not exactly representable in float; at r = rc - 1e-6 energy and force are ~0 and at
+    r = rc + 1e-6 they are exactly 0 (shifted force, continuous in E and F)."""
+    rc, s6 = 15.3, 0.75
+    for k, (dist, bound) in enumerate(((rc - 1e-6, 1e-9), (rc + 1e-6, 0.0))):
+        atoms = Atoms('CO', positions=[[0, 0, 0], [0, 0, dist]], cell=[40, 40, 40], pbc=False)
+        e0, f0, _ = _run(tmp_path / f'a{k}', atoms, None)
+        e1, f1, _ = _run(tmp_path / f'b{k}', atoms, f'dftd2 {s6} {rc}')
+        # for scale: the unshifted pair energy at rc is ~1e-5 eV
+        assert abs(e1 - e0) <= max(bound, 1e-12), f'E = {e1 - e0:.3e} at r = {dist}'
+        assert np.abs(f1 - f0).max() <= max(bound, 1e-12), f'|F| = {np.abs(f1 - f0).max():.3e} at r = {dist}'
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd2_repeated_runs_agree(tmp_path):
+    """Run-to-run reproducibility (limited by the atomic placement into cells): H atoms on a sparse
+    jittered lattice (spacing 9 A, beyond the NEP cutoff, so NEP contributes nothing and the whole
+    result is the D2 part), 1000 atoms, rc = 12 A, 5 runs; relative difference <= 1e-12."""
+    rng = np.random.default_rng(5)
+    n = 10
+    grid = np.array([[i, j, k] for i in range(n) for j in range(n) for k in range(n)], float) * 9.0
+    atoms = Atoms('H%d' % len(grid), positions=grid + rng.uniform(-0.8, 0.8, grid.shape),
+                  cell=[9.0 * n] * 3, pbc=True)
+    results = [_run(tmp_path / f'run{i}', atoms, 'dftd2 0.75 12') for i in range(5)]
+    e0, f0, v0 = results[0]
+    assert abs(e0) > 0
+    for e, f, v in results[1:]:
+        assert abs(e - e0) <= 1e-12 * abs(e0)
+        assert np.abs(f - f0).max() <= 1e-12 * np.abs(f0).max()
+        assert np.abs(v - v0).max() <= 1e-12 * np.abs(v0).max()
 
 
 # ---------------------------------------------------------------------------------------------
@@ -352,6 +437,22 @@ def test_dftd2_cutoff_must_be_positive(tmp_path, rc):
 def test_dftd2_rejects_elements_beyond_z86_naming_them(tmp_path):
     atoms = Atoms('CUAcH', positions=[[0, 0, 0], [3, 0, 0], [0, 3, 0], [3, 3, 3]], cell=[20, 20, 20])
     _expect_input_error(tmp_path, ['dftd2 0.75 12'], [r'\bU\b', r'\bAc\b'], atoms=atoms)
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize('symbol', ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu'])
+def test_dftd2_names_each_element_beyond_z86(tmp_path, symbol):
+    atoms = Atoms(f'H{symbol}', positions=[[0, 0, 0], [3, 0, 0]], cell=[20, 20, 20])
+    _expect_input_error(tmp_path, ['dftd2 0.75 12'], [rf'\b{symbol}\b'], atoms=atoms)
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd2_runs_with_nep89_when_structure_has_no_element_beyond_z86(tmp_path):
+    """NEP89 itself contains Ac..Pu, but only the elements present in the structure matter."""
+    first_line = NEP_MODEL.read_text().splitlines()[0].split()
+    assert {'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu'} <= set(first_line)
+    e1, f1, _ = _run(tmp_path / 'D2', structure('dimer'), 'dftd2 0.75 12')
+    assert np.isfinite(e1) and np.all(np.isfinite(f1))
 
 
 @pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')

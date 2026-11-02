@@ -16,6 +16,7 @@ Below you can find a listing of keywords for the ``run.in`` input file.
    correct_velocity
    potential
    compute_extrapolation
+   dftd2
    dftd3
    change_box
    deform

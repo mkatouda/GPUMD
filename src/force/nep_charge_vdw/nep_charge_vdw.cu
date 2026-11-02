@@ -342,6 +342,18 @@ NEP_Charge_VDW::NEP_Charge_VDW(
   nep_data.cpu_NN_radial.resize(num_atoms);
   nep_data.cpu_NN_angular.resize(num_atoms);
   neighbor_manager.initialize(rc, num_atoms, paramb.MN_radial);
+
+  // The dftd2 correction is external to the built-in vdW term of this model (double counting is
+  // the user's responsibility, see the manual).
+  double dftd2_s6, dftd2_rc;
+  if (DFTD2::find_in_run_input(run_input, dftd2_s6, dftd2_rc)) {
+    has_dftd2 = true;
+    std::vector<int> atomic_numbers(paramb.num_types);
+    for (int n = 0; n < paramb.num_types; ++n) {
+      atomic_numbers[n] = zbl.atomic_numbers[n];
+    }
+    dftd2.initialize(dftd2_s6, dftd2_rc, atomic_numbers);
+  }
 }
 
 NEP_Charge_VDW::~NEP_Charge_VDW(void)
@@ -2071,6 +2083,10 @@ void NEP_Charge_VDW::compute(
       box, type, position_per_atom, potential_per_atom, force_per_atom, virial_per_atom);
   } else {
     compute_large_box(
+      box, type, position_per_atom, potential_per_atom, force_per_atom, virial_per_atom);
+  }
+  if (has_dftd2) {
+    dftd2.compute(
       box, type, position_per_atom, potential_per_atom, force_per_atom, virial_per_atom);
   }
 }

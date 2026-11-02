@@ -15,8 +15,9 @@ requirements:
     source: specs/requirements/DR-002-dftd2-external-correction.md
     design: specs/design/DES-0002-dftd2-implementation-plan.md
     adrs: []
-    tests: [tests_pytest/test_dftd2_reference.py]   # planned, not yet written
-    status: planned
+    verification: [specs/verification/VER-0003-dftd2-parameters-and-oracle]
+    tests: [tests_pytest/test_dftd2_reference.py, tests_pytest/test_dftd2_src_table.py]   # AC-1/AC-2 etc.; Phases 2 (cutoff study) and 5 (FD/NVE/perf/regression/examples) pending
+    status: partial
 # Example entry:
 # - id: DR-001
 #   title: Short requirement title

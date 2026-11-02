@@ -18,6 +18,7 @@ Run simulation according to the inputs in the run.in file.
 ------------------------------------------------------------------------------*/
 
 #include "cohesive.cuh"
+#include "force/dftd2.cuh"
 #include "force/force.cuh"
 #include "integrate/ensemble.cuh"
 #include "integrate/integrate.cuh"
@@ -192,6 +193,7 @@ void Run::execute_run_in(const RunInput& run_input)
   if (integrate.has_ensemble()) {
     PRINT_INPUT_ERROR("The last ensemble is not followed by a run.");
   }
+  check_dftd2_potential();
 
   print_line_1();
   printf("Finished executing the commands in run.in.\n");
@@ -372,7 +374,23 @@ void Run::parse_one_keyword(
     if (has_seen_dftd3_command) {
       PRINT_INPUT_ERROR("dftd3 can only appear once.");
     }
+    if (has_seen_dftd2_command) {
+      PRINT_INPUT_ERROR("dftd3 and dftd2 cannot be used together; use only one of them.");
+    }
     has_seen_dftd3_command = true;
+  } else if (tokens[0] == "dftd2") {
+    if (has_seen_dftd2_command) {
+      PRINT_INPUT_ERROR("dftd2 can only appear once.");
+    }
+    if (has_seen_dftd3_command) {
+      PRINT_INPUT_ERROR("dftd2 and dftd3 cannot be used together; use only one of them.");
+    }
+    double dftd2_s6, dftd2_rc;
+    DFTD2::parse_tokens(tokens, dftd2_s6, dftd2_rc);
+    has_seen_dftd2_command = true;
+    if (force.has_any_potential()) {
+      check_dftd2_potential();
+    }
   } else if (tokens[0] == "run") {
     parse_run(tokens);
   } else if (!measure.parse_action(
@@ -489,8 +507,18 @@ void Run::parse_time_step(const std::vector<std::string>& tokens)
   }
 }
 
+void Run::check_dftd2_potential() const
+{
+  if (has_seen_dftd2_command && !force.all_potentials_are_nep()) {
+    PRINT_INPUT_ERROR(
+      "dftd2 is only supported for NEP potentials (nep4*, nep4_charge*, nep_vdw, qnep3_vdw); "
+      "the potential used here is not supported.");
+  }
+}
+
 void Run::parse_run(const std::vector<std::string>& tokens)
 {
+  check_dftd2_potential();
   const int num_param = tokens.size();
   int number_of_steps;
   if (num_param != 2) {

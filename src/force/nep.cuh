@@ -14,6 +14,7 @@
 */
 
 #pragma once
+#include "dftd2.cuh"
 #include "dftd3.cuh"
 #include "neighbor.cuh"
 #include "potential.cuh"
@@ -138,6 +139,7 @@ private:
   ZBL zbl;
   ExpandedBox ebox;
   DFTD3 dftd3;
+  DFTD2 dftd2;
   NeighborManager neighbor_manager;
 
   void update_potential(float* parameters, ANN& ann);
@@ -177,5 +179,7 @@ private:
     GPU_Vector<double>& virial);
 
   bool has_dftd3 = false;
+  bool has_dftd2 = false;
   void initialize_dftd3(const RunInput& run_input);
+  void initialize_dftd2(const RunInput& run_input);
 };

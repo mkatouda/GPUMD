@@ -51,10 +51,12 @@ private:
     const std::vector<std::string>& tokens, const std::vector<Group>& group);
   void parse_time_step(const std::vector<std::string>& tokens);
   void parse_run(const std::vector<std::string>& tokens);
+  void check_dftd2_potential() const;
 
   int number_of_types; // number of atom types
   int has_velocity_in_xyz = 0;
   bool has_seen_dftd3_command = false;
+  bool has_seen_dftd2_command = false;
   bool has_seen_kspace_command = false;
   bool has_replicate_ = false;
   int replicate_size_[3] = {1, 1, 1};

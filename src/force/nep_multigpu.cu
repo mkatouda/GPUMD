@@ -51,6 +51,9 @@ void NEP_MULTIGPU::initialize_dftd3(const RunInput& run_input)
   if (run_input.contains("dftd3")) {
     PRINT_INPUT_ERROR("dftd3 has not been implemented for multi-GPU version.");
   }
+  if (run_input.contains("dftd2")) {
+    PRINT_INPUT_ERROR("dftd2 has not been implemented for multi-GPU version.");
+  }
 }
 
 NEP_MULTIGPU::NEP_MULTIGPU(
