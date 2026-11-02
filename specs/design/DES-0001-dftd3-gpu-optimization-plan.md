@@ -1,6 +1,7 @@
 # DES-0001: Work plan for GPU optimization of the GPUMD DFT-D3 implementation
 
-- Status: Approved by the human on 2026-11-03 (plan only); `DR-001` and `ADR-0002` still need approval before any `src/` change
+- Status: Approved by the human on 2026-11-03 (plan only); revised 2026-11-03 after Phase 0 (`VER-0002`), revision approved by the human.
+  `DR-001` and `ADR-0002` still need approval before any `src/` change
 - Date: 2026-11-03
 - Basis: `specs/verification/VER-0001-dftd3-vs-simple-dftd3/` (accuracy and timing baseline)
 - Target code: `src/force/dftd3.cu`, `src/force/dftd3.cuh`; callers `nep.cu`, `nep_charge.cu`,
@@ -23,7 +24,15 @@ algorithmic and stays).
 | 5,184 at 25/15 | 40.7 | 7.9 |
 
 Reading: 8x more atoms costs only 1.8x more time, so the GPU is under-filled at N <= ~10^4
-(one thread per atom, block size 64). Not yet measured: kernel-level breakdown.
+(one thread per atom, block size 64).
+
+Phase 0 result (`VER-0002`, kernel-level `nsys` profile): D3 is 56-96% of the GPU step time.
+Two code paths exist (`dftd3.cu:265-284`); the small-box path is used when any periodic
+thickness is <= 2.5 x `rc_potential` (cells up to 30 A at rc=12 A):
+- large-box path: the force kernel is 80-87% of D3 time; time per pair is 0.89 ns at
+  N=5,184 vs 0.22 ns at N=41,472 (under-filled GPU); cell-list build is negligible;
+- small-box path: building the explicit neighbor list is 44-65% of D3 time (as much as or more
+  than the force kernel), e.g. 2.83 of 4.37 ms at N=648.
 
 Candidate causes (from reading the code, NOT yet verified by profiling):
 - A. Thread-per-atom parallelism too coarse for small/medium N (`dftd3.cu` launches
@@ -32,8 +41,9 @@ Candidate causes (from reading the code, NOT yet verified by profiling):
   (`dftd3.cu:143-175`, large-box twin from line 559); the Gaussian weight factorizes into
   per-atom factors, so it can be computed once per atom per reference CN.
 - C. Full neighbor list: each pair is evaluated from both atoms.
-- D. Neighbor/cell lists rebuilt every step; about 10 kernel launches per step; small-box path
-  stores `N x MN(=10000) x 6` floats of pair vectors.
+- D. Neighbor lists rebuilt every step; about 10 kernel launches per step; small-box path
+  stores `N x MN(=10000) x 6` floats of pair vectors. Confirmed first-order for the small-box
+  path by Phase 0 (44-65% of D3 time); negligible for the large-box path.
 - E. D3 runs after NEP on the same stream (no overlap).
 
 ## 3. Acceptance criteria (apply to every phase)
@@ -48,6 +58,11 @@ Numerical (against the same simple-dftd3 references as VER-0001, same-cutoff):
 Performance (VER-0001 slope method, 100 vs 500 steps, same machine):
 - target D3 extra time: N=81: <= 1.0 ms; N=5,184: <= 2.0 ms; N=41,472: <= 6.0 ms
   (12/6 A); no case slower than baseline by more than 3%.
+- added after Phase 0 (to be added to `DR-001` AC-4 on approval): N=648 (small-box path)
+  <= 2.0 ms (baseline 4.37 ms D3 total in `VER-0002`); the fcc Cu case (N=4,000, 12/6 A,
+  baseline 3.65 ms) <= 2.0 ms.
+- required acceptance case set: both paths, namely small box (water N=81, 648) and large box
+  (water N=5,184, 41,472), plus fcc Cu, plus graphite (small box, C), 12/6 and 25/15 A.
 Targets are goals, not promises; a phase is dropped if its gate fails (Section 5).
 
 ## 4. Process rules for this work (from AGENTS.md)
@@ -64,43 +79,49 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
 - Benchmarks and run directories go to a scratch directory, never the repository.
 
 ## 5. Phases and gates (cheapest first; stop and report if a gate fails)
-### Phase 0: profile (no source change)
-- `nsys` (and `ncu` for the top kernels) from `/usr/local/cuda/bin`.
-- Cases: water (small-box path at N=81, 648; large-box path at N=5,184, 41,472), graphite
-  (C), an element-rich/metal case such as fcc Cu (up to 5x5 reference CNs); cutoffs 12/6 and 25/15.
-- Record per kernel: time share, achieved occupancy, registers, memory vs compute bound;
-  split D3 time into neighbor/cell build, CN, force.
-- Gate: continue only if D3 is >= 20% of a NEP+D3 step in at least one typical case and the
-  force kernel is the dominant D3 cost. Output: `VER-0002` record. Decides which of B-E matter.
+### Phase 0: profile (DONE; gate PASSED; record `VER-0002`)
+- `nsys` kernel-level profile of 7 cases on both paths; `ncu` counters unavailable
+  (`ERR_NVGPUCTRPERM`), so occupancy statements are estimates from register and thread counts.
+- Gate (D3 >= 20% of a step and force kernel dominant): passed; see Section 2 for the findings
+  that changed this plan (small-box neighbor list promoted to its own phase).
 
 ### Phase 1: specs and reference test (no `src/` change)
-- `DR-001`, `ADR-0002`, `VER-0002` benchmark protocol, pytest with stored references,
-  `traceability.yaml` entries. Gate: human approval; test passes on unmodified code.
+- `DR-001`, `ADR-0002` (drafted), `VER-0002` (done), pytest with stored simple-dftd3
+  reference values covering the required case set (both paths), `traceability.yaml` updates.
+- Gate: human approval of `DR-001` and `ADR-0002`; the new test passes on unmodified code.
 
-### Phase 2: factorized C6 weights (cause B)
+### Phase 2: factorized C6 weights (cause B), both paths
 - Per-atom precompute of `L_i(n) = exp(-4 (cn_n - cn_ref_i)^2)` and its derivative terms;
-  pair loop uses products only. Applies to both small-box and large-box kernels.
-- Gate: accuracy criteria met; speed-up >= 1.2x on the element-rich case. Otherwise drop.
+  the pair loop uses products only. Applies to `add_dftd3_force_small_box` and
+  `find_dftd3_force_large_box` (and the extra-force kernels).
+- Gate: accuracy criteria met; speed-up >= 1.2x of the force kernel on the Cu case. Else drop.
 
-### Phase 3: parallelism for small and medium N (cause A)
-- Warp-per-atom (or pair-parallel) force and CN kernels; keep the thread-per-atom path for
-  large N if it is faster; choose by N at run time.
-- Gate: >= 2x at N=5,184 (12/6) and no slowdown at N=41,472. Otherwise drop.
+### Phase 3: parallelism of the force kernels (cause A), large-box path first
+- Warp-per-atom (or pair-parallel) force and CN kernels; keep thread-per-atom where faster
+  (choose by N at run time). Target: bring the per-pair time at N=5,184 toward the 0.22 ns
+  measured at N=41,472.
+- Gate: >= 2x on the force kernel at N=5,184 (12/6) and no slowdown at N=41,472. Else drop.
 
-### Phase 4: conditional extras (causes C, D, E; only those Phase 0 justified)
+### Phase 4: small-box neighbor list (cause D) - promoted by Phase 0
+- Re-design the small-box neighbor-list build (`find_neighbor_list_small_box` in `dftd3.cu`,
+  explicit `N x MN` pair vectors, thread per atom): parallelize over atoms x images or pairs,
+  reduce the stored data (e.g. recompute pair vectors), and consider reuse across steps
+  (Verlet list with skin, rebuild on displacement).
+- Gate: neighbor-list kernel time at N=648 (12/6) reduced by >= 2x; accuracy criteria met;
+  memory use not larger than baseline. Else drop.
+
+### Phase 5: conditional extras (causes C, E; only if still justified after Phases 2-4)
 - C: half neighbor list (needs atomics; keep only if measured faster).
-- D: Verlet list with skin and rebuild on displacement; fewer launches; reduce the
-  `N x MN` small-box storage.
-- E: run D3 on a second stream concurrently with NEP.
-- Gate for each: the targeted part is >= 30% of D3 time (D, C) or D3 time at N=81 is latency-bound (E).
+- E: run D3 on a second stream concurrently with NEP (only if D3 is latency-bound at small N).
+- Gate: each item must show a measured gain >= 10% of the D3 total on the case set.
 
-### Phase 5: integration and release
+### Phase 6: integration and release
 - Check all callers (`NEP`, `NEP charge`, `NEP charge vdw`, `NEP multigpu` documented as
   unsupported), `--suite full` against a `master` baseline built with `sm_86`, update
-  `doc/gpumd/input_parameters/dftd3.rst` (performance tips, cutoff cost).
-- Re-measure VER-0001 tables as `VER-0003` (before/after).
-- Upstream: cherry-pick only code, tests and `doc/` changes (no `specs/`, `.claude/`,
-  process rules); open the PR from a branch based on `upstream/master`.
+  `doc/gpumd/input_parameters/dftd3.rst` (performance tips, cutoff cost, small vs large box).
+- Re-measure `VER-0001` tables and the `VER-0002` profile as `VER-0003` (before/after).
+- Upstream: cherry-pick only code, tests and `doc/` changes (no `specs/`, `.claude/`, process
+  rules); open the PR from a branch based on `upstream/master`.
 
 ## 6. Risks
 - Results change at round-off level (float summation order); `--update-golden` must not be
@@ -108,13 +129,15 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
 - Double-precision `atomicAdd` on `sm < 60` has a hand-written fallback (`dftd3.cu:84`);
   keep it working.
 - The small-box path (`MN = 10000`) and large-box path are separate code; every change needs
-  both covered by tests (VER-0001 systems include both: N=81 small box, N=5,184 large box).
+  both covered by tests (VER-0001/VER-0002 systems include both: N=81 and 648 small box,
+  N=5,184 and 41,472 large box).
 - Run-to-run non-determinism already exists in the suite (37 known cases); a new
   non-deterministic D3 result must be distinguished from those.
 - Results measured only on one GPU (sm_86); other architectures (and HIP) are unverified.
 - CUDA/HIP: any new CUDA-only construct must go through `gpu_macro.cuh`.
 
 ## 7. Estimated effort and order
-Phase 0 and 1 first (about one working session), then Phases 2 and 3 as separate delegations;
-Phase 4 only if Phase 0 supports it; Phase 5 once. Each phase ends with a completion report
+Phase 0 is done; Phase 1 next (about one working session). Phases 2, 3 and 4 are independent
+and are delegated one at a time (Phase 4 matters most for cells <= 30 A, Phases 2-3 for larger
+cells); Phase 5 only if still justified; Phase 6 once. Each phase ends with a completion report
 (commands, results, tolerances, limitations).

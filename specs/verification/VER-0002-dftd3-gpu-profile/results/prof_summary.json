@@ -1,0 +1,83 @@
+{
+ "water81_12_6": {
+  "natoms": 81,
+  "gpu_ms_per_step": 3.93428143,
+  "d3_ms_per_step": 2.54612195,
+  "d3_share": 0.6471631466384447,
+  "kernels": {
+   "add_dftd3_force_small_box": 1.329,
+   "find_neighbor_list_small_box": 1.1195,
+   "add_dftd3_force_extra_small_box": 0.0655,
+   "find_dftd3_coordination_number_small_box": 0.0321
+  }
+ },
+ "water648_12_6": {
+  "natoms": 648,
+  "gpu_ms_per_step": 5.93051002,
+  "d3_ms_per_step": 4.3694547,
+  "d3_share": 0.7367755362126511,
+  "kernels": {
+   "find_neighbor_list_small_box": 2.8271,
+   "add_dftd3_force_small_box": 1.3963,
+   "add_dftd3_force_extra_small_box": 0.0974,
+   "find_dftd3_coordination_number_small_box": 0.0486
+  }
+ },
+ "water5184_12_6": {
+  "natoms": 5184,
+  "gpu_ms_per_step": 5.5988418399999995,
+  "d3_ms_per_step": 3.8601369699999997,
+  "d3_share": 0.6894527618947707,
+  "kernels": {
+   "find_dftd3_force_large_box": 3.3655,
+   "find_dftd3_force_extra_large_box": 0.2622,
+   "find_dftd3_coordination_number_large_box": 0.2324
+  }
+ },
+ "water41472_12_6": {
+  "natoms": 41472,
+  "gpu_ms_per_step": 14.68516974,
+  "d3_ms_per_step": 8.16533116,
+  "d3_share": 0.5560256574875654,
+  "kernels": {
+   "find_dftd3_force_large_box": 6.541,
+   "find_dftd3_force_extra_large_box": 0.8359,
+   "find_dftd3_coordination_number_large_box": 0.7884
+  }
+ },
+ "water5184_25_15": {
+  "natoms": 5184,
+  "gpu_ms_per_step": 42.432482310000005,
+  "d3_ms_per_step": 40.746547830000004,
+  "d3_share": 0.9602678328436449,
+  "kernels": {
+   "find_neighbor_list_small_box": 22.4921,
+   "add_dftd3_force_small_box": 15.1879,
+   "add_dftd3_force_extra_small_box": 2.3026,
+   "find_dftd3_coordination_number_small_box": 0.7639
+  }
+ },
+ "graphite4320_12_6": {
+  "natoms": 4608,
+  "gpu_ms_per_step": 7.702296209999999,
+  "d3_ms_per_step": 6.02731546,
+  "d3_share": 0.7825348825425139,
+  "kernels": {
+   "find_neighbor_list_small_box": 3.245,
+   "add_dftd3_force_small_box": 2.5742,
+   "add_dftd3_force_extra_small_box": 0.146,
+   "find_dftd3_coordination_number_small_box": 0.0621
+  }
+ },
+ "Cu4000_12_6": {
+  "natoms": 4000,
+  "gpu_ms_per_step": 4.96031608,
+  "d3_ms_per_step": 3.6533647399999998,
+  "d3_share": 0.7365185365364861,
+  "kernels": {
+   "find_dftd3_force_large_box": 3.1045,
+   "find_dftd3_force_extra_large_box": 0.2954,
+   "find_dftd3_coordination_number_large_box": 0.2535
+  }
+ }
+}
