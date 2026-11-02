@@ -136,6 +136,15 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
 - Stage 3: accuracy (reference test, `dftd3_*` regression, num_sub forced 1..16 comparison) and the
   memory cost of two N x max_cn float arrays (report the increase).
 
+- Outcome (2026-11-03, stage 1 measured; stage 2 not implemented): RTX A6000 sm_86, base `cc5129d2`,
+  nsys, 100-step NVE, median of 7 alternating runs, C6 replaced by a constant (upper bound).
+  Share of the force kernel in the C6 loop: Cu 4,000 13.8% (0.4398 -> 0.3792 ms, upper bound 1.16x),
+  water 5,184 43.9% (0.781 -> 0.438 ms, 1.78x), water 648 34.1% (1.418 -> 0.934 ms, 1.52x).
+  Other kernels unchanged (within 0.002 ms). The stage 2 gate (>= 1.2x on Cu 4,000) is unreachable
+  (needs a C6 share >= 16.7%), so Phase 2' is DROPPED under the gate as written (human decision
+  2026-11-03: keep the Cu 4,000 gate). Water systems would benefit (upper bounds above); revisit only
+  if the gate is changed by a human decision. Results are diagnostic only (scratch variant, not merged).
+
 ### Phase 5: conditional extras (causes C, E; only if still justified after Phases 2-4)
 - C: half neighbor list (needs atomics; keep only if measured faster).
 - E: run D3 on a second stream concurrently with NEP (only if D3 is latency-bound at small N).
