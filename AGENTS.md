@@ -56,11 +56,16 @@ and document the source, settings, and uncertainty of every reference value.
 
 ## Delegation to subagents
 
-After the plan is approved, delegate implementation (edits, builds, test runs) to a
-forked subagent, preferably with `isolation: "worktree"`. The main thread owns task
-understanding, spec decisions, plan agreement with the human, and the final report.
-This does not relax any other rule in this file.
+After the plan is approved, delegate the actual implementation (edits, builds, test
+runs) so the main thread is not filled with build/test noise. The main thread owns
+task understanding, spec decisions, plan agreement with the human, and the final
+report. This does not relax any other rule in this file.
 
+- **Agent types.** Implementation → `subagent_type: "gpumd-implementer"`
+  (`.claude/agents/gpumd-implementer.md`: no `Agent`, `WebFetch`, `WebSearch`) with
+  `isolation: "worktree"` by default, so the parent reviews the real diff before
+  merging it. Do not skip the worktree merely for convenience. Investigation/survey
+  only → `subagent_type: "Explore"` (cannot edit), not `fork`/`general-purpose`.
 - **Verify, don't trust.** Re-run/inspect `git status`, `git diff`, test and
   regression output yourself before accepting a subagent's "tests pass".
 - **Independent review on a separate lineage.** Reviews run as fresh (non-fork)
@@ -77,6 +82,25 @@ This does not relax any other rule in this file.
 - **Technical backstops** (not a substitute for the above): `.claude/settings.json`
   denies `git reset --hard`, `git commit --amend`, and force-push, and a `PreToolUse`
   hook warns on edits under `specs/` or `fixtures/golden/`.
+
+### Gated, staged measurement
+
+Before delegating an expensive study (long MD, PPPM/Ewald convergence scans, NEP
+training, many GPU-hours), first design one cheap diagnostic that could predict
+NO-GO (a small system, a few steps, a single number; minutes, not days). The
+delegation prompt must (1) list the stages in order, cheapest first, (2) give each
+stage a numeric gate criterion, and (3) say "if the criterion is not met, stop there
+and report". Later stages start only after the parent reads the earlier result and
+the human agrees.
+
+### Keep command output short
+
+Long logs stay in context for every later turn. Pipe builds through
+`2>&1 | tail -30`, use `pytest -q` and `-m "not slow"`/`-k` for focused runs, and add
+`--output-on-failure`-style verbosity only on the failing subset. Run only the tests
+of the area you changed; run `run_regression.py --suite full` once, before the final
+report. Large files (> ~40 KB) are read in parts (`grep -n`, then `Read` with
+`offset`/`limit`), never whole.
 
 ## Git policy
 
