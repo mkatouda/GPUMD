@@ -99,6 +99,10 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
   the pair loop uses products only. Applies to `add_dftd3_force_small_box` and
   `find_dftd3_force_large_box` (and the extra-force kernels).
 - Gate: accuracy criteria met; speed-up >= 1.2x of the force kernel on the Cu case. Else drop.
+- Status (2026-11-03): ON HOLD by human decision. Prototype (patch kept outside the repo,
+  worktree `agent-aed059ade4cc294d7`) passes AC-1 but gave 1.04x on Cu 4,000 (gate 1.2x),
+  1.14x water 5,184, 1.27x water 648, 1.22x water 81. Probable cause: the large-box kernel is
+  bound by thread count and cell-list traversal, not by exp. Re-evaluate on top of Phase 3.
 
 ### Phase 3: parallelism of the force kernels (cause A), large-box path first
 - Warp-per-atom (or pair-parallel) force and CN kernels; keep thread-per-atom where faster

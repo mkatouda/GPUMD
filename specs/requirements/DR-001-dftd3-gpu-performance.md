@@ -31,7 +31,14 @@ systems (revised 2026-11-03 after the Phase 1 measurement; the original absolute
 AC-2 (no regression). `pytest -m "not slow"` in `tests_pytest/` shows no new failure
 (baseline: 738 passed, 480 skipped); `run_regression.py --suite full` shows no failure other
 than the 37 known non-deterministic cases listed in `AGENTS.md`, and all 25 relations pass;
-the `dftd3_*` bugfix cases pass.
+the `dftd3_*` bugfix cases pass under the following tolerance (added 2026-11-03).
+The manifest tolerance of those cases (rtol 0, atol 1e-17) demands bit-identical output, which
+no change of the floating-point operation order can satisfy. For a change that alters D3 at
+round-off level (Phases 2-4), the `dftd3_*` cases are compared against the baseline binary with
+rtol 1e-5 (atol 1e-12) on `thermo.out` and `restart.xyz`; the value is about 10x the largest
+difference observed with the Phase 2 prototype (1e-6). `tests_regression/manifest.json` is not edited; the
+comparison with these tolerances is recorded in the VER record of the phase. A change that
+needs a looser value is a SPEC_CONFLICT.
 
 AC-3 (energy conservation). A short NVE run with D3 shows an energy drift no worse than the
 baseline binary on the same system.
