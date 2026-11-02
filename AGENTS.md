@@ -114,10 +114,10 @@ Keep generated files out of the tracked source tree. `run_regression.py` writes
 `tests_regression/.work/` and `tests_regression/reports/` (both git-ignored; `--keep-all`
 keeps them, so delete them when done). Run manual `gpumd`/`nep` jobs in a scratch
 directory, never in the repository root or `src/`. Binaries (`src/gpumd*`, `src/nep*`)
-are git-ignored. Observed: `pytest -m "not slow"` appends to the tracked
-`examples/gpumd_static/dump.xyz` and `neighbor.out`; restore them with
-`git checkout -- examples/gpumd_static/dump.xyz examples/gpumd_static/neighbor.out`
-after a pytest run and never commit them. Before reporting a task done, `git status`
+are git-ignored. Running `gpumd` directly inside `examples/<name>/` overwrites or appends
+to tracked outputs there (e.g. `examples/gpumd_static/dump.xyz` and `neighbor.out`):
+copy the example to a scratch directory and run it there; if tracked files were
+modified, restore them with `git checkout -- <files>` and never commit them. Before reporting a task done, `git status`
 must show no `*.out`, dumps, `nep.txt`, `*.h5`/`*.npy`, or run directories; the
 `PostToolUse` subagent audit hook flags them.
 
