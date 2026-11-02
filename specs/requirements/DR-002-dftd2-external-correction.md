@@ -29,8 +29,11 @@ D4. Scope: NEP, the charge variants, and qNEP including the vdW models `nep_vdw`
     `dftd2` (not requested; confirm if needed).
 D5. Parameters (decided 2026-11-03, resolves OQ-2): the built-in C6/R0 table covers Z <= 86
     (H-Rn) only, taken from dftd3-lib (`prg/extras.f90`, `loadoldpar`, commit `3c99ee9`) after
-    the H-Xe cross-check of VER-0003. A model that contains an element with Z > 86 (for NEP89:
-    Ac, Th, Pa, U, Np, Pu) makes `dftd2` stop with an error that names the element(s); there is
+    the H-Xe cross-check of VER-0003. If the structure contains atoms of an element with Z > 86 (for NEP89
+    the model lists Ac, Th, Pa, U, Np, Pu, but only the atom types actually present in the
+    structure are checked; decided 2026-11-03), `dftd2` stops with an error that names the
+    element(s). The check runs at the first force evaluation; a type change during a run (e.g.
+    MC) is not re-checked (documented limitation). There is
     no silent zero, extrapolation or fallback. A user-supplied parameter file is NOT part of
     this requirement (possible later extension). Z = 55-86 values come from a single source
     and are group-filled (e.g. Ce-Lu share one value); the manual must say so.
@@ -64,9 +67,10 @@ AC-1 (accuracy). Energy, forces and virial equal an independent D2 implementatio
 AC-2 (parameters). Every built-in C6/R0 value (Z <= 86) is traceable to the cited source;
   H-Xe agree with the published table (VER-0003), Z = 55-86 are labelled single-source in the
   docs; units and conversion constants are documented. A test checks the built-in table against
-  the dftd3-lib values (all 86 entries). A model element with Z > 86 (or not in the table) stops
-  the run with an error naming the element(s), tested with NEP89 and a model containing Ac..Pu
-  elements; it is never a silent zero.
+  the dftd3-lib values (all 86 entries). An atom of an element with Z > 86 (or not in the table)
+  present in the structure stops the run with an error naming the element(s); a structure
+  without such atoms runs with NEP89 even though the model lists Ac..Pu. Both cases are tested;
+  it is never a silent zero.
 AC-3 (cutoff). The default cutoff is the smallest value in 12-40 A for which, on the test
   systems, energy per atom, force and pressure changes against rc = 40 A are below stated
   thresholds (set in the VER record before measuring). The measured table is recorded.
