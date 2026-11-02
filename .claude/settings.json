@@ -4,7 +4,15 @@
       "Bash(git reset --hard*)",
       "Bash(git commit --amend*)",
       "Bash(git push --force*)",
-      "Bash(git push -f*)"
+      "Bash(git push -f*)",
+      "Bash(git checkout -- .*)",
+      "Bash(git clean -f*)",
+      "Bash(git clean -fd*)",
+      "Bash(git branch -D*)",
+      "Bash(git rebase -i*)",
+      "Bash(git commit --no-verify*)",
+      "Bash(git commit -n *)",
+      "Bash(git push origin master --force*)"
     ]
   },
   "hooks": {
@@ -15,6 +23,19 @@
           {
             "type": "command",
             "command": "python3 -c \"import sys,json; d=json.load(sys.stdin); f=(d.get('tool_input') or {}).get('file_path') or ''; m='specs/' if (f.startswith('specs/') or '/specs/' in f) else ('fixtures/golden/' if 'fixtures/golden/' in f else ''); print(json.dumps({'systemMessage': 'WARNING: editing under ' + m + ' (' + f + ') - per AGENTS.md, spec changes and golden-file regeneration require human approval.'})) if m else None\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-agent-audit.sh",
+            "timeout": 15,
+            "statusMessage": "Auditing subagent's changes to the working tree..."
           }
         ]
       }

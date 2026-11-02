@@ -44,7 +44,7 @@ and document the source, settings, and uncertainty of every reference value.
    `tests_regression/manifest.json` for run-level behavior).
 4. Make the smallest conforming change; keep CUDA and HIP paths in sync via
    `gpu_macro.cuh`, and mirror changes into `main_replica/` copies where applicable.
-5. Build warning-clean (`make CUDA_ARCH="-arch=sm_89" -j4`), run clang-format, focused
+5. Build warning-clean (`make CUDA_ARCH="-arch=sm_86" -j4`), run clang-format, focused
    pytest, and `run_regression.py --suite full` against the `master` baseline binary.
 6. Check, as applicable: units, energy/force/virial consistency (finite difference),
    energy conservation in NVE, translational/rotational invariance, atom-order and
@@ -108,6 +108,36 @@ Do not commit unless asked. Never force-push, rewrite history, amend a human com
 or commit generated outputs (`*.out`, dumps, trained `nep.txt`, regression run dirs).
 One atomic commit per task, with requirement IDs in the message.
 
+## Generated outputs
+
+Keep generated files out of the tracked source tree. `run_regression.py` writes
+`tests_regression/.work/` and `tests_regression/reports/` (both git-ignored; `--keep-all`
+keeps them, so delete them when done). Run manual `gpumd`/`nep` jobs in a scratch
+directory, never in the repository root or `src/`. Binaries (`src/gpumd*`, `src/nep*`)
+are git-ignored. Observed: `pytest -m "not slow"` appends to the tracked
+`examples/gpumd_static/dump.xyz` and `neighbor.out`; restore them with
+`git checkout -- examples/gpumd_static/dump.xyz examples/gpumd_static/neighbor.out`
+after a pytest run and never commit them. Before reporting a task done, `git status`
+must show no `*.out`, dumps, `nep.txt`, `*.h5`/`*.npy`, or run directories; the
+`PostToolUse` subagent audit hook flags them.
+
+## Known test results (not regressions; do not investigate unless your change touches them)
+
+Measured 2026-11-02 on RTX A6000 (sm_86), CUDA from `/usr/local/cuda`, built with
+`make CUDA_ARCH="-arch=sm_86" -j4` (this machine is sm_86, not sm_89):
+
+- `pytest -m "not slow"` in `tests_pytest/`: 738 passed, 480 skipped, 0 failed (about 10 min).
+  Python deps are not installed system-wide; use a venv with `ase calorine numpy pytest hypothesis`.
+- `run_regression.py --suite full` with the SAME binary as baseline and candidate:
+  218 passed, 37 failed, relations 25/25 passed. The 37 failures are run-to-run text
+  differences (non-determinism on this GPU), not regressions: `nvt_bdp`, `npt_scr_iso`,
+  `heat_bdp`, `deform_npt_tri`, `pimd_scr`, `replicate_default_velocity`,
+  `replicate_velocity_unseeded`, `graphene_hac`, `graphene_hnemd_shc`,
+  `graphene_nemd_shc`, `silicon_liquid_transport`, `ilp_{nep,tersoff,tmd_sw}_compute`, and
+  the `train_*` NEP/qNEP/TNEP/vdW training cases. A change is suspect only if a case
+  OUTSIDE this list fails, or if a listed case fails in a way other than small numeric
+  differences. Re-measure the list when the GPU, CUDA version, or flags change.
+
 ## Test execution policy
 
 Tests longer than a few minutes are marked `slow` (pytest) and excluded from the
@@ -128,7 +158,7 @@ Needs `nvcc` and a GPU; build from `src/` with GNU Make:
 
 ```bash
 cd src
-make CUDA_ARCH="-arch=sm_89" -j4   # default is sm_60, which fails on CUDA 13.x; run `make clean` after changing arch/flags
+make CUDA_ARCH="-arch=sm_86" -j4   # default is sm_60, which fails on CUDA 13.x; run `make clean` after changing arch/flags
 make -f makefile.hip               # AMD / ROCm
 make gnep                          # optional target, not part of `all`
 ```
