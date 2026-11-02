@@ -1,0 +1,12 @@
+# Requirement -> design/ADR -> tests -> status traceability.
+# status vocabulary (closed): implemented | partial | planned
+# `partial` = an acceptance criterion or mandatory check is unmet; never report it as implemented.
+requirements: []
+# Example entry:
+# - id: DR-001
+#   title: Short requirement title
+#   source: specs/requirements/DR-001.md
+#   design: specs/design/xxx.md
+#   adrs: [specs/decisions/ADR-0001-spec-driven-process.md]
+#   tests: [tests_pytest/test_xxx.py::test_yyy]
+#   status: planned

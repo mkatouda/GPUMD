@@ -1,0 +1,34 @@
+{
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "deny": [
+      "Bash(git reset --hard*)",
+      "Bash(git commit --amend*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)"
+    ],
+    "defaultMode": "auto"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import sys,json; d=json.load(sys.stdin); f=(d.get('tool_input') or {}).get('file_path') or ''; m='specs/' if (f.startswith('specs/') or '/specs/' in f) else ('fixtures/golden/' if 'fixtures/golden/' in f else ''); print(json.dumps({'systemMessage': 'WARNING: editing under ' + m + ' (' + f + ') - per AGENTS.md, spec changes and golden-file regeneration require human approval.'})) if m else None\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  },
+  "model": "sonnet",
+  "theme": "dark",
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
+  "modelSettings": {
+    "claude-haiku-5-5": {
+      "autoCompactWindow": 100000
+    }
+  }
+}

@@ -1,0 +1,138 @@
+# AGENTS.md
+
+This file provides guidance to coding agents (Claude Code, etc.) when working with code in this repository.
+
+GPUMD is a CUDA/HIP molecular dynamics package. Executables: `gpumd` (MD/static calculations, input `run.in` + `model.xyz`), `nep` (NEP training/prediction, input `nep.in`), plus `gpumd_replica`, `tb` and optional `gnep`. Docs: `doc/` (Sphinx, user manual); `developer/README.md` is the developer guide — read it before adding keywords, potentials, ensembles, or actions.
+
+## Scope of these rules
+
+This fork (mkatouda/GPUMD) develops dielectric-response features on top of upstream
+brucefan1983/GPUMD. The process rules below, `specs/`, and `.claude/` are fork-only:
+never include them in upstream PRs (build upstream PR branches from `upstream/master`
+and cherry-pick only code, tests, examples, and `doc/` changes). Upstream code style
+and conventions (Build / Tests / Architecture sections) always apply.
+
+## Authority and specifications
+
+Approved files under `specs/` are the source of truth. Priority: requirements
+(`specs/requirements/`), design (`specs/design/`), ADRs (`specs/decisions/`), this
+file, tests, implementation, comments. Each requirement has an ID (e.g. `DR-012`).
+
+- Ambiguous or contradictory requirement → stop and report `SPEC_CONFLICT`; ask the
+  human. Never implement a guessed interpretation.
+- Spec changes require human approval. Implementation and tests may proceed
+  autonomously only within an approved spec.
+- Upstream behavior is a contract: changes to existing keywords, file formats, or
+  default numerics need an ADR and an explicit regression-suite result.
+
+## Scientific standard
+
+Correctness, traceability, reproducibility, and verification outrank speed.
+Never invent reference values, loosen tolerances merely to pass, hide instability
+(e.g. by thermostat damping or clamping), regenerate golden files to make a test
+pass (`--update-golden` only with human approval and a stated reason), or call a
+regression comparison "validation". Keep verification (analytic/limiting cases),
+regression (baseline vs candidate binary), and validation (DFT/experiment) separate,
+and document the source, settings, and uncertainty of every reference value.
+
+## Required workflow
+
+1. Read the task and all linked requirements, design notes, ADRs, and existing tests;
+   read `developer/README.md` before adding keywords, potentials, ensembles, or actions.
+2. State affected requirement IDs and planned files; get the plan approved.
+3. Add a failing test first when practical (`tests_pytest/`, or a new case in
+   `tests_regression/manifest.json` for run-level behavior).
+4. Make the smallest conforming change; keep CUDA and HIP paths in sync via
+   `gpu_macro.cuh`, and mirror changes into `main_replica/` copies where applicable.
+5. Build warning-clean (`make CUDA_ARCH="-arch=sm_89" -j4`), run clang-format, focused
+   pytest, and `run_regression.py --suite full` against the `master` baseline binary.
+6. Check, as applicable: units, energy/force/virial consistency (finite difference),
+   energy conservation in NVE, translational/rotational invariance, atom-order and
+   periodic-image invariance, charge neutrality, Ewald/PPPM convergence, float vs
+   double agreement, and determinism across runs.
+7. Update `specs/traceability.yaml`, the `doc/` manual for user-facing keywords, and examples.
+8. Obtain independent reviews (see Delegation) for any force/physics/kernel change.
+9. Report per "Completion report".
+
+## Delegation to subagents
+
+After the plan is approved, delegate implementation (edits, builds, test runs) to a
+forked subagent, preferably with `isolation: "worktree"`. The main thread owns task
+understanding, spec decisions, plan agreement with the human, and the final report.
+This does not relax any other rule in this file.
+
+- **Verify, don't trust.** Re-run/inspect `git status`, `git diff`, test and
+  regression output yourself before accepting a subagent's "tests pass".
+- **Independent review on a separate lineage.** Reviews run as fresh (non-fork)
+  agents from `.claude/agents/`: `numerical-gpu-reviewer`,
+  `physics-dielectric-reviewer`, `api-compat-reviewer`. Give them the diff and
+  specs, not the implementer's conclusions.
+- **Prompts are scope contracts.** State files/specs in scope, files out of scope,
+  that commits and destructive git operations are forbidden unless the human asked,
+  and that ambiguity means stop with `SPEC_CONFLICT`.
+- **No overlapping concurrent delegation.** Confirm parallel subagents touch
+  disjoint files.
+- **GPU contention.** Only one subagent at a time runs GPU-heavy builds/tests unless
+  the human approves otherwise.
+- **Technical backstops** (not a substitute for the above): `.claude/settings.json`
+  denies `git reset --hard`, `git commit --amend`, and force-push, and a `PreToolUse`
+  hook warns on edits under `specs/` or `fixtures/golden/`.
+
+## Git policy
+
+Do not commit unless asked. Never force-push, rewrite history, amend a human commit,
+or commit generated outputs (`*.out`, dumps, trained `nep.txt`, regression run dirs).
+One atomic commit per task, with requirement IDs in the message.
+
+## Test execution policy
+
+Tests longer than a few minutes are marked `slow` (pytest) and excluded from the
+default quick loop; they still must pass before completion. Timeouts detect hangs
+and must never paper over an unresolved hang or nondeterminism.
+
+## Completion report
+
+Report requirement IDs, files changed, exact commands, results, tolerances,
+conservation/consistency diagnostics, GPU arch and CUDA version used, limitations,
+residual risks, and the next task. A task is incomplete while any acceptance
+criterion or BLOCKER/MAJOR review finding is open. Traceability `status` is one of
+`implemented`, `partial`, `planned`; never report `partial` as implemented.
+
+## Build
+
+Needs `nvcc` and a GPU; build from `src/` with GNU Make:
+
+```bash
+cd src
+make CUDA_ARCH="-arch=sm_89" -j4   # default is sm_60, which fails on CUDA 13.x; run `make clean` after changing arch/flags
+make -f makefile.hip               # AMD / ROCm
+make gnep                          # optional target, not part of `all`
+```
+
+`make` (target `all`) builds `gpumd nep gpumd_replica tb`, outputs in `src/`. A CMake build (`CMakeLists.txt`, `-DPKG_NNAP=yes` for NNAP) is also available. Both build systems glob sources by directory (`src/force/*.cu` and `src/force/*/*.cu` for gpumd; `src/main_nep/**` for nep), so new files in existing dirs need no build edits, but nested deeper dirs do. The Linux makefile enables many `-W` flags; keep code warning-clean. Formatting uses clang-format (`src/apply_clang_format.sh`).
+
+## Tests
+
+All tests need a GPU and built binaries (`src/gpumd`, `src/nep`).
+
+- `tests_pytest/` — main pytest suite (needs `ase calorine numpy pytest hypothesis`). Run from that dir:
+  `pytest -q`, `pytest -m "not slow" -q`, `pytest -m fast -q`, single test: `pytest test_parsing.py::test_name -q`. `--update-golden` regenerates frozen references in `fixtures/golden/` (deliberate only).
+- `tests_regression/` — manifest-driven behavior contract suite comparing a baseline vs candidate binary. Acceptance is `--suite full`; focused suites (e.g. `parsing_validation`, `pppm`) are diagnostics only. See `CONTRACT_SUITES.md`:
+  `python3 run_regression.py --repo-root <repo> --baseline <gpumd_old> --candidate <gpumd_new> --suite <name> --keep-all`
+  Unit tests of the runner itself: `pytest tests_regression/test_runner.py` etc.
+- `tests_tb/` — tests for the `tb` executable.
+- CI (`.github/workflows/`) builds with CUDA containers; the integration workflow uses calorine + pytest.
+
+## Architecture (gpumd)
+
+`Run` (`src/main_gpumd/run.cu`) owns `Atom`, `Velocity`, `Box`, `Group[]`, `Force`, `Integrate`, `Measure`. `RunInput` tokenizes `run.in`, and each keyword is dispatched to the module that owns it — implement new keywords in that module, not in `Run`, unless they change overall execution flow.
+
+- `Force` (`src/force/`) holds `Potential` subclasses (NEP, qNEP/charge with PPPM/Ewald, Tersoff, EAM, LJ, ILP, DFT-D3, …). Keep per-model data and GPU workspaces in the potential object; avoid reallocating in `compute()`.
+- `Integrate` (`src/integrate/`) holds the active `Ensemble` (`compute1`/`compute2`).
+- `Measure` (`src/measure/`) holds `Action` objects (dumps, computes, observers) hooked into the MD loop: `pre_run, setup_force, post_integrate1, pre_force, post_force, end_of_step, post_run`. Use the matching hook rather than special-casing the loop.
+- Other dirs: `model/` (atoms/box/groups), `minimize/`, `phonon/`, `mc/`, `utilities/` (`GPU_Vector`, `gpu_macro.cuh` CUDA/HIP abstraction, `error.cuh`).
+- Polymorphic objects are owned via `std::unique_ptr`. Code shared between CUDA and HIP must go through `gpu_macro.cuh`.
+
+The `nep` executable (`src/main_nep/`) has its own training `Potential` interface, separate from the MD `Potential` in `src/force/`; spin training in `main_nep/nep_spin/` shares headers with `src/force/nep_spin/`. `main_replica/` has its own copies of force/integrate/model subsets (see its makefile). When changing a user-facing keyword, update the manual in `doc/` too.
+
+Other top-level dirs: `examples/`, `potentials/` (potential files), `tools/` (Python/format-conversion/analysis utilities), `scripts/`.
