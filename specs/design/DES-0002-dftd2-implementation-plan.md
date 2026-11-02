@@ -1,6 +1,6 @@
 # DES-0002: DFT-D2 implementation plan
 
-- Status: DRAFT (2026-11-03); implements DR-002 once approved. Process per `AGENTS.md`.
+- Status: Approved by the human on 2026-11-03 (together with DR-002). Implements DR-002; process per `AGENTS.md`.
 - Order: Phase 0 -> 1 -> 2 -> 3 -> 4 -> 5. Each phase has a gate; if it fails, stop and report.
 
 ## 1. Facts established (2026-11-03)
