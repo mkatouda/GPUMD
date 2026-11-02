@@ -10,6 +10,13 @@ requirements:
     verification: [specs/verification/VER-0001-dftd3-vs-simple-dftd3]
     tests: [tests_pytest/test_dftd3_reference.py]   # AC-1; AC-2..AC-6 covered by the existing suites and phases of DES-0001
     status: planned
+  - id: DR-002
+    title: DFT-D2 dispersion correction added externally to NEP
+    source: specs/requirements/DR-002-dftd2-external-correction.md
+    design: specs/design/DES-0002-dftd2-implementation-plan.md
+    adrs: []
+    tests: [tests_pytest/test_dftd2_reference.py]   # planned, not yet written
+    status: planned
 # Example entry:
 # - id: DR-001
 #   title: Short requirement title
