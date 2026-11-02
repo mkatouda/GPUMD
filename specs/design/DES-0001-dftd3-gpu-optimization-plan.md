@@ -80,8 +80,10 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
 
 ## 5. Phases and gates (cheapest first; stop and report if a gate fails)
 ### Phase 0: profile (DONE; gate PASSED; record `VER-0002`)
-- `nsys` kernel-level profile of 7 cases on both paths; `ncu` counters unavailable
-  (`ERR_NVGPUCTRPERM`), so occupancy statements are estimates from register and thread counts.
+- `nsys` kernel-level profile of 7 cases on both paths; `ncu` counters are unavailable
+  (`ERR_NVGPUCTRPERM`) and, by the owner's security policy, must not be enabled with admin
+  rights; occupancy statements are estimates from register and thread counts, and every
+  phase gate is judged with `nsys` times and the accuracy tests only.
 - Gate (D3 >= 20% of a step and force kernel dominant): passed; see Section 2 for the findings
   that changed this plan (small-box neighbor list promoted to its own phase).
 

@@ -63,8 +63,12 @@ share the cost.
 ## Not measured (limitations)
 - `ncu` (achieved occupancy, stall reasons, memory vs compute bound) could not be used:
   `ERR_NVGPUCTRPERM` (`RmProfilingAdminOnly: 1` in `/proc/driver/nvidia/params`). Enabling
-  needs admin rights (e.g. `NVreg_RestrictProfilingToAdminUsers=0`) and was not changed.
+  needs admin rights (e.g. `NVreg_RestrictProfilingToAdminUsers=0`). By the owner's security
+  policy (2026-11-03) GPU performance counters are NOT to be enabled with admin rights, so
+  `ncu` counter metrics are out of scope for this project, not merely pending.
   Occupancy statements above are from register counts and thread counts, not from counters.
+  Alternatives used or available: `nsys` kernel times, `cuobjdump --dump-resource-usage`,
+  theoretical occupancy from register counts, CUDA-event timing, and micro-benchmarks.
 - Host-side time and launch gaps are not included; GPU-time sums only.
 - One GPU, one NEP model, H/C/O/Cu systems; the 25/15 A case is in the small-box path because
   the box (37 A) is below 2.5 x 25 A.
