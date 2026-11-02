@@ -8,7 +8,7 @@ requirements:
     design: specs/design/DES-0001-dftd3-gpu-optimization-plan.md
     adrs: [specs/decisions/ADR-0002-dftd3-optimization-numerics.md]
     verification: [specs/verification/VER-0001-dftd3-vs-simple-dftd3]
-    tests: []   # reference-value pytest to be added in Phase 1 of DES-0001
+    tests: [tests_pytest/test_dftd3_reference.py]   # AC-1; AC-2..AC-6 covered by the existing suites and phases of DES-0001
     status: planned
 # Example entry:
 # - id: DR-001

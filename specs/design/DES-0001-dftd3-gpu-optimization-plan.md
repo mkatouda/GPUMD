@@ -48,8 +48,10 @@ Candidate causes (from reading the code, NOT yet verified by profiling):
 
 ## 3. Acceptance criteria (apply to every phase)
 Numerical (against the same simple-dftd3 references as VER-0001, same-cutoff):
-- for every VER-0001 system and cutoff set, |dE|, max|dF|, max|dVirial| are each no worse than
-  2x the VER-0001 value and never above 1e-5 eV, 1e-5 eV/A, 1e-4 eV respectively;
+- for every reference case of `tests_pytest/test_dftd3_reference.py` (both code paths): |dE| <=
+  2e-6 x |E_D3|, max|dVirial| <= 2e-6 x max|Virial_ref|, max|dF| <= 1e-5 eV/A, and each error
+  no worse than max(2 x the error measured on the unmodified code, a float-noise floor)
+  (`DR-001` AC-1 as revised on 2026-11-03: relative limits for energy and virial);
 - the `tests_pytest` suite (738 passed / 480 skipped baseline) and
   `run_regression.py --suite full` (218 passed, the same 37 known non-deterministic failures,
   25/25 relations) show no new failure; the `dftd3_*` bugfix cases keep passing;

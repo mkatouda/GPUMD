@@ -13,7 +13,9 @@ differ between identical binaries on this GPU (non-determinism).
 ## Decision
 1. D3 results may change at the single-precision round-off level; they must not change
    beyond the tolerances of `DR-001` AC-1, which are tied to the measured baseline
-   (VER-0001) and to an independent reference (simple-dftd3, two-body, PBE-BJ).
+   (VER-0001, `tests_pytest/test_dftd3_reference.py`) and to an independent reference
+   (simple-dftd3, two-body, PBE-BJ). Energy and virial limits are relative (2e-6 of the
+   D3 energy / virial scale), because their float error scales with their magnitude.
 2. Golden or reference values are never regenerated to make a test pass; reference values
    come only from simple-dftd3 with recorded provenance.
 3. Precision is not lowered (no half precision, no fast-math flags). Raising precision in a
