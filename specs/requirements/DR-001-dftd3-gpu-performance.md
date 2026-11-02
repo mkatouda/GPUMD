@@ -1,6 +1,6 @@
 # DR-001: Faster GPU DFT-D3 with unchanged results
 
-- Status: Proposed (drafted 2026-11-03; needs human approval)
+- Status: Approved by the human on 2026-11-03
 - Design: `specs/design/DES-0001-dftd3-gpu-optimization-plan.md`
 - Decision: `specs/decisions/ADR-0002-dftd3-optimization-numerics.md`
 - Baseline: `specs/verification/VER-0001-dftd3-vs-simple-dftd3/`

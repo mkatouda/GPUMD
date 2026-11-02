@@ -1,7 +1,7 @@
 # DES-0001: Work plan for GPU optimization of the GPUMD DFT-D3 implementation
 
 - Status: Approved by the human on 2026-11-03 (plan only); revised 2026-11-03 after Phase 0 (`VER-0002`), revision approved by the human.
-  `DR-001` and `ADR-0002` still need approval before any `src/` change
+  `DR-001` and `ADR-0002` approved by the human on 2026-11-03 (Phase 1 gate met; `src/` changes may start)
 - Date: 2026-11-03
 - Basis: `specs/verification/VER-0001-dftd3-vs-simple-dftd3/` (accuracy and timing baseline)
 - Target code: `src/force/dftd3.cu`, `src/force/dftd3.cuh`; callers `nep.cu`, `nep_charge.cu`,

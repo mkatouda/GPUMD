@@ -1,6 +1,6 @@
 # ADR-0002: Numerical tolerance for D3 optimization
 
-- Status: Proposed (drafted 2026-11-03; needs human approval)
+- Status: Accepted (approved by the human on 2026-11-03)
 - Requirement: `DR-001`
 
 ## Context
