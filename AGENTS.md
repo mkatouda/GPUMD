@@ -128,8 +128,10 @@ Measured 2026-11-02 on RTX A6000 (sm_86), CUDA from `/usr/local/cuda`, built wit
 
 - `pytest -m "not slow"` in `tests_pytest/`: 738 passed, 480 skipped, 0 failed (about 10 min).
   Python deps are not installed system-wide; use a venv with `ase calorine numpy pytest hypothesis`.
-- `run_regression.py --suite full` with the SAME binary as baseline and candidate:
-  218 passed, 37 failed, relations 25/25 passed. The 37 failures are run-to-run text
+- `run_regression.py --suite full`, once with the SAME binary as baseline and candidate and
+  once with a `master` build (`3b2c8db8`, identical `src/` to `develop`) as baseline:
+  both gave 218 passed, 37 failed, relations 25/25 passed, and exactly the same 37
+  failing cases. Identical sources failing identically means these are run-to-run
   differences (non-determinism on this GPU), not regressions: `nvt_bdp`, `npt_scr_iso`,
   `heat_bdp`, `deform_npt_tri`, `pimd_scr`, `replicate_default_velocity`,
   `replicate_velocity_unseeded`, `graphene_hac`, `graphene_hnemd_shc`,
