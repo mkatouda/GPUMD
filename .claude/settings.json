@@ -1,13 +1,11 @@
 {
-  "includeCoAuthoredBy": false,
   "permissions": {
     "deny": [
       "Bash(git reset --hard*)",
       "Bash(git commit --amend*)",
       "Bash(git push --force*)",
       "Bash(git push -f*)"
-    ],
-    "defaultMode": "auto"
+    ]
   },
   "hooks": {
     "PreToolUse": [
@@ -21,14 +19,5 @@
         ]
       }
     ]
-  },
-  "model": "sonnet",
-  "theme": "dark",
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
-  "modelSettings": {
-    "claude-haiku-5-5": {
-      "autoCompactWindow": 100000
-    }
   }
 }
