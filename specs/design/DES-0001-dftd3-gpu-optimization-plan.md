@@ -220,6 +220,23 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
   2026-11-04: adopt (v) although the N = 41,472 gate is not met; the AC-4 target at N = 41,472 is recorded as
   unmet and dropped (DR-001 AC-4 allows this). Stage 3 below applies to the merged result (the AC-3 NVE
   closure of 2026-11-03 predates (i) and (v) and must be repeated).
+- Item (vi) NEW (human instruction 2026-11-04, independent of the adoption decision for (v)): speed up the
+  coordination-number (CN) kernel and the extra (angular/three-index-free CN-derivative) kernel of the large-box
+  path. Motivation: at water 41,472 the CN kernel takes 0.71 ms and the extra kernel 0.75 ms of the 6.32 ms D3
+  total (VER-0014); the force kernel is 4.81 ms. Stage 6a (diagnostic, no `src/` change; nsys and the
+  compiler report only): for water 41,472, water 5,184, Cu 4,000 and cluster 972 at `dftd3 pbe 12 6`, per kernel
+  (CN, extra, and the cell-list kernels): time, registers/spills, threads per atom and blocks, accepted/visited
+  candidates, share of the time in exp/CN function evaluation (constant-replacement timing variant), the
+  atomic operations (counts and whether they serialize), and how much of the neighbor traversal is repeated
+  between the CN and extra kernels (a fused or cached traversal is a candidate). Gate for 6b: a measured
+  upper bound (timing variant) of at least 0.2 ms saved on CN + extra at water 41,472, or >= 1.15x on CN + extra
+  at water 5,184. Stage 6b (implementation, only after the gate): candidates in this order, each with its own gate
+  (>= 1.2x on the kernel and no case slower than 1.03x on the D3 total; AC-1 tolerances and the AC-2 `dftd3_*`
+  tolerance met; determinism not worse than now): (1) several threads per atom with a fixed-order reduction for
+  the CN kernel, (2) the same for the extra kernel, (3) sharing the neighbor traversal between the CN and extra
+  kernels (only if the 6a data support it). If the resulting D3 total at water 41,472 is <= 6.0 ms, the AC-4
+  target there is met again (the human decision of 2026-11-04 to drop it remains valid but is then moot).
+  Stage 3 below is run after (vi), once, on the final code.
 - Stage 3: re-measure VER-0004 section 3 and the VER-0001 slope method, `--suite full` against the `master`
   baseline, independent numerical review of the changed kernels, NVE with the VER-0011 protocol (single
   trajectory is not enough; see VER-0011), then record AC-4 per target point (met/unmet) and let the human
