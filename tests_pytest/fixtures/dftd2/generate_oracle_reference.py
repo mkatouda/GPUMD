@@ -51,7 +51,7 @@ def make_structures():
             pos[k] = rng.uniform(-6.0, 6.0, size=3)
     all86 = Atoms(numbers=list(range(1, 87)), positions=pos, cell=[40, 40, 40], pbc=False)
     write(HERE / 'all86.xyz', all86, format='extxyz')
-    # small triclinic cell with 6 atoms (the one of VER-0003 pbc_cmp.py), many images within rc
+    # small triclinic cell with 6 atoms, many images within rc
     cart = np.array([[0, 0, 0], [1.3, .2, .1], [2.6, 3.1, 2.2], [5, 1, 4], [6.1, 5.2, 7.7], [2, 6, 3.3]])
     tri6 = Atoms('CCOHHH', positions=cart,
                  cell=[[8, 0, 0], [.5, 7.5, 0], [.3, .4, 9]], pbc=True)
@@ -125,7 +125,7 @@ def run_case(oracle, atoms, func, rc, workdir):
     if kind == 'POSCAR':
         # dftd3_cellgradient = dE/d(lattice vector components) at fixed fractional coordinates
         # (Eh/bohr, row i = lattice vector i).  Strain derivative S_ab = sum_i cg[i,a] lat[i,b];
-        # GPUMD virial W = -S (see VER-0003: this agrees with the analytic strain derivative
+        # GPUMD virial W = -S (this agrees with the analytic strain derivative
         # of the NumPy reference to 1e-13; the earlier "8e-4 mismatch" was finite-difference
         # noise of the sharply truncated energy, not an oracle error).
         cg = np.array([[float(x.lower().replace('d', 'e')) for x in ln.split()]

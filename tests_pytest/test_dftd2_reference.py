@@ -1,8 +1,5 @@
 """DFT-D2 (`dftd2` keyword): parameter table, independent reference, and GPUMD agreement.
 
-Requirement DR-002 (AC-1, AC-2, AC-4, AC-5), design DES-0002 Phases 0-1, verification record
-specs/verification/VER-0003-dftd2-parameters-and-oracle.
-
 Three groups of tests:
 
 1. CPU only (must pass without the feature): the generated C6/R0 table against the dftd3-lib
@@ -11,11 +8,8 @@ Three groups of tests:
    analytically), and self-consistency of the reference (finite-difference forces, strain-
    derivative virial, translation / permutation / periodic-image invariance, continuity at rc).
 2. GPU (`gpumd dftd2 <s6> <rc>`): the D2 contribution, isolated as (run with `dftd2`) - (same run
-   without it) on NEP89, against the reference with the same shifted-force definition.  These
-   fail until DES-0002 Phase 3/4 is implemented.
-3. GPU input errors (AC-5).  The exact message texts are not fixed by DR-002; the expected
-   patterns below are the planned wording and may be adapted by the implementer together with
-   the owner.  Every pattern also requires that the message is NOT the generic "invalid keyword"
+   without it) on NEP89, against the reference with the same shifted-force definition.
+3. GPU input errors.  The expected message patterns below may be adapted if the wording changes.  Every pattern also requires that the message is NOT the generic "invalid keyword"
    error GPUMD prints for an unknown keyword today.
 
 Tolerances (fixed BEFORE any GPU measurement; never to be loosened to make a test pass):
@@ -23,7 +17,7 @@ Tolerances (fixed BEFORE any GPU measurement; never to be loosened to make a tes
   force component, virial 5e-9 of the largest virial component.  Observed on 2026-11-03: <= 3.2e-11,
   1.2e-9, 3.8e-11 (periodic cases show a ~1e-9 force residual of the oracle itself, cause not found).
 - reference self-consistency: finite-difference force / strain virial relative 1e-7.
-- GPU vs reference: exactly the DR-002 AC-1 values (energy and virial relative 2e-6 of |E_ref| and
+- GPU vs reference: energy and virial relative 2e-6 of |E_ref| and
   max|W_ref|; force 1e-5 of the largest reference force component), with no absolute floors.  The D2 part
   is obtained as a difference of two float NEP runs, so s6 is chosen large (75) to make the D2 signal much
   larger than the float run-to-run noise of NEP.  Observed (s6 = 0.75, 2026-11-03): relative errors
@@ -124,8 +118,8 @@ def test_csv_is_exactly_the_generator_output(tmp_path):
     assert (tmp_path / 'regenerated.csv').read_text() == (FIXTURE_DIR / 'dftd2_params.csv').read_text()
 
 
-def test_group_fills_documented_in_ver0003():
-    """VER-0003 section 2: Z = 55-86 are single-source group fills (Ce-Lu one value, Ta-Au one value)."""
+def test_group_fills_are_single_source():
+    """Z = 55-86 are single-source group fills (Ce-Lu one value, Ta-Au one value)."""
     c6 = ref.PARAMS['c6']
     R0 = ref.PARAMS['R0']
     for lo, hi in ((58, 71), (73, 79), (21, 30)):          # Ce-Lu, Ta-Au, Sc-Zn
@@ -134,7 +128,7 @@ def test_group_fills_documented_in_ver0003():
 
 
 def test_hxe_matches_published_table():
-    """H-Xe agree with Table 6.3 of the Turbomole manual (VER-0003 section 2): C6 exactly, R0 to the
+    """H-Xe agree with Table 6.3 of the Turbomole manual: C6 exactly, R0 to the
     3 printed decimals."""
     lines = [ln for ln in (FIXTURE_DIR / 'turbomole_table63_hxe.csv').read_text().splitlines()
              if ln and not ln.startswith('#')][1:]
@@ -295,7 +289,7 @@ def _run(workdir, atoms, dftd2_line):
 
 
 def _check_against_reference(tmp_path, atoms, s6, rc):
-    """AC-1: (run with dftd2) - (run without) equals the reference; relative caps only, no floors."""
+    """(run with dftd2) - (run without) equals the reference; relative caps only, no floors."""
     E_ref, F_ref, W_ref = ref.energy_forces_virial(atoms, s6, rc)
     e0, f0, v0 = _run(tmp_path / 'noD2', atoms, None)
     e1, f1, v1 = _run(tmp_path / 'D2', atoms, f'dftd2 {s6} {rc}')
@@ -395,7 +389,7 @@ def test_dftd2_repeated_runs_agree(tmp_path):
 
 
 # ---------------------------------------------------------------------------------------------
-# 3. GPU input errors (AC-5)
+# 3. GPU input errors
 # ---------------------------------------------------------------------------------------------
 def _expect_input_error(tmp_path, dftd_lines, patterns, atoms=None):
     atoms = atoms if atoms is not None else structure('dimer')

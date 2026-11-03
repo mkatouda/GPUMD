@@ -1,18 +1,17 @@
 """GPU DFT-D2 (`dftd2` keyword): force / virial consistency with finite differences of the GPU energy.
 
-Requirement DR-002 AC-4 (force = -dE/dx, virial = -dE/d(strain)); results in
-specs/verification/VER-0006-dftd2-consistency-and-performance.
+Checks force = -dE/dx and virial = -dE/d(strain).
 
 The D2 part is isolated as (run with dftd2) - (same run without), so the NEP part cancels exactly
-(the difference is bit-reproducible, VER-0006).  s6 = 75 (100 times the usual value) makes the D2
+(the difference is bit-reproducible).  s6 = 75 (100 times the usual value) makes the D2
 signal large compared with the float rounding of the pair terms.  Derivatives are 5-point central
 differences of the double-precision energy of the dump header.
 
 Tolerances (fixed BEFORE the first GPU measurement, never to be loosened to make a test pass):
 - force: max |F_fd - F_gpu| <= 2e-4 * max|F_D2|, step 0.01 A;
 - virial: max |W_fd - W_gpu| <= 2e-4 * max|W_D2|, step 1e-3 in the deformation x -> (1 + eps) x.
-The largest observed errors are listed in the VER-0006 record.  The tests fail when the sign of the
-force or of the virial is flipped (checked with scratch builds, VER-0006).
+The tests fail when the sign of the
+force or of the virial is flipped (checked with scratch builds).
 
 Environment: DFTD2_TEST_GPUMD overrides the gpumd executable (used for the mutation checks).
 """

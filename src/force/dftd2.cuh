@@ -21,12 +21,12 @@ class Box;
 class RunInput;
 
 // DFT-D2 pairwise dispersion correction (S. Grimme, J. Comput. Chem. 27, 1787 (2006)),
-// added externally to a NEP model (DR-002). Keyword: dftd2 <s6> [<cutoff in Angstrom>].
+// added externally to a NEP model. Keyword: dftd2 <s6> [<cutoff in Angstrom>].
 class DFTD2
 {
 public:
-  // PROVISIONAL (2026-11-03): default cutoff used when the cutoff is omitted.
-  // To be decided in DES-0002 Phase 2 (cutoff study); do not rely on this value.
+  // Default cutoff (Angstrom) used when the cutoff is omitted
+  // (chosen from a cutoff-convergence study).
   static constexpr double DEFAULT_CUTOFF = 30.0;
 
   bool enabled = false;

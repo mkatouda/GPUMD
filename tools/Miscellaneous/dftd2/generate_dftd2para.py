@@ -1,7 +1,7 @@
 """Generate src/force/dftd2para.cuh (built-in DFT-D2 C6/R0 table, Z = 1..86) from the CSV.
 
 Input : tests_pytest/fixtures/dftd2/dftd2_params.csv  (itself generated from dftd3-lib by
-        tests_pytest/fixtures/dftd2/generate_params.py; see DR-002 D5 and VER-0003)
+        tests_pytest/fixtures/dftd2/generate_params.py)
 Output: src/force/dftd2para.cuh
 
 Usage (from the repository root):

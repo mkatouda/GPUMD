@@ -22,7 +22,7 @@ long-range dispersion correction, J. Comput. Chem. 27, 1787 (2006).
 E = - s6 sum_{i<j} C6_ij f(r_ij) / r_ij^6,  f = 1 / (1 + exp(-d (r / R0_ij - 1))),
 C6_ij = sqrt(C6_i C6_j), R0_ij = R0_i + R0_j, d = 20.
 The sum runs over all pairs and periodic images with r < rc, with the shifted-force
-truncation phi_sf(r) = phi(r) - phi(rc) - phi'(rc) (r - rc) (DR-002 D1).
+truncation phi_sf(r) = phi(r) - phi(rc) - phi'(rc) (r - rc).
 
 Pair search: one cell list (counting sort) in fractional coordinates; one thread per atom
 loops over the neighboring cells including periodic images (the same kernel handles cells

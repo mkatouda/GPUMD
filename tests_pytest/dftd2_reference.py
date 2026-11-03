@@ -1,11 +1,11 @@
-"""Independent NumPy reference for the DFT-D2 pairwise dispersion correction (DR-002 / DES-0002).
+"""Independent NumPy reference for the DFT-D2 pairwise dispersion correction.
 
 Model (Grimme, J. Comput. Chem. 27, 1787 (2006)), per pair at distance r:
 
     phi(r) = -s6 * C6_ij * f(r) / r^6,   f(r) = 1 / (1 + exp(-d (r / R0_ij - 1))),   d = 20
     C6_ij = sqrt(C6_i C6_j),   R0_ij = R0_i + R0_j  (published R0 = 1.1 * r0 of the source table)
 
-Truncation at rc is shifted-force (DR-002 D1):  phi_sf(r) = phi(r) - phi(rc) - phi'(rc) (r - rc)
+Truncation at rc is shifted-force:  phi_sf(r) = phi(r) - phi(rc) - phi'(rc) (r - rc)
 for r < rc, 0 otherwise.  With `shifted=False` the plain sharp truncation (what dftd3-lib does) is
 returned instead; that is the limit in which the dftd3-lib D2 mode is the numerical oracle.
 
@@ -49,7 +49,7 @@ PARAMS = load_params()
 
 
 def check_elements(atoms):
-    """Raise ValueError naming every element with Z > 86 (DR-002 D5)."""
+    """Raise ValueError naming every element with Z > 86."""
     bad = sorted({int(z) for z in atoms.numbers if z > Z_MAX or z < 1})
     if bad:
         from ase.data import chemical_symbols

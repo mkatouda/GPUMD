@@ -1,4 +1,4 @@
-"""The built-in DFT-D2 table in src/force/dftd2para.cuh is generated from the CSV (DR-002 AC-2).
+"""The built-in DFT-D2 table in src/force/dftd2para.cuh is generated from the CSV.
 
 CPU only.  The header must be byte-identical to the output of
 tools/Miscellaneous/dftd2/generate_dftd2para.py and its values must equal the CSV

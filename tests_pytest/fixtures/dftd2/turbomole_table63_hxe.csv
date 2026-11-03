@@ -2,7 +2,7 @@
 # source: https://extras.csc.fi/chem/progs/turbomole/DOC/DOC_HTML/node153.html (reproduces
 #   S. Grimme, J. Comput. Chem. 27, 1787 (2006)); fetched 2026-11-03 through a web-fetch tool, so
 #   treat transcription as unverified by itself: it was compared with the dftd3-lib values
-#   (independent source) and agreed for all 54 elements (VER-0003 section 2).
+#   (independent source) and agreed for all 54 elements.
 # Group entries in the source (Sc-Zn: 10.80 / 1.562, Y-Cd: 24.67 / 1.639) are expanded per element.
 symbol,c6_J_nm6_mol,R0_pub_A
 H,0.14,1.001
