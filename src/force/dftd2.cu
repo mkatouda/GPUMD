@@ -48,6 +48,8 @@ smaller or larger than the cutoff). Forces and virials are accumulated per atom 
 namespace
 {
 constexpr double D_DAMP = 20.0;
+// a warning is printed for cutoffs above this value (Angstrom)
+constexpr double WARN_CUTOFF = 200.0;
 constexpr int BLOCK_SIZE = 128;
 constexpr int REDUCE_BLOCK_SIZE = 256;
 // target cell width = cutoff / CELL_DIVISOR (finer cells reduce the number of rejected candidates)
@@ -190,12 +192,26 @@ __global__ void scan_cells(const int num_cells, const int* g_count, int* g_start
   }
 }
 
+// first pass: list the atoms of each cell; the order inside a cell depends on thread scheduling
+__global__ void
+list_atoms(const int N, const int* g_cell, const int* g_start, int* g_fill, int* g_listed_index)
+{
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= N) {
+    return;
+  }
+  const int cell = g_cell[i];
+  g_listed_index[g_start[cell] + atomicAdd(&g_fill[cell], 1)] = i;
+}
+
+// second pass: deterministic order inside a cell (increasing original index): the slot of atom i
+// is the start of its cell plus the number of atoms of the same cell with a smaller index
 __global__ void place_atoms(
   const int N,
   const double4* g_wrapped,
   const int* g_cell,
   const int* g_start,
-  int* g_fill,
+  const int* g_listed_index,
   double4* g_sorted,
   int* g_sorted_index)
 {
@@ -204,9 +220,14 @@ __global__ void place_atoms(
     return;
   }
   const int cell = g_cell[i];
-  const int slot = g_start[cell] + atomicAdd(&g_fill[cell], 1);
-  g_sorted[slot] = g_wrapped[i];
-  g_sorted_index[slot] = i;
+  const int begin = g_start[cell];
+  const int end = g_start[cell + 1];
+  int rank = 0;
+  for (int s = begin; s < end; ++s) {
+    rank += (g_listed_index[s] < i) ? 1 : 0;
+  }
+  g_sorted[begin + rank] = g_wrapped[i];
+  g_sorted_index[begin + rank] = i;
 }
 
 // one thread per atom (in cell order); sums over all neighbors, including periodic images
@@ -388,7 +409,9 @@ void DFTD2::initialize(
 {
   enabled = true;
   s6 = s6_in;
-  rc = rc_in;
+  // The device code uses single-precision distances, so the cutoff is rounded to float once here;
+  // the shift terms phi(rc), phi'(rc), the cutoff test and the cell search all use this same value.
+  rc = static_cast<double>(static_cast<float>(rc_in));
   atomic_numbers_ = atomic_numbers;
   num_types_ = static_cast<int>(atomic_numbers.size());
 
@@ -419,6 +442,13 @@ void DFTD2::initialize(
   pair_param_.copy_from_host(table.data());
 
   printf("Use the DFT-D2 correction (s6 = %g, shifted-force cutoff = %g A).\n", s6, rc);
+  if (rc > WARN_CUTOFF) {
+    printf(
+      "Warning: the dftd2 cutoff (%g A) is larger than %g A; the cost grows as the cube of the "
+      "cutoff and the run may be very slow or exhaust memory.\n",
+      rc,
+      WARN_CUTOFF);
+  }
 }
 
 void DFTD2::check_elements(const GPU_Vector<int>& type)
@@ -530,6 +560,7 @@ void DFTD2::compute(
   ensure_size(wrapped_, N);
   ensure_size(sorted_, N);
   ensure_size(sorted_index_, N);
+  ensure_size(listed_index_, N);
   ensure_size(cell_of_atom_, N);
   // num_cells <= max_cells always holds, so the cell arrays are allocated once at the upper bound
   // (no reallocation when the box changes, e.g. in NPT)
@@ -545,12 +576,15 @@ void DFTD2::compute(
   GPU_CHECK_KERNEL
   scan_cells<<<1, REDUCE_BLOCK_SIZE>>>(num_cells, cell_count_.data(), cell_start_.data());
   GPU_CHECK_KERNEL
+  list_atoms<<<grid_size, BLOCK_SIZE>>>(
+    N, cell_of_atom_.data(), cell_start_.data(), cell_fill_.data(), listed_index_.data());
+  GPU_CHECK_KERNEL
   place_atoms<<<grid_size, BLOCK_SIZE>>>(
     N,
     wrapped_.data(),
     cell_of_atom_.data(),
     cell_start_.data(),
-    cell_fill_.data(),
+    listed_index_.data(),
     sorted_.data(),
     sorted_index_.data());
   GPU_CHECK_KERNEL

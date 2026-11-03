@@ -13,6 +13,12 @@ Tolerances (fixed BEFORE the first GPU measurement, never to be loosened to make
 The tests fail when the sign of the
 force or of the virial is flipped (checked with scratch builds).
 
+Measured margins (s6 = 75, rc = 12 A, 5 repeated evaluations, 2026-11-03): the errors did not vary
+between runs at the printed precision (the D2 part is deterministic and the NEP part cancels in the
+difference).  Relative force error 2.2e-5 (cubic) and 1.9e-5 (open) against the tolerance 2e-4
+(factor 9 margin); relative virial error 3.6e-6 (cubic) and 2.9e-6 (triclinic) against 2e-4
+(factor 55 margin).  No flakiness was reproduced.
+
 Environment: DFTD2_TEST_GPUMD overrides the gpumd executable (used for the mutation checks).
 """
 import os

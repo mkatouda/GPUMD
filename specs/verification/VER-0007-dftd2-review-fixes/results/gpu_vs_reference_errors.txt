@@ -1,0 +1,17 @@
+dimer                            E 5.49e-08  W 2.28e-07  F 2.35e-07
+benzene_dimer                    E 3.30e-07  W 5.86e-07  F 8.62e-07
+graphite                         E 4.00e-08  W 4.69e-08  F 1.63e-06
+water27                          E 2.03e-08  W 1.62e-07  F 1.18e-06
+water27_tri                      E 8.25e-09  W 3.29e-08  F 1.45e-06
+water_large                      E 1.41e-08  W 9.25e-08  F 1.67e-06
+tri_many_cells                   E 8.25e-09  W 3.29e-08  F 1.45e-06
+open_cluster                     E 1.91e-08  W 2.13e-07  F 1.18e-06
+slab_ttf                         E 1.93e-08  W 1.69e-07  F 1.18e-06
+permuted_order                   E 8.25e-09  W 3.29e-08  F 1.45e-06
+huge_coordinates                 E 8.25e-09  W 3.29e-08  F 1.45e-06
+two_atoms_periodic               E 2.58e-08  W 4.64e-08  F 2.44e-07
+two_atoms_open_beyond_cutoff     E 0.00e+00  W 0.00e+00  F 0.00e+00
+tiny_box                         E 3.65e-08  W 1.22e-07  F 7.53e-07
+sparse_large_box                 E 2.06e-07  W 2.66e-07  F 3.46e-07
+triclinic_mixed_pbc              E 5.60e-09  W 3.55e-08  F 1.19e-06
+far_separated_open_direction     E 1.82e-08  W 1.77e-07  F 1.14e-06

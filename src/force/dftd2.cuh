@@ -62,7 +62,8 @@ private:
   GPU_Vector<double> extent_;    // min/max fractional coordinates (non-periodic directions)
   GPU_Vector<double4> wrapped_;  // wrapped position (x, y, z) and type (w), original order
   GPU_Vector<double4> sorted_;   // the same in cell order
-  GPU_Vector<int> sorted_index_; // original atom index in cell order
+  GPU_Vector<int> sorted_index_; // original atom index in cell order (increasing inside a cell)
+  GPU_Vector<int> listed_index_; // atoms listed per cell in scheduling-dependent order (scratch)
   GPU_Vector<int> cell_of_atom_;
   GPU_Vector<int> cell_count_;
   GPU_Vector<int> cell_start_;

@@ -1,0 +1,5 @@
+run 0: F[cubic] 2.162e-05  F[open] 1.862e-05  W[cubic] 3.594e-06  W[triclinic] 2.851e-06
+run 1: F[cubic] 2.162e-05  F[open] 1.862e-05  W[cubic] 3.594e-06  W[triclinic] 2.851e-06
+run 2: F[cubic] 2.162e-05  F[open] 1.862e-05  W[cubic] 3.594e-06  W[triclinic] 2.851e-06
+run 3: F[cubic] 2.162e-05  F[open] 1.862e-05  W[cubic] 3.594e-06  W[triclinic] 2.851e-06
+run 4: F[cubic] 2.162e-05  F[open] 1.862e-05  W[cubic] 3.594e-06  W[triclinic] 2.851e-06

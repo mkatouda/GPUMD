@@ -20,8 +20,9 @@ Tolerances (fixed BEFORE any GPU measurement; never to be loosened to make a tes
 - GPU vs reference: energy and virial relative 2e-6 of |E_ref| and
   max|W_ref|; force 1e-5 of the largest reference force component), with no absolute floors.  The D2 part
   is obtained as a difference of two float NEP runs, so s6 is chosen large (75) to make the D2 signal much
-  larger than the float run-to-run noise of NEP.  Observed (s6 = 0.75, 2026-11-03): relative errors
-  <= 3.8e-8 (energy), <= 5.6e-8 (virial), <= 1.1e-6 (force, of the largest component).
+  larger than the float run-to-run noise of NEP.  Observed (s6 = 75, all 17 GPU cases including the
+  degenerate ones, 2026-11-03): relative errors <= 3.3e-7 (energy), <= 5.9e-7 (virial), <= 1.7e-6
+  (force, of the largest component).
 """
 import importlib.util
 import json
@@ -357,10 +358,14 @@ def test_dftd2_matches_reference_geometry_variants(name, tmp_path):
 
 @pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
 def test_dftd2_goes_to_zero_at_the_cutoff(tmp_path):
-    """rc = 15.3 is not exactly representable in float; at r = rc - 1e-6 energy and force are ~0 and at
-    r = rc + 1e-6 they are exactly 0 (shifted force, continuous in E and F)."""
+    """The pair distance is evaluated in single precision, and so is the cutoff (rc = 15.3 is not
+    exactly representable).  At distances 4 float ulps (about 3.8e-6 A, resolved by the float
+    arithmetic) below the cutoff, energy and force are ~0 (shifted force, continuous in E and F)
+    and 4 ulps above it they are exactly 0."""
     rc, s6 = 15.3, 0.75
-    for k, (dist, bound) in enumerate(((rc - 1e-6, 1e-9), (rc + 1e-6, 0.0))):
+    rc_f = float(np.float32(rc))
+    ulp = float(np.spacing(np.float32(rc)))
+    for k, (dist, bound) in enumerate(((rc_f - 4 * ulp, 1e-9), (rc_f + 4 * ulp, 0.0))):
         atoms = Atoms('CO', positions=[[0, 0, 0], [0, 0, dist]], cell=[40, 40, 40], pbc=False)
         e0, f0, _ = _run(tmp_path / f'a{k}', atoms, None)
         e1, f1, _ = _run(tmp_path / f'b{k}', atoms, f'dftd2 {s6} {rc}')
@@ -386,6 +391,73 @@ def test_dftd2_repeated_runs_agree(tmp_path):
         assert abs(e - e0) <= 1e-12 * abs(e0)
         assert np.abs(f - f0).max() <= 1e-12 * np.abs(f0).max()
         assert np.abs(v - v0).max() <= 1e-12 * np.abs(v0).max()
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd2_dense_water_is_bitwise_reproducible(tmp_path):
+    """The order of the atoms inside a cell is deterministic (increasing atom index), so repeated
+    runs give bit-identical energy, forces and virial.  Dense water (2187 atoms, rc = 30 A, so that the
+    whole system is one or a few cells), 5 runs with dftd2, NEP-only run for the D2 part."""
+    atoms = structure('water_large')
+    runs = [_run(tmp_path / f'on{i}', atoms, 'dftd2 0.75 30') for i in range(5)]
+    e0, f0, w0 = runs[0]
+    for e, f, w in runs[1:]:
+        assert e == e0 and np.array_equal(f, f0) and np.array_equal(w, w0)
+    e_off, f_off, _ = _run(tmp_path / 'off', atoms, None)
+    assert abs(e0 - e_off) > 1.0 and np.abs(f0 - f_off).max() > 1e-3     # D2 is really active
+
+
+# gpumd itself requires at least 2 atoms ("Number of atoms should >= 2"), so N = 1 cannot be run.
+def _two_atoms_periodic():       # smallest periodic system: self-images and the pair, rc = 3 cells
+    return Atoms('CO', positions=[[1.0, 1.0, 1.0], [2.7, 1.4, 0.6]], cell=[4.0, 4.0, 4.0], pbc=True)
+
+
+def _two_atoms_open_beyond_cutoff():     # non-periodic, separated by more than rc: D2 is exactly zero
+    return Atoms('CO', positions=[[1.0, 1.0, 1.0], [1.0, 1.0, 21.0]], cell=[30.0, 30.0, 30.0], pbc=False)
+
+
+def _tiny_box():             # box (2.4 A) much smaller than rc = 12 A: neighbor range k = 5 cells
+    return Atoms('C2O2', positions=[[0.1, 0.2, 0.3], [1.3, 1.4, 0.2], [0.2, 1.2, 1.3], [1.4, 0.1, 1.2]],
+                 cell=[2.4, 2.4, 2.4], pbc=True)
+
+
+def _sparse_large_box():     # 1000 atoms in a 300 A box: 50^3 cells requested, halved to the cell limit
+    rng = np.random.default_rng(3)
+    return Atoms('C1000', positions=rng.uniform(0.0, 300.0, (1000, 3)), cell=[300.0] * 3, pbc=True)
+
+
+def _triclinic_mixed_pbc():  # triclinic, periodic in x and z, open in y
+    atoms = structure('water27_tri').copy()
+    atoms.pbc = [True, False, True]
+    return atoms
+
+
+def _far_separated_open_direction():     # two groups 150 A apart along the open z direction
+    atoms = structure('water27').repeat((1, 1, 2))
+    atoms.pbc = [True, True, False]
+    pos = atoms.positions
+    pos[len(atoms) // 2:, 2] += 150.0
+    atoms.set_positions(pos)
+    return atoms
+
+
+# Coincident atoms (r = 0) are not tested: the NEP model itself returns NaN for them, so the D2
+# contribution cannot be isolated; D2 is documented as unsupported for them.
+DEGENERATE_CASES = {    # name: (builder, rc)
+    'two_atoms_periodic': (_two_atoms_periodic, 12.0),
+    'two_atoms_open_beyond_cutoff': (_two_atoms_open_beyond_cutoff, 12.0),
+    'tiny_box': (_tiny_box, 12.0),
+    'sparse_large_box': (_sparse_large_box, 12.0),
+    'triclinic_mixed_pbc': (_triclinic_mixed_pbc, 12.0),
+    'far_separated_open_direction': (_far_separated_open_direction, 12.0),
+}
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize('name', list(DEGENERATE_CASES))
+def test_dftd2_matches_reference_degenerate_cases(name, tmp_path):
+    builder, rc = DEGENERATE_CASES[name]
+    _check_against_reference(tmp_path, builder(), S6_GPU, rc)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -463,3 +535,30 @@ def test_dftd2_on_unsupported_potential_is_an_error(tmp_path):
     assert result.returncode != 0
     assert 'invalid keyword' not in text.lower(), 'dftd2 is not implemented (generic unknown-keyword error)'
     assert re.search(r'dftd2.*(NEP|support)', text, re.I), text[-600:]
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd2_without_potential_gives_a_specific_message(tmp_path):
+    structure('dimer').write(tmp_path / 'model.xyz', format='extxyz')
+    (tmp_path / 'run.in').write_text('dftd2 0.75 12\nensemble nve\ntime_step 0\nrun 1\n')
+    result = subprocess.run([str(GPUMD_EXECUTABLE)], cwd=tmp_path, capture_output=True, text=True)
+    text = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert re.search(r"no 'potential' keyword", text), text[-600:]
+    assert 'only supported for NEP' not in text and 'not supported' not in text
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd2_large_cutoff_prints_a_warning_and_still_runs(tmp_path):
+    """A cutoff above 200 A only triggers a printed warning (open dimer, so the run is cheap)."""
+    atoms = structure('dimer')
+    atoms.pbc = False
+    workdir = tmp_path / 'big'
+    workdir.mkdir()
+    atoms.write(workdir / 'model.xyz', format='extxyz')
+    (workdir / 'run.in').write_text(f'potential {NEP_MODEL}\ndftd2 0.75 250\nensemble nve\ntime_step 0\nrun 1\n')
+    result = subprocess.run([str(GPUMD_EXECUTABLE)], cwd=workdir, capture_output=True, text=True, timeout=300)
+    assert result.returncode == 0, (result.stdout + result.stderr)[-800:]
+    assert re.search(r'Warning: the dftd2 cutoff \(250 A\) is larger than 200 A', result.stdout)
+    small = _run(tmp_path / 'small', atoms, 'dftd2 0.75 12')
+    assert np.isfinite(small[0])
