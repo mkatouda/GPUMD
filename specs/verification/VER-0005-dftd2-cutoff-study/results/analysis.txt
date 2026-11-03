@@ -1,0 +1,25 @@
+system rc  T1(dE<=0.5) T2(max<=5e-3 eV/A..., rms<=1) T3(dP<=0.02)
+water     12  False  True   True 
+water     16  True   True   True 
+water     20  True   True   True 
+water     25  True   True   True 
+water     30  True   True   True 
+graphite  12  False  True   False
+graphite  16  False  True   False
+graphite  20  False  True   False
+graphite  25  False  True   True 
+graphite  30  True   True   True 
+mgo       12  False  True   False
+mgo       16  False  True   False
+mgo       20  False  True   False
+mgo       25  False  True   True 
+mgo       30  True   True   True 
+rc satisfying all systems: [30]
+
+Tail model: E(rc)-E(inf) ~ A rc^-3 (and P likewise), A from the rc=30 vs 40 difference
+water     E(40)-E(inf)= 0.025 meV/atom, P(40)-P(inf)= 0.401 MPa;  rc=25: dE_inf=0.102 meV, dP_inf=1.64 MPa; rc=30: dE_inf=0.059 meV, dP_inf=0.95 MPa
+          scaling check A(rc=20,25,30) = 1589, 1589, 1590 meV A^3/atom
+graphite  E(40)-E(inf)= 0.177 meV/atom, P(40)-P(inf)= 3.218 MPa;  rc=25: dE_inf=0.725 meV, dP_inf=13.18 MPa; rc=30: dE_inf=0.419 meV, dP_inf=7.63 MPa
+          scaling check A(rc=20,25,30) = 11320, 11324, 11324 meV A^3/atom
+mgo       E(40)-E(inf)= 0.248 meV/atom, P(40)-P(inf)= 4.254 MPa;  rc=25: dE_inf=1.016 meV, dP_inf=17.43 MPa; rc=30: dE_inf=0.588 meV, dP_inf=10.08 MPa
+          scaling check A(rc=20,25,30) = 15862, 15867, 15869 meV A^3/atom

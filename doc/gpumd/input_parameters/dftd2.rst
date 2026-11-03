@@ -14,8 +14,8 @@ Syntax
   dftd2 <s6> [<cutoff>]
 
 where :attr:`s6` is the dimensionless global scaling factor (must be positive; there is no functional table, the value is given by the user) and :attr:`cutoff` is the cutoff radius in units of Angstrom (must be positive).
-If :attr:`cutoff` is omitted, a **provisional** default of 25 Angstrom is used.
-*This default is provisional: it will be decided by the cutoff study of the DFT-D2 development plan (DES-0002, Phase 2) and may change before release. Specify the cutoff explicitly in production runs.*
+If :attr:`cutoff` is omitted, a default of 30 Angstrom is used.
+The default is the smallest cutoff in a 12-40 Angstrom scan for which the D2 energy per atom (within 0.5 meV), the forces and the pressure (within 0.02 GPa) agree with a 40 Angstrom cutoff for water, graphite and MgO. The cost grows quickly with the cutoff (about 35 times the NEP evaluation for 648 water atoms at 30 Angstrom); a smaller cutoff can be specified explicitly if a lower accuracy is acceptable.
 
 This keyword can be put anywhere in the ``run.in`` input file.
 It may appear only once and cannot be combined with :ref:`dftd3 <kw_dftd3>`.
@@ -50,7 +50,7 @@ Force and virial are the exact derivatives of this shifted energy.
 Truncation effects
 ^^^^^^^^^^^^^^^^^^
 
-The dispersion energy has a long :math:`r^{-6}` tail, and the shifted-force scheme changes the energy and force relative to the untruncated sum. Rough estimates for a single-element system of uniform density (not measured for any real system; they will be replaced by the values measured in the cutoff study of the development plan): the energy per atom differs from the untruncated sum by about 3 meV at :math:`r_\mathrm{c}` = 15 Å and about 0.64 meV at 25 Å, and the pressure by about 0.05 GPa at 15 Å and about 0.01 GPa at 25 Å.
+The dispersion energy has a long :math:`r^{-6}` tail, and the shifted-force scheme changes the energy and force relative to the untruncated sum. The difference decreases as :math:`r_\mathrm{c}^{-3}`. Measured for water, graphite and MgO (NEP89, :math:`s_6` = 0.75; estimated limits relative to an infinite cutoff): at :math:`r_\mathrm{c}` = 30 Å the energy per atom differs from the untruncated sum by about 0.06 (water), 0.4 (graphite) and 0.6 (MgO) meV, and the pressure differs by about 1 to 10 MPa; at 25 Å these values are up to about 1.6 times larger. The values scale linearly with :math:`s_6`.
 In constant-pressure (NPT) simulations this is a systematic error in pressure, and hence in volume, which decreases as the cutoff increases.
 
 Parameters and element coverage

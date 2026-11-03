@@ -1,0 +1,4 @@
+rc=  0: Etot mean -3213.4915 eV, std 0.01703 eV, drift 27.115 meV/ps (= 0.0418 meV/atom/ps), max-min 0.08483 eV, T_end 289.1 K
+rc= 12: Etot mean -3235.3610 eV, std 0.00812 eV, drift -1.530 meV/ps (= -0.0024 meV/atom/ps), max-min 0.05121 eV, T_end 290.9 K
+rc= 25: Etot mean -3235.8941 eV, std 0.00991 eV, drift -4.631 meV/ps (= -0.0071 meV/atom/ps), max-min 0.05643 eV, T_end 291.7 K
+rc= 30: Etot mean -3235.9222 eV, std 0.00882 eV, drift -8.202 meV/ps (= -0.0127 meV/atom/ps), max-min 0.05607 eV, T_end 303.9 K

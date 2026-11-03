@@ -46,7 +46,7 @@ D6. Intended use: D2 added externally to NEP.
   GPL v3; cite Grimme, J. Comput. Chem. 27, 1787 (2006) and dftd3-lib commit `3c99ee9` where
   the table is stored.
 - OQ-3: RESOLVED (D1: shifted-force).
-- OQ-4 (default rc): the value is an output of Phase 2 (tolerance in AC-3), not fixed here.
+- OQ-4 (default rc): RESOLVED 2026-11-03: default rc = 30 A (smallest rc in the grid meeting the pre-registered criteria T1-T3 on water, graphite and MgO; VER-0005; accepted by the human).
 
 ## Scope
 In: new files `src/force/dftd2.cu/.cuh`, the hook in `NEP` and `NEP_Charge` (init + compute),

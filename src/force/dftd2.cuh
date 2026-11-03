@@ -27,7 +27,7 @@ class DFTD2
 public:
   // PROVISIONAL (2026-11-03): default cutoff used when the cutoff is omitted.
   // To be decided in DES-0002 Phase 2 (cutoff study); do not rely on this value.
-  static constexpr double DEFAULT_CUTOFF = 25.0;
+  static constexpr double DEFAULT_CUTOFF = 30.0;
 
   bool enabled = false;
   double s6 = 0.0;
