@@ -209,6 +209,17 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
   (including Cu 4,000) slower than 1.03x, AC-1 tolerances unchanged and met, `dftd3_*` cases within the AC-2
   tolerance, determinism not worse than now, warning-clean build, memory increase of the per-atom tables reported.
   The results change at round-off level; the AC-1 and AC-2 rules above apply unchanged.
+- Stage 2 outcome (2026-11-04). (i) adopted (VER-0013): small-box D3 total N = 81 1.516 -> 0.101 ms (15.1x),
+  N = 648 1.873 -> 0.487 ms (3.84x), N = 2,187 2.380 -> 0.793 ms (3.0x); large-box unchanged; AC-1 tolerances
+  met; `dftd3_*` within the AC-2 tolerance; the double `atomicAdd` of the small-box kernels was removed (no
+  atomics left in `dftd3.cu`, so the `sm < 60` fallback was deleted). (ii) put on hold by human decision
+  (not needed for AC-4). (v) measured (VER-0014): D3 total 6.931 -> 6.316 ms at water 41,472 (1.10x; the gate
+  <= 6.0 ms is NOT met; the C6-constant upper bound 5.59 ms is not reachable because the C6 reference-table
+  double sum stays in the pair loop and registers rise 72 -> about 80), 1.21x at water 5,184, 1.23x at
+  cluster 972, 1.02-1.08x elsewhere, no case slower; AC-1/AC-2 met; memory +20 B/atom. Human decision
+  2026-11-04: adopt (v) although the N = 41,472 gate is not met; the AC-4 target at N = 41,472 is recorded as
+  unmet and dropped (DR-001 AC-4 allows this). Stage 3 below applies to the merged result (the AC-3 NVE
+  closure of 2026-11-03 predates (i) and (v) and must be repeated).
 - Stage 3: re-measure VER-0004 section 3 and the VER-0001 slope method, `--suite full` against the `master`
   baseline, independent numerical review of the changed kernels, NVE with the VER-0011 protocol (single
   trajectory is not enough; see VER-0011), then record AC-4 per target point (met/unmet) and let the human

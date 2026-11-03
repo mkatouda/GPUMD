@@ -49,10 +49,15 @@ N=5,184, and 6.0 ms at N=41,472; also, after Phase 0 (`VER-0002`), at most 2.0 m
 N=648 (small-box path; baseline 4.37 ms) and for fcc Cu N=4,000 (baseline 3.65 ms); no case is
 slower than baseline by more than 3%.
 Targets for a phase may be dropped by the human if a phase gate in DES-0001 fails.
+Result (2026-11-04, VER-0013/0014): met at N = 81 (0.10 ms), 648 (0.50 ms) and 5,184 (0.77 ms); NOT met at
+N = 41,472 (6.32 ms vs 6.0 ms). The N = 41,472 target is dropped by the human decision of 2026-11-04.
 
 AC-5 (portability). The code builds warning-clean with CUDA; any new construct goes through
 `gpu_macro.cuh` so the HIP build is not broken; the `sm_60`-and-older `atomicAdd` fallback
 keeps working.
+Note (2026-11-04): after Phase 7 `dftd3.cu` contains no `atomicAdd` (the small-box kernels use fixed-order
+reductions), so the `sm_60`-and-older `atomicAdd(double)` fallback of `dftd3.cu` was removed as unused;
+HIP and `sm < 60` builds are not verified.
 
 AC-6 (docs). `doc/gpumd/input_parameters/dftd3.rst` states the cost scaling with the cutoff.
 
