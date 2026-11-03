@@ -52,8 +52,15 @@ constexpr double D_DAMP = 20.0;
 constexpr double WARN_CUTOFF = 200.0;
 constexpr int BLOCK_SIZE = 128;
 constexpr int REDUCE_BLOCK_SIZE = 256;
-// target cell width = cutoff / CELL_DIVISOR (finer cells reduce the number of rejected candidates)
-constexpr double CELL_DIVISOR = 2.0;
+constexpr int MAX_NUM_SUB = 32;
+constexpr double MIN_CANDIDATES_PER_THREAD = 32.0;
+constexpr int NUM_REDUCE = 13; // E, F (3), W (9) per atom
+// The number of cells per direction is chosen by a cost estimate (see choose_cell_counts):
+// candidate counts are floor(kk * width / rc) for kk = 1..MAX_CELL_RANGE (cell width >= rc / kk).
+constexpr int MAX_CELL_RANGE = 6;
+// cost of visiting one (empty or not) neighbor cell, in units of one candidate pair test
+// (fitted to measured pair-kernel times on water and Cu, rc = 12..30 A)
+constexpr double CELL_VISIT_COST = 3.0;
 
 const char* const SYMBOL[94] = {
   "H",  "He", "Li", "Be", "B",  "C",  "N",  "O",  "F",  "Ne", "Na", "Mg", "Al", "Si", "P",  "S",
@@ -230,7 +237,10 @@ __global__ void place_atoms(
   g_sorted_index[begin + rank] = i;
 }
 
-// one thread per atom (in cell order); sums over all neighbors, including periodic images
+// NUM_SUB consecutive threads (a power of two) share one atom (in cell order). Each of them takes
+// every NUM_SUB-th atom of each neighbor cell (including periodic images); the partial sums are
+// added in a fixed tree order in shared memory, so the result does not depend on scheduling.
+template <int NUM_SUB>
 __global__ void dftd2_pair_kernel(
   const int N,
   const int num_types,
@@ -247,12 +257,18 @@ __global__ void dftd2_pair_kernel(
   double* g_fz,
   double* g_virial)
 {
-  const int slot = blockIdx.x * blockDim.x + threadIdx.x;
-  if (slot >= N) {
-    return;
-  }
-  const int i = g_sorted_index[slot];
-  const double4 pi = g_sorted[slot];
+  static_assert(
+    NUM_SUB >= 1 && (NUM_SUB & (NUM_SUB - 1)) == 0 && BLOCK_SIZE % NUM_SUB == 0,
+    "NUM_SUB must be a power of two that divides the block size");
+  const int tid = threadIdx.x;
+  const int sub = tid % NUM_SUB;
+  const int slot = blockIdx.x * (BLOCK_SIZE / NUM_SUB) + tid / NUM_SUB;
+  const bool valid = slot < N;
+  __shared__ double s_red[(NUM_SUB > 1) ? NUM_REDUCE : 1][BLOCK_SIZE];
+  // (invalid threads stay alive for the reduction; they read atom 0 and skip all loops)
+  const int slot_safe = valid ? slot : 0;
+  const int i = g_sorted_index[slot_safe];
+  const double4 pi = g_sorted[slot_safe];
   const int type_i = static_cast<int>(pi.w);
   const int cell_i = g_cell[i];
   const int cx = cell_i % grid.n[0];
@@ -264,7 +280,9 @@ __global__ void dftd2_pair_kernel(
   double v_xx = 0.0, v_yy = 0.0, v_zz = 0.0, v_xy = 0.0, v_xz = 0.0, v_yz = 0.0;
   double v_yx = 0.0, v_zx = 0.0, v_zy = 0.0;
 
-  for (int oz = -grid.k[2]; oz <= grid.k[2]; ++oz) {
+  const int oz_begin = valid ? -grid.k[2] : 1;
+  const int oz_end = valid ? grid.k[2] : 0; // empty range for invalid threads
+  for (int oz = oz_begin; oz <= oz_end; ++oz) {
     int uz = cz + oz;
     int shz = 0;
     if (grid.periodic[2]) {
@@ -298,7 +316,7 @@ __global__ void dftd2_pair_kernel(
         const double tz = shx * grid.H[6] + shy * grid.H[7] + shz * grid.H[8];
         const bool home = (shx == 0 && shy == 0 && shz == 0);
         const int j_end = g_start[cell + 1];
-        for (int js = g_start[cell]; js < j_end; ++js) {
+        for (int js = g_start[cell] + sub; js < j_end; js += NUM_SUB) {
           if (home && js == slot) {
             continue;
           }
@@ -344,6 +362,46 @@ __global__ void dftd2_pair_kernel(
     }
   }
 
+  if (NUM_SUB > 1) {
+    s_red[0][tid] = e_i;
+    s_red[1][tid] = fx;
+    s_red[2][tid] = fy;
+    s_red[3][tid] = fz;
+    s_red[4][tid] = v_xx;
+    s_red[5][tid] = v_yy;
+    s_red[6][tid] = v_zz;
+    s_red[7][tid] = v_xy;
+    s_red[8][tid] = v_xz;
+    s_red[9][tid] = v_yz;
+    s_red[10][tid] = v_yx;
+    s_red[11][tid] = v_zx;
+    s_red[12][tid] = v_zy;
+    for (int offset = NUM_SUB / 2; offset > 0; offset >>= 1) {
+      __syncthreads();
+      if (sub < offset) {
+        for (int c = 0; c < NUM_REDUCE; ++c) {
+          s_red[c][tid] += s_red[c][tid + offset];
+        }
+      }
+    }
+    e_i = s_red[0][tid];
+    fx = s_red[1][tid];
+    fy = s_red[2][tid];
+    fz = s_red[3][tid];
+    v_xx = s_red[4][tid];
+    v_yy = s_red[5][tid];
+    v_zz = s_red[6][tid];
+    v_xy = s_red[7][tid];
+    v_xz = s_red[8][tid];
+    v_yz = s_red[9][tid];
+    v_yx = s_red[10][tid];
+    v_zx = s_red[11][tid];
+    v_zy = s_red[12][tid];
+  }
+  if (!valid || sub != 0) {
+    return;
+  }
+
   g_potential[i] += e_i;
   g_fx[i] += fx;
   g_fy[i] += fy;
@@ -357,6 +415,84 @@ __global__ void dftd2_pair_kernel(
   g_virial[i + 6 * N] += v_yx;
   g_virial[i + 7 * N] += v_zx;
   g_virial[i + 8 * N] += v_zy;
+}
+
+// Choose the number of cells n[d] in each direction by minimizing the estimated work per atom
+//   (number of candidate atoms visited) + CELL_VISIT_COST * (number of neighbor cells visited),
+// for a uniform density. Candidates per direction: n = 1 and floor(kk * width / rc), kk
+// = 1..MAX_CELL_RANGE. Each count is limited to cbrt(max_cells), so the product never exceeds
+// max_cells. Returns the estimated number of candidate atoms visited per atom for the chosen
+// counts.
+double choose_cell_counts(
+  const int N,
+  const double width[3],
+  const int periodic[3],
+  const double rc,
+  const long long max_cells,
+  int n[3])
+{
+  // per-direction cap so that (cap, cap, cap) always fits into max_cells
+  const double cap =
+    std::max(1.0, std::floor(std::cbrt(static_cast<double>(max_cells)) * (1.0 + 1.0e-9)));
+  int cand[3][MAX_CELL_RANGE + 1];
+  int num_cand[3];
+  for (int d = 0; d < 3; ++d) {
+    num_cand[d] = 0;
+    for (int kk = 0; kk <= MAX_CELL_RANGE; ++kk) {
+      const double v = (kk == 0) ? 1.0 : std::floor(kk * width[d] / rc);
+      const int c = static_cast<int>(std::min(std::max(v, 1.0), cap));
+      bool seen = false;
+      for (int m = 0; m < num_cand[d]; ++m) {
+        seen = seen || (cand[d][m] == c);
+      }
+      if (!seen) {
+        cand[d][num_cand[d]++] = c;
+      }
+    }
+  }
+  double visited = 0.0;
+  double best = -1.0; // the candidate (1, 1, 1) is always evaluated, so n is always set
+  for (int a = 0; a < num_cand[0]; ++a) {
+    for (int b = 0; b < num_cand[1]; ++b) {
+      for (int c = 0; c < num_cand[2]; ++c) {
+        const int m[3] = {cand[0][a], cand[1][b], cand[2][c]};
+        double cells_visited = 1.0;
+        for (int d = 0; d < 3; ++d) {
+          const double k = std::ceil(rc / (width[d] / m[d]) * (1.0 + 1.0e-12));
+          double count = 2.0 * k + 1.0;
+          if (!periodic[d]) {
+            count = std::min(count, static_cast<double>(m[d]));
+          }
+          cells_visited *= count;
+        }
+        const double num_cells = static_cast<double>(m[0]) * m[1] * m[2];
+        const double cost = N * cells_visited / num_cells + CELL_VISIT_COST * cells_visited;
+        if (best < 0.0 || cost < best) {
+          best = cost;
+          visited = N * cells_visited / num_cells;
+          for (int d = 0; d < 3; ++d) {
+            n[d] = m[d];
+          }
+        }
+      }
+    }
+  }
+  return visited;
+}
+
+// Number of threads that share one atom in the pair kernel (a power of two, at most MAX_NUM_SUB):
+// the largest value for which the total thread count N * num_sub stays at or below target_threads
+// (number of SMs * BLOCK_SIZE: a small system still fills the GPU, a larger one is not slowed down
+// by the reduction) and every thread keeps at least MIN_CANDIDATES_PER_THREAD candidate atoms.
+// One thread per atom if N * 2 > target_threads.
+int get_num_sub(const int N, const double candidates_per_atom, const int target_threads)
+{
+  int num_sub = 1;
+  while (num_sub < MAX_NUM_SUB && static_cast<long long>(N) * (2 * num_sub) <= target_threads &&
+         candidates_per_atom >= MIN_CANDIDATES_PER_THREAD * (2 * num_sub)) {
+    num_sub *= 2;
+  }
+  return num_sub;
 }
 
 template <typename T>
@@ -414,6 +550,11 @@ void DFTD2::initialize(
   rc = static_cast<double>(static_cast<float>(rc_in));
   atomic_numbers_ = atomic_numbers;
   num_types_ = static_cast<int>(atomic_numbers.size());
+
+  // one block of BLOCK_SIZE threads per SM is enough to fill the device for this kernel
+  gpuDeviceProp device_prop;
+  CHECK(gpuGetDeviceProperties(&device_prop, 0));
+  target_threads_ = device_prop.multiProcessorCount * BLOCK_SIZE;
 
   std::vector<float4> table(static_cast<size_t>(num_types_) * num_types_);
   for (int a = 0; a < num_types_; ++a) {
@@ -533,20 +674,13 @@ void DFTD2::compute(
   }
 
   // number of cells and neighbor range
+  double width[3];
   for (int d = 0; d < 3; ++d) {
-    const double width = grid.len[d] * height[d];
-    grid.n[d] = std::max(1, static_cast<int>(std::floor(CELL_DIVISOR * width / rc)));
+    width[d] = grid.len[d] * height[d];
   }
   const long long max_cells = std::max<long long>(1000, 2LL * N);
-  while (static_cast<long long>(grid.n[0]) * grid.n[1] * grid.n[2] > max_cells) {
-    int dmax = 0;
-    for (int d = 1; d < 3; ++d) {
-      if (grid.n[d] > grid.n[dmax]) {
-        dmax = d;
-      }
-    }
-    grid.n[dmax] = std::max(1, grid.n[dmax] / 2);
-  }
+  const double candidates_per_atom =
+    choose_cell_counts(N, width, grid.periodic, rc, max_cells, grid.n);
   for (int d = 0; d < 3; ++d) {
     const double cell_width = grid.len[d] * height[d] / grid.n[d];
     int k = static_cast<int>(std::ceil(rc / cell_width * (1.0 + 1.0e-12)));
@@ -588,20 +722,44 @@ void DFTD2::compute(
     sorted_.data(),
     sorted_index_.data());
   GPU_CHECK_KERNEL
-  dftd2_pair_kernel<<<grid_size, BLOCK_SIZE>>>(
-    N,
-    num_types_,
-    grid,
-    static_cast<float>(rc),
-    pair_param_.data(),
-    cell_of_atom_.data(),
-    cell_start_.data(),
-    sorted_.data(),
-    sorted_index_.data(),
-    potential_per_atom.data(),
-    force_per_atom.data(),
-    force_per_atom.data() + N,
-    force_per_atom.data() + 2 * N,
+  const int num_sub = get_num_sub(N, candidates_per_atom, target_threads_);
+  const int pair_blocks = (N * num_sub - 1) / BLOCK_SIZE + 1;
+#define DFTD2_LAUNCH_PAIR(NS)                                                                      \
+  dftd2_pair_kernel<NS><<<pair_blocks, BLOCK_SIZE>>>(                                              \
+    N,                                                                                             \
+    num_types_,                                                                                    \
+    grid,                                                                                          \
+    static_cast<float>(rc),                                                                        \
+    pair_param_.data(),                                                                            \
+    cell_of_atom_.data(),                                                                          \
+    cell_start_.data(),                                                                            \
+    sorted_.data(),                                                                                \
+    sorted_index_.data(),                                                                          \
+    potential_per_atom.data(),                                                                     \
+    force_per_atom.data(),                                                                         \
+    force_per_atom.data() + N,                                                                     \
+    force_per_atom.data() + 2 * N,                                                                 \
     virial_per_atom.data());
+  switch (num_sub) {
+    case 1:
+      DFTD2_LAUNCH_PAIR(1)
+      break;
+    case 2:
+      DFTD2_LAUNCH_PAIR(2)
+      break;
+    case 4:
+      DFTD2_LAUNCH_PAIR(4)
+      break;
+    case 8:
+      DFTD2_LAUNCH_PAIR(8)
+      break;
+    case 16:
+      DFTD2_LAUNCH_PAIR(16)
+      break;
+    default:
+      DFTD2_LAUNCH_PAIR(32)
+      break;
+  }
+#undef DFTD2_LAUNCH_PAIR
   GPU_CHECK_KERNEL
 }

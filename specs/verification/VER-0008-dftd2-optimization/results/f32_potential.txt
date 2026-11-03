@@ -1,0 +1,9 @@
+Timing-only scratch variant (accuracy NOT checked, not in the tree): the candidate loop reads a float4 copy of the
+sorted positions and forms dx = pj.x + float(tx - pi.x); everything else (double accumulators, expf, ...) unchanged.
+Pair-kernel median [ms], nsys, 3 repetitions, RTX A6000. "it2" = kept tree (items i + ii).
+system rc it2_ms f32_ms ratio
+w648   30  3.09  2.36 1.31
+w5184  30 15.50  9.91 1.56
+cu4000 30 15.13  9.94 1.52
+w5184  12  1.53  1.02 1.50
+w20736 30 59.11 34.75 1.70

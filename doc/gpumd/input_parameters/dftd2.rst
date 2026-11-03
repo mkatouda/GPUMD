@@ -15,7 +15,7 @@ Syntax
 
 where :attr:`s6` is the dimensionless global scaling factor (must be positive; there is no functional table, the value is given by the user) and :attr:`cutoff` is the cutoff radius in units of Angstrom (must be positive).
 If :attr:`cutoff` is omitted, a default of 30 Angstrom is used.
-The default is the smallest cutoff in a 12-30 Angstrom scan (grid 12, 16, 20, 25, 30; reference 40 Angstrom) for which the D2 energy per atom (within 0.5 meV), the forces and the pressure (within 0.02 GPa) agree with a 40 Angstrom cutoff for water, graphite and MgO (light elements only; see Truncation effects). A warning is printed for cutoffs above 200 Angstrom. The cost grows quickly with the cutoff (about 35 times the NEP evaluation for 648 water atoms at 30 Angstrom); a smaller cutoff can be specified explicitly if a lower accuracy is acceptable.
+The default is the smallest cutoff in a 12-30 Angstrom scan (grid 12, 16, 20, 25, 30; reference 40 Angstrom) for which the D2 energy per atom (within 0.5 meV), the forces and the pressure (within 0.02 GPa) agree with a 40 Angstrom cutoff for water, graphite and MgO (light elements only; see Truncation effects). A warning is printed for cutoffs above 200 Angstrom. The cost grows quickly with the cutoff (for 648 water atoms at 30 Angstrom about twice the NEP evaluation on an RTX A6000, for 41,472 atoms about 17 times); a smaller cutoff can be specified explicitly if a lower accuracy is acceptable.
 
 This keyword can be put anywhere in the ``run.in`` input file.
 It may appear only once and cannot be combined with :ref:`dftd3 <kw_dftd3>`.
@@ -99,10 +99,11 @@ Cost
 ----
 
 The cost per step is proportional to the number of atoms times the number of neighbors within the cutoff, i.e. :math:`O(N r_\mathrm{c}^3)`. A cell list is used, so there is no :math:`O(N^2)` term, and no coordination numbers are needed.
-Cells of any size relative to the cutoff (including cells smaller than the cutoff) are handled by the same kernel.
+Cells of any size relative to the cutoff (including cells smaller than the cutoff) are handled by the same kernel. The number of cells in each direction is chosen every step from an estimate of the work (candidate atoms visited plus a cost per neighbor cell visited), not from a fixed ratio of the cell size to the cutoff.
+For small systems several threads share one atom (up to 32, chosen from the number of atoms and the number of SMs so that the GPU is filled); each thread handles a fixed subset of the neighbors and the partial sums are added in a fixed order in shared memory, so the result stays deterministic.
 The pair terms are evaluated in single precision and accumulated in double precision.
 For systems that are not periodic in all three directions, the extent of the atoms is determined every step with a small reduction kernel and a device-to-host copy, which adds a synchronization per step.
-The atoms inside each cell are kept in order of increasing atom index, and every thread sums its neighbors in a fixed order, so repeated runs on the same GPU with the same binary give bit-identical D2 energy, forces and virial (checked for a dense 2187-atom water system with a 30 Å cutoff). Results can still differ between different GPU architectures or compilers.
+The atoms inside each cell are kept in order of increasing atom index, and every thread sums its neighbors, and the threads of one atom add their partial sums, in a fixed order, so repeated runs on the same GPU with the same binary give bit-identical D2 energy, forces and virial (checked for a dense 2187-atom water system with a 30 Å cutoff, which uses several threads per atom). Results can still differ between different GPU architectures or compilers.
 
 Limitations
 -----------

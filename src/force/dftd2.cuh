@@ -55,6 +55,7 @@ private:
   std::vector<int> atomic_numbers_;
   bool elements_checked_ = false;
   int num_types_ = 0;
+  int target_threads_ = 0; // threads that fill the device (set in initialize)
 
   // float4 per type pair: {s6*C6_ij, R0_ij, phi(rc), phi'(rc)}
   GPU_Vector<float4> pair_param_;

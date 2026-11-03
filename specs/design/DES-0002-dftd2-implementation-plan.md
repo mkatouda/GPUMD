@@ -110,6 +110,14 @@
   Gate per item: >= 1.3x D2 time on water 648 at rc = 30 A (and no slowdown above 1.0x at
   the other measured sizes), AC-1 tolerances unchanged and met, determinism test of Phase 5d
   still passing (except (iv)), warning-clean build.
+- Stage 2 outcome (2026-11-03, VER-0008, pair-kernel median, nsys, RTX A6000 sm_86): (i) cost-based cell count
+  (candidates + 3 x visited cells) adopted: water 648 rc = 30 A 1.62x, rc = 20 A 2.28x, no case slower than 1.03x.
+  (ii) several threads per atom (power of two, fixed-order shared-memory tree reduction, no atomics, deterministic)
+  adopted: a further 9.4x at water 648 rc = 30 A (15.2x in total). D2 extra at rc = 30 A: 54.3 -> 2.92 ms (N = 648),
+  211 -> 117 ms (N = 41,472); D2(30)/D3 = 1.3-15.7 (was 22-54); AC-7 still unmet at rc = 30 A (informative).
+  (iii) not started (forced cell counts are always slower than the automatic choice). (iv) not pursued.
+  Observation: the candidate loop computes coordinate differences in double (GA102 FP64 = 1/64 rate); a float
+  scratch variant was 1.3-1.7x faster, accuracy not yet checked (Stage 2b, human-approved 2026-11-03).
 - Stage 3: re-measure VER-0006 timing tables (AC-7), re-run the finite-difference checks at
   rc = 30 A (closing the rc = 12 A-only gap of AC-4), `--suite full` against the master baseline,
   independent numerical review of the changed kernel; then set the DR-002 status by the rule

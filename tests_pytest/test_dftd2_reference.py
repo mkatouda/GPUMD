@@ -460,6 +460,38 @@ def test_dftd2_matches_reference_degenerate_cases(name, tmp_path):
     _check_against_reference(tmp_path, builder(), S6_GPU, rc)
 
 
+# The kernel chooses the number of cells per direction from a cost estimate and the number of
+# threads per atom from N (several threads share one atom for small N and add their partial sums
+# in a fixed order).  These cases cover the combinations: N = 81, 648 and 5184 (about 32, 16, 2
+# threads per atom on an 84-SM device), cutoffs smaller and larger than the box, a triclinic cell
+# and open boundaries.
+def _water(rep, tri=False, pbc=True):
+    atoms = structure('water27_tri' if tri else 'water27').repeat(rep)
+    atoms.pbc = pbc
+    return atoms
+
+
+SELECTION_CASES = {     # name: (builder, rc)
+    'n81_rc12': (lambda: _water((1, 1, 1)), 12.0),
+    'n81_rc30': (lambda: _water((1, 1, 1)), 30.0),
+    'n648_rc12': (lambda: _water((2, 2, 2)), 12.0),
+    'n648_rc20': (lambda: _water((2, 2, 2)), 20.0),
+    'n648_rc30': (lambda: _water((2, 2, 2)), 30.0),
+    'n648_tri_rc20': (lambda: _water((2, 2, 2), tri=True), 20.0),
+    'n648_open_rc20': (lambda: _water((2, 2, 2), pbc=False), 20.0),
+    'n5184_rc12': (lambda: _water((4, 4, 4)), 12.0),
+    'n5184_rc20': (lambda: _water((4, 4, 4)), 20.0),     # about 6 min (NumPy reference): slow
+}
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize(
+    'name', [pytest.param(n, marks=pytest.mark.slow) if n == 'n5184_rc20' else n for n in SELECTION_CASES])
+def test_dftd2_matches_reference_cell_and_thread_selection(name, tmp_path):
+    builder, rc = SELECTION_CASES[name]
+    _check_against_reference(tmp_path, builder(), S6_GPU, rc)
+
+
 # ---------------------------------------------------------------------------------------------
 # 3. GPU input errors
 # ---------------------------------------------------------------------------------------------
