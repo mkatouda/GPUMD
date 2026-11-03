@@ -68,6 +68,54 @@
   (units, external-correction caveat) and `api-compat-reviewer`.
 - Upstream: cherry-pick code/tests/doc only (no `specs/`, `.claude/`).
 
+## Phase 6: performance optimization (draft 2026-11-03)
+- Why: at the default rc = 30 A the D2 term costs 22-54x the D3 term and about 35x the NEP evaluation
+  (VER-0006: N = 81..41,472, slope method); DR-002 AC-7 (D2 <= 0.5x D3) is unmet. The VER-0005/0006
+  data also show a cost jump between rc = 16 and 20 A (x4.8 time for x1.95 neighbors) and equal
+  cost at N = 648 and 5,184 (rc = 30), i.e. the GPU is not filled at small N. Current kernel: one
+  thread per atom, full neighbor traversal, no atomics, deterministic (Phase 5d).
+- Constraints: results stay within the AC-1 tolerances against the NumPy reference; the
+  deterministic (bit-reproducible) behaviour is kept unless the human approves otherwise
+  (a half list with force atomics would give it up: decision required before implementing it).
+  Default numerics (rc = 30 A, shifted-force) are not changed.
+- Stage 1 (cheap diagnostic, no code in src/; scratch variants only; nsys, ncu counters are not
+  available): on water 648, water 5,184 and Cu/Au 4,000 at rc = 12 and 30 A,
+  (a) share of the pair kernel spent in the transcendental part (variant with the damping/exp
+  replaced by a constant), (b) candidate pairs visited versus accepted pairs (r < rc) per atom
+  (host-side count in a harness), (c) kernel time versus the cell divisor and the 16-20 A jump
+  (find the cause: registers/occupancy via the compiler report, local memory spills, cell-visit
+  count), (d) time versus N at fixed rc to quantify the fill problem at N <= 5,000.
+  Gate for continuing to Stage 2: at least one of (a) >= 25% share, (b) accepted/visited <= 0.3,
+  (c) a removable cause of the 16-20 A jump, (d) a small-N time that is >= 2x the time expected
+  from the large-N throughput. If none holds, stop and keep AC-7 as an informative miss.
+- Stage 1 outcome (2026-11-03, scratch harness, nsys, pair-kernel median, RTX A6000 sm_86; raw tables
+  kept outside the repository): gate passed via (b), (c), (d); (a) not met.
+  (a) exp/damping replaced by a constant saves only 0.5-1.7% of the pair kernel (water 648/5,184,
+  Cu 4,000, rc = 12 and 30 A): candidate scanning dominates, not the transcendental part.
+  (b) accepted/visited = 0.08-0.19 at rc = 30 A (0.04-0.34 over all cases); CELL_DIVISOR = 3 is about 11%
+  faster at rc = 30 A for large N and slower for water 648 at rc = 12 A.
+  (c) the 16 -> 20 A jump on water 648 (18.6 A box) comes from the cell-count quantization
+  n = floor(2*width/rc): n drops from 2 to 1 at rc >= 18.6 A, every atom then scans the 125 images
+  (k = 2), visited candidates x8, time x4-4.8; 82 registers, no spills, no local memory. A scratch
+  `ceil` variant (timing only, accuracy not checked) was 2.18x (rc 20), 1.93x (rc 25), 1.20x (rc 30)
+  faster, but 0.63x (slower) at rc = 12: the cell count must be chosen by a cost estimate.
+  (d) at rc = 30 one thread per atom fills only ~6 of 84 SMs at N = 648: measured time is 15.7x
+  (N = 648), 4.2x (N = 2,025), 2.4x (N = 5,184) the time expected from the N = 20,736 throughput.
+  Consequence: item (iv) (half list) is expected to help little (transcendental part < 2%) and costs
+  determinism; it is not pursued unless the human decides otherwise after (i)-(iii).
+- Stage 2 (candidates, each separately, in this order, each with its own gate): (i) the cause found
+  in (c) if any; (ii) several threads per atom with a fixed-order reduction for small N (as in
+  DR-001 Phase 3; deterministic); (iii) tighter candidate filtering / cell size / shared-memory tiling of
+  the neighbor cells; (iv) half list with atomics (only with human approval of non-determinism).
+  Gate per item: >= 1.3x D2 time on water 648 at rc = 30 A (and no slowdown above 1.0x at
+  the other measured sizes), AC-1 tolerances unchanged and met, determinism test of Phase 5d
+  still passing (except (iv)), warning-clean build.
+- Stage 3: re-measure VER-0006 timing tables (AC-7), re-run the finite-difference checks at
+  rc = 30 A (closing the rc = 12 A-only gap of AC-4), `--suite full` against the master baseline,
+  independent numerical review of the changed kernel; then set the DR-002 status by the rule
+  in AGENTS.md (implemented only if all acceptance criteria incl. AC-4 are met; AC-7 is
+  informative and is reported as met/unmet).
+
 ## Risks
 - NEP89 elements Ac, Th, Pa, U, Np, Pu have no D2 value: `dftd2` is unusable for models that
   contain them (decided: error, D5). Z = 55-86 values are single-source group fills.

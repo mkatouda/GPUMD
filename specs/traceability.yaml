@@ -15,8 +15,8 @@ requirements:
     source: specs/requirements/DR-002-dftd2-external-correction.md
     design: specs/design/DES-0002-dftd2-implementation-plan.md
     adrs: []
-    verification: [specs/verification/VER-0003-dftd2-parameters-and-oracle]
-    tests: [tests_pytest/test_dftd2_reference.py, tests_pytest/test_dftd2_src_table.py]   # AC-1/AC-2 etc.; Phases 2 (cutoff study) and 5 (FD/NVE/perf/regression/examples) pending
+    verification: [specs/verification/VER-0003-dftd2-parameters-and-oracle, specs/verification/VER-0005-dftd2-cutoff-study, specs/verification/VER-0006-dftd2-consistency-and-performance, specs/verification/VER-0007-dftd2-review-fixes]
+    tests: [tests_pytest/test_dftd2_reference.py, tests_pytest/test_dftd2_src_table.py, tests_pytest/test_dftd2_consistency.py]   # partial: AC-4 finite difference only at rc=12 A, AC-7 unmet (informative); Phase 6 (optimization, FD at rc=30 A) pending
     status: partial
 # Example entry:
 # - id: DR-001
