@@ -1,0 +1,13 @@
+case rc | variant: dE/E  dF/Fmax  dW/Wmax (vs dbl GPU) | same vs NumPy ref | sumF/Fmax | ratio to AC-1 (E2e-6,F1e-5,W2e-6)
+w81 rc=12.0 N=81: dbl-vs-ref 5.02e-09 1.17e-06 1.33e-07  sumF/Fmax dbl 3.8e-16 ref 4.4e-15
+   fa: vs dbl 3.27e-09 2.14e-06 4.49e-08 | vs ref 1.75e-09 2.87e-06 9.34e-08 | sumF 2.3e-06 | AC1 frac 0.287
+   fb: vs dbl 5.68e-08 1.56e-06 7.77e-08 | vs ref 5.17e-08 1.18e-06 5.55e-08 | sumF 2.8e-16 | AC1 frac 0.118
+w81 rc=30.0 N=81: dbl-vs-ref 7.75e-09 1.21e-06 1.42e-07  sumF/Fmax dbl 1.1e-15 ref 2.6e-14
+   fa: vs dbl 3.76e-09 2.18e-06 4.38e-08 | vs ref 3.98e-09 2.86e-06 9.79e-08 | sumF 2.4e-06 | AC1 frac 0.286
+   fb: vs dbl 1.13e-07 2.11e-06 1.14e-07 | vs ref 1.21e-07 2.67e-06 1.05e-07 | sumF 1.2e-15 | AC1 frac 0.267
+w648 rc=12.0 N=648: dbl-vs-ref 5.02e-09 1.17e-06 1.33e-07  sumF/Fmax dbl 3.0e-15 ref 2.0e-14
+   fa: vs dbl 7.01e-09 3.74e-06 4.33e-08 | vs ref 1.20e-08 4.21e-06 8.99e-08 | sumF 1.9e-05 | AC1 frac 0.421
+   fb: vs dbl 1.24e-07 2.23e-06 6.32e-08 | vs ref 1.18e-07 1.39e-06 1.02e-07 | sumF 7.5e-16 | AC1 frac 0.139
+w648 rc=30.0 N=648: dbl-vs-ref 7.75e-09 1.21e-06 1.42e-07  sumF/Fmax dbl 2.4e-15 ref 1.4e-13
+   fa: vs dbl 5.83e-09 3.74e-06 4.85e-08 | vs ref 1.36e-08 4.21e-06 9.31e-08 | sumF 1.8e-05 | AC1 frac 0.421
+   fb: vs dbl 1.24e-07 2.24e-06 6.04e-08 | vs ref 1.16e-07 1.38e-06 1.10e-07 | sumF 1.9e-15 | AC1 frac 0.138

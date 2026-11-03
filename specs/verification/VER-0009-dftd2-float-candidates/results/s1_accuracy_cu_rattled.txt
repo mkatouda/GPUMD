@@ -1,0 +1,7 @@
+case rc | variant: dE/E  dF/Fmax  dW/Wmax (vs dbl GPU) | same vs NumPy ref | sumF/Fmax | ratio to AC-1 (E2e-6,F1e-5,W2e-6)
+cu4000_rat rc=12.0 N=4000: dbl-vs-ref 1.09e-07 8.58e-07 2.87e-08  sumF/Fmax dbl 1.2e-15 ref 5.4e-14
+   fa: vs dbl 1.34e-09 5.46e-06 3.40e-08 | vs ref 1.10e-07 5.52e-06 5.55e-08 | sumF 1.2e-05 | AC1 frac 0.552
+   fb: vs dbl 1.20e-07 1.04e-06 3.65e-07 | vs ref 2.29e-07 1.05e-06 3.36e-07 | sumF 3.7e-15 | AC1 frac 0.168
+cu4000_rat rc=30.0 N=4000: dbl-vs-ref 1.03e-07 8.61e-07 2.59e-08  sumF/Fmax dbl 9.9e-15 ref 4.7e-14
+   fa: vs dbl 1.32e-09 5.46e-06 3.05e-08 | vs ref 1.04e-07 5.52e-06 5.12e-08 | sumF 1.2e-05 | AC1 frac 0.552
+   fb: vs dbl 1.17e-07 1.12e-06 3.54e-07 | vs ref 2.20e-07 9.99e-07 3.28e-07 | sumF 1.2e-14 | AC1 frac 0.164

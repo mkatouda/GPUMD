@@ -60,9 +60,9 @@ private:
   // float4 per type pair: {s6*C6_ij, R0_ij, phi(rc), phi'(rc)}
   GPU_Vector<float4> pair_param_;
 
-  GPU_Vector<double> extent_;    // min/max fractional coordinates (non-periodic directions)
-  GPU_Vector<double4> wrapped_;  // wrapped position (x, y, z) and type (w), original order
-  GPU_Vector<double4> sorted_;   // the same in cell order
+  GPU_Vector<double> extent_;   // min/max fractional coordinates (non-periodic directions)
+  GPU_Vector<double4> wrapped_; // wrapped position (x, y, z) and type (w), original order
+  GPU_Vector<float4> sorted_; // cell order; (x, y, z) relative to the cell center (float), w = type
   GPU_Vector<int> sorted_index_; // original atom index in cell order (increasing inside a cell)
   GPU_Vector<int> listed_index_; // atoms listed per cell in scheduling-dependent order (scratch)
   GPU_Vector<int> cell_of_atom_;

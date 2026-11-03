@@ -492,6 +492,65 @@ def test_dftd2_matches_reference_cell_and_thread_selection(name, tmp_path):
     _check_against_reference(tmp_path, builder(), S6_GPU, rc)
 
 
+# The candidate positions are stored in single precision relative to their cell center: the absolute
+# accuracy of the pair vector must not depend on the box size or on the distance from the origin.
+def _scaled(rep, factor, tri=False):    # same molecules' relative layout stretched: large box, sparse
+    atoms = _water(rep, tri=tri)
+    atoms.set_cell(atoms.cell.array * factor, scale_atoms=True)
+    return atoms
+
+
+def _open_far_from_origin():            # non-periodic, absolute coordinates of order 100 A
+    atoms = _water((2, 2, 2), pbc=False)
+    atoms.positions += 100.0
+    return atoms
+
+
+def _periodic_off_origin():             # periodic, translated by a non-lattice vector (different wrapping)
+    atoms = _water((2, 2, 2), tri=True)
+    atoms.positions += np.array([13.3, -41.7, 7.9])
+    return atoms
+
+
+FLOAT_CASES = {     # name: (builder, rc)
+    'big_cubic_box_rc30': (lambda: _scaled((2, 2, 2), 5), 30.0),
+    'big_cubic_box_rc12': (lambda: _scaled((2, 2, 2), 5), 12.0),
+    'big_triclinic_box_rc30': (lambda: _scaled((2, 2, 2), 4, tri=True), 30.0),
+    'open_far_from_origin_rc12': (_open_far_from_origin, 12.0),
+    'open_far_from_origin_rc30': (_open_far_from_origin, 30.0),
+    'periodic_off_origin_rc20': (_periodic_off_origin, 20.0),
+}
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize('name', list(FLOAT_CASES))
+def test_dftd2_matches_reference_float_positions(name, tmp_path):
+    builder, rc = FLOAT_CASES[name]
+    _check_against_reference(tmp_path, builder(), S6_GPU, rc)
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize('rc', [12.0, 30.0])
+def test_dftd2_is_invariant_under_a_rigid_shift_and_has_zero_net_force(rc, tmp_path):
+    """The same system translated rigidly (other wrapping and cell assignment): the D2 contribution
+    (run with dftd2 - run without) agrees within the AC-1 caps, and its net force is zero."""
+    atoms = _water((2, 2, 2), tri=True)
+    shifted = atoms.copy()
+    shifted.positions += np.array([13.3, -41.7, 7.9]) + 0.5 * atoms.cell.array.sum(axis=0)
+    out = []
+    for k, at in enumerate((atoms, shifted)):
+        e0, f0, v0 = _run(tmp_path / f'noD2_{k}', at, None)
+        e1, f1, v1 = _run(tmp_path / f'D2_{k}', at, f'dftd2 {S6_GPU} {rc}')
+        out.append((e1 - e0, f1 - f0, v1 - v0))
+    (ea, fa, va), (eb, fb, vb) = out
+    scale_f = np.abs(fa).max()
+    assert abs(ea - eb) <= REL_CAP_EV * abs(ea)
+    assert np.abs(fa - fb).max() <= REL_CAP_F * scale_f
+    assert np.abs(va - vb).max() <= REL_CAP_EV * np.abs(va).max()
+    for f in (fa, fb):
+        assert np.abs(f.sum(axis=0)).max() <= REL_CAP_F * scale_f
+
+
 # ---------------------------------------------------------------------------------------------
 # 3. GPU input errors
 # ---------------------------------------------------------------------------------------------

@@ -27,7 +27,9 @@ truncation phi_sf(r) = phi(r) - phi(rc) - phi'(rc) (r - rc).
 Pair search: one cell list (counting sort) in fractional coordinates; one thread per atom
 loops over the neighboring cells including periodic images (the same kernel handles cells
 smaller or larger than the cutoff). Forces and virials are accumulated per atom in registers
-(double); there is no atomicAdd on forces.
+(double); there is no atomicAdd on forces. Candidate positions are stored in float relative to the
+center of their cell; the displacement between two cells is formed in double and rounded once
+to float, so the pair vector has an absolute error of about 1e-7 of the cell width.
 ------------------------------------------------------------------------------*/
 
 #include "dftd2.cuh"
@@ -87,6 +89,8 @@ struct Grid {
   double s0[3];  // fractional origin of the grid
   double len[3]; // fractional length covered by the grid
   double H[9];   // lattice vectors are the columns (box.cpu_h[0..8])
+  double C[9];   // cell step vectors: column d = H[:, d] * len[d] / n[d]
+  double O[3];   // cartesian origin of the grid: H * s0
   double Hinv[9];
 };
 
@@ -215,11 +219,12 @@ list_atoms(const int N, const int* g_cell, const int* g_start, int* g_fill, int*
 // is the start of its cell plus the number of atoms of the same cell with a smaller index
 __global__ void place_atoms(
   const int N,
+  const Grid grid,
   const double4* g_wrapped,
   const int* g_cell,
   const int* g_start,
   const int* g_listed_index,
-  double4* g_sorted,
+  float4* g_sorted,
   int* g_sorted_index)
 {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -233,7 +238,20 @@ __global__ void place_atoms(
   for (int s = begin; s < end; ++s) {
     rank += (g_listed_index[s] < i) ? 1 : 0;
   }
-  g_sorted[begin + rank] = g_wrapped[i];
+  // position relative to the center of its own cell (small numbers: float keeps ~1e-7 of the cell
+  // width as absolute accuracy)
+  const double4 w = g_wrapped[i];
+  const int ux = cell % grid.n[0];
+  const int uy = (cell / grid.n[0]) % grid.n[1];
+  const int uz = cell / (grid.n[0] * grid.n[1]);
+  const double cu[3] = {ux + 0.5, uy + 0.5, uz + 0.5};
+  float local[3];
+  for (int a = 0; a < 3; ++a) {
+    const double center =
+      grid.O[a] + grid.C[3 * a] * cu[0] + grid.C[3 * a + 1] * cu[1] + grid.C[3 * a + 2] * cu[2];
+    local[a] = static_cast<float>((a == 0 ? w.x : (a == 1 ? w.y : w.z)) - center);
+  }
+  g_sorted[begin + rank] = make_float4(local[0], local[1], local[2], static_cast<float>(w.w));
   g_sorted_index[begin + rank] = i;
 }
 
@@ -249,7 +267,7 @@ __global__ void dftd2_pair_kernel(
   const float4* g_pair,
   const int* g_cell,
   const int* g_start,
-  const double4* g_sorted,
+  const float4* g_sorted,
   const int* g_sorted_index,
   double* g_potential,
   double* g_fx,
@@ -268,7 +286,7 @@ __global__ void dftd2_pair_kernel(
   // (invalid threads stay alive for the reduction; they read atom 0 and skip all loops)
   const int slot_safe = valid ? slot : 0;
   const int i = g_sorted_index[slot_safe];
-  const double4 pi = g_sorted[slot_safe];
+  const float4 pi = g_sorted[slot_safe];
   const int type_i = static_cast<int>(pi.w);
   const int cell_i = g_cell[i];
   const int cx = cell_i % grid.n[0];
@@ -283,6 +301,7 @@ __global__ void dftd2_pair_kernel(
   const int oz_begin = valid ? -grid.k[2] : 1;
   const int oz_end = valid ? grid.k[2] : 0; // empty range for invalid threads
   for (int oz = oz_begin; oz <= oz_end; ++oz) {
+    const double bz0 = oz * grid.C[2], bz1 = oz * grid.C[5], bz2 = oz * grid.C[8];
     int uz = cz + oz;
     int shz = 0;
     if (grid.periodic[2]) {
@@ -300,6 +319,8 @@ __global__ void dftd2_pair_kernel(
       } else if (uy < 0 || uy >= grid.n[1]) {
         continue;
       }
+      const double by0 = bz0 + oy * grid.C[1], by1 = bz1 + oy * grid.C[4],
+                   by2 = bz2 + oy * grid.C[7];
       for (int ox = -grid.k[0]; ox <= grid.k[0]; ++ox) {
         int ux = cx + ox;
         int shx = 0;
@@ -310,20 +331,21 @@ __global__ void dftd2_pair_kernel(
           continue;
         }
         const int cell = ux + grid.n[0] * (uy + grid.n[1] * uz);
-        // translation of the image cell
-        const double tx = shx * grid.H[0] + shy * grid.H[1] + shz * grid.H[2];
-        const double ty = shx * grid.H[3] + shy * grid.H[4] + shz * grid.H[5];
-        const double tz = shx * grid.H[6] + shy * grid.H[7] + shz * grid.H[8];
+        // displacement of the (image) neighbor cell center from the center of this atom's cell, in
+        // double, rounded once to float (it is the same for all candidates of the cell)
+        const float ofx = static_cast<float>(by0 + ox * grid.C[0]);
+        const float ofy = static_cast<float>(by1 + ox * grid.C[3]);
+        const float ofz = static_cast<float>(by2 + ox * grid.C[6]);
         const bool home = (shx == 0 && shy == 0 && shz == 0);
         const int j_end = g_start[cell + 1];
         for (int js = g_start[cell] + sub; js < j_end; js += NUM_SUB) {
           if (home && js == slot) {
             continue;
           }
-          const double4 pj = g_sorted[js];
-          const float dx = static_cast<float>(pj.x + tx - pi.x);
-          const float dy = static_cast<float>(pj.y + ty - pi.y);
-          const float dz = static_cast<float>(pj.z + tz - pi.z);
+          const float4 pj = g_sorted[js];
+          const float dx = (pj.x - pi.x) + ofx;
+          const float dy = (pj.y - pi.y) + ofy;
+          const float dz = (pj.z - pi.z) + ofz;
           const float r2 = dx * dx + dy * dy + dz * dz;
           if (r2 >= rc2) {
             continue;
@@ -690,6 +712,15 @@ void DFTD2::compute(
     grid.k[d] = std::max(k, 0);
   }
   const int num_cells = grid.n[0] * grid.n[1] * grid.n[2];
+  for (int d = 0; d < 3; ++d) {
+    for (int a = 0; a < 3; ++a) {
+      grid.C[3 * a + d] = grid.H[3 * a + d] * grid.len[d] / grid.n[d];
+    }
+  }
+  for (int a = 0; a < 3; ++a) {
+    grid.O[a] =
+      grid.H[3 * a] * grid.s0[0] + grid.H[3 * a + 1] * grid.s0[1] + grid.H[3 * a + 2] * grid.s0[2];
+  }
 
   ensure_size(wrapped_, N);
   ensure_size(sorted_, N);
@@ -715,6 +746,7 @@ void DFTD2::compute(
   GPU_CHECK_KERNEL
   place_atoms<<<grid_size, BLOCK_SIZE>>>(
     N,
+    grid,
     wrapped_.data(),
     cell_of_atom_.data(),
     cell_start_.data(),

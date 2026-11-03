@@ -118,6 +118,11 @@
   (iii) not started (forced cell counts are always slower than the automatic choice). (iv) not pursued.
   Observation: the candidate loop computes coordinate differences in double (GA102 FP64 = 1/64 rate); a float
   scratch variant was 1.3-1.7x faster, accuracy not yet checked (Stage 2b, human-approved 2026-11-03).
+- Stage 2b outcome (2026-11-03, VER-0009): float candidate loop with cell-centre-relative float coordinates adopted
+  (naive float coordinates failed the accuracy gate: 2.53 x AC-1 tolerance far from the origin). Max error 0.27 x AC-1
+  tolerance (gate 1/3); sum of forces ~1e-15; pair kernel 1.49-1.86x faster on 35 points (water 648/5,184, Cu 4,000 at
+  rc = 30 A: 1.6x), no slowdown; determinism and all existing tests unchanged. Not yet done: finite difference at
+  rc = 30 A, --suite full, independent review (Stage 3).
 - Stage 3: re-measure VER-0006 timing tables (AC-7), re-run the finite-difference checks at
   rc = 30 A (closing the rc = 12 A-only gap of AC-4), `--suite full` against the master baseline,
   independent numerical review of the changed kernel; then set the DR-002 status by the rule

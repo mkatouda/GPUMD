@@ -1,0 +1,13 @@
+/tmp/claude-1001/-home-katouda-work-dielectric-response-pj-GPUMD/e8515210-3788-4777-872c-6503ac9338a6/scratchpad/p6c/acc.py:68: RuntimeWarning: invalid value encountered in scalar divide
+  row={'case':n,'rc':rc,'N':N,'dbl_vs_ref':rows['dbl'],'sumF_dbl':float(np.abs(Fd.sum(0)).max()/np.abs(Fd).max()),'sumF_ref':float(np.abs(Fr.sum(0)).max()/np.abs(Fr).max())}
+case rc | variant: dE/E  dF/Fmax  dW/Wmax (vs dbl GPU) | same vs NumPy ref | sumF/Fmax | ratio to AC-1 (E2e-6,F1e-5,W2e-6)
+cu4000 rc=12.0 N=4000: dbl-vs-ref 1.15e-07 1.00e+00 4.69e-07  sumF/Fmax dbl nan ref 3.4e+00
+/tmp/claude-1001/-home-katouda-work-dielectric-response-pj-GPUMD/e8515210-3788-4777-872c-6503ac9338a6/scratchpad/p6c/acc.py:66: RuntimeWarning: divide by zero encountered in scalar divide
+  return (abs(E-E0)/abs(E0), np.abs(F-F0).max()/np.abs(F0).max(), np.abs(W-W0).max()/np.abs(W0).max())
+   fb: vs dbl 5.05e-07 inf 9.55e-07 | vs ref 3.90e-07 1.21e+08 4.86e-07 | sumF 0.0e+00 | AC1 frac 12089749374529.795
+cu4000 rc=30.0 N=4000: dbl-vs-ref 1.10e-07 1.00e+00 4.09e-07  sumF/Fmax dbl 1.2e+02 ref 2.0e+01
+   fb: vs dbl 4.41e-07 1.07e+09 8.26e-07 | vs ref 3.31e-07 8.97e+07 4.17e-07 | sumF 3.0e-07 | AC1 frac 8968610113946.842
+cu4000_shift rc=12.0 N=4000: dbl-vs-ref 1.15e-07 1.00e+00 4.69e-07  sumF/Fmax dbl nan ref 9.4e-02
+   fb: vs dbl 4.96e-07 inf 9.56e-07 | vs ref 3.81e-07 4.74e+06 4.87e-07 | sumF 0.0e+00 | AC1 frac 473973748526.293
+cu4000_shift rc=30.0 N=4000: dbl-vs-ref 1.10e-07 1.00e+00 4.09e-07  sumF/Fmax dbl 8.0e+01 ref 2.5e-01
+   fb: vs dbl 4.47e-07 1.39e+09 8.40e-07 | vs ref 3.37e-07 4.73e+06 4.31e-07 | sumF 3.6e-07 | AC1 frac 473116303248.255
