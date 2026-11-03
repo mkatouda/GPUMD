@@ -28,8 +28,12 @@ Pair search: one cell list (counting sort) in fractional coordinates; one thread
 loops over the neighboring cells including periodic images (the same kernel handles cells
 smaller or larger than the cutoff). Forces and virials are accumulated per atom in registers
 (double); there is no atomicAdd on forces. Candidate positions are stored in float relative to the
-center of their cell; the displacement between two cells is formed in double and rounded once
-to float, so the pair vector has an absolute error of about 1e-7 of the cell width.
+center of their cell; the displacement between two cell centers is formed in double and rounded once
+to float. The pair vector is then (pj - pi) + offset in float: the offset (up to about k*width, i.e.
+about rc) is rounded and the sum is rounded again, so each component has an absolute error of about
+6e-8 * (pair distance + cell width), independent of the box size and of the distance from the
+origin. For close pairs this is up to about (1 + width/r) times larger than rounding the exact
+double vector once (about 6e-8 * r); e.g. r = 3 A and width = 12 A: about 5 times (2e-7 -> 1e-6 A).
 ------------------------------------------------------------------------------*/
 
 #include "dftd2.cuh"
@@ -42,6 +46,7 @@ to float, so the pair vector has an absolute error of about 1e-7 of the cell wid
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <set>
 #include <string>
@@ -255,6 +260,88 @@ __global__ void place_atoms(
   g_sorted_index[begin + rank] = i;
 }
 
+// Sum over the NUM_SUB consecutive threads that share an atom, in a fixed tree order; the result is
+// left in the first thread (sub == 0) of the group. The shared array exists only for NUM_SUB > 1.
+template <int NUM_SUB>
+struct SubReduce {
+  static __device__ void run(
+    const int tid,
+    const int sub,
+    double& e_i,
+    double& fx,
+    double& fy,
+    double& fz,
+    double& v_xx,
+    double& v_yy,
+    double& v_zz,
+    double& v_xy,
+    double& v_xz,
+    double& v_yz,
+    double& v_yx,
+    double& v_zx,
+    double& v_zy)
+  {
+    __shared__ double s_red[NUM_REDUCE][BLOCK_SIZE];
+    s_red[0][tid] = e_i;
+    s_red[1][tid] = fx;
+    s_red[2][tid] = fy;
+    s_red[3][tid] = fz;
+    s_red[4][tid] = v_xx;
+    s_red[5][tid] = v_yy;
+    s_red[6][tid] = v_zz;
+    s_red[7][tid] = v_xy;
+    s_red[8][tid] = v_xz;
+    s_red[9][tid] = v_yz;
+    s_red[10][tid] = v_yx;
+    s_red[11][tid] = v_zx;
+    s_red[12][tid] = v_zy;
+    for (int offset = NUM_SUB / 2; offset > 0; offset >>= 1) {
+      __syncthreads();
+      if (sub < offset) {
+        for (int c = 0; c < NUM_REDUCE; ++c) {
+          s_red[c][tid] += s_red[c][tid + offset];
+        }
+      }
+    }
+    e_i = s_red[0][tid];
+    fx = s_red[1][tid];
+    fy = s_red[2][tid];
+    fz = s_red[3][tid];
+    v_xx = s_red[4][tid];
+    v_yy = s_red[5][tid];
+    v_zz = s_red[6][tid];
+    v_xy = s_red[7][tid];
+    v_xz = s_red[8][tid];
+    v_yz = s_red[9][tid];
+    v_yx = s_red[10][tid];
+    v_zx = s_red[11][tid];
+    v_zy = s_red[12][tid];
+  }
+};
+
+// one thread per atom: nothing to add
+template <>
+struct SubReduce<1> {
+  static __device__ void run(
+    const int,
+    const int,
+    double&,
+    double&,
+    double&,
+    double&,
+    double&,
+    double&,
+    double&,
+    double&,
+    double&,
+    double&,
+    double&,
+    double&,
+    double&)
+  {
+  }
+};
+
 // NUM_SUB consecutive threads (a power of two) share one atom (in cell order). Each of them takes
 // every NUM_SUB-th atom of each neighbor cell (including periodic images); the partial sums are
 // added in a fixed tree order in shared memory, so the result does not depend on scheduling.
@@ -282,7 +369,6 @@ __global__ void dftd2_pair_kernel(
   const int sub = tid % NUM_SUB;
   const int slot = blockIdx.x * (BLOCK_SIZE / NUM_SUB) + tid / NUM_SUB;
   const bool valid = slot < N;
-  __shared__ double s_red[(NUM_SUB > 1) ? NUM_REDUCE : 1][BLOCK_SIZE];
   // (invalid threads stay alive for the reduction; they read atom 0 and skip all loops)
   const int slot_safe = valid ? slot : 0;
   const int i = g_sorted_index[slot_safe];
@@ -384,42 +470,8 @@ __global__ void dftd2_pair_kernel(
     }
   }
 
-  if (NUM_SUB > 1) {
-    s_red[0][tid] = e_i;
-    s_red[1][tid] = fx;
-    s_red[2][tid] = fy;
-    s_red[3][tid] = fz;
-    s_red[4][tid] = v_xx;
-    s_red[5][tid] = v_yy;
-    s_red[6][tid] = v_zz;
-    s_red[7][tid] = v_xy;
-    s_red[8][tid] = v_xz;
-    s_red[9][tid] = v_yz;
-    s_red[10][tid] = v_yx;
-    s_red[11][tid] = v_zx;
-    s_red[12][tid] = v_zy;
-    for (int offset = NUM_SUB / 2; offset > 0; offset >>= 1) {
-      __syncthreads();
-      if (sub < offset) {
-        for (int c = 0; c < NUM_REDUCE; ++c) {
-          s_red[c][tid] += s_red[c][tid + offset];
-        }
-      }
-    }
-    e_i = s_red[0][tid];
-    fx = s_red[1][tid];
-    fy = s_red[2][tid];
-    fz = s_red[3][tid];
-    v_xx = s_red[4][tid];
-    v_yy = s_red[5][tid];
-    v_zz = s_red[6][tid];
-    v_xy = s_red[7][tid];
-    v_xz = s_red[8][tid];
-    v_yz = s_red[9][tid];
-    v_yx = s_red[10][tid];
-    v_zx = s_red[11][tid];
-    v_zy = s_red[12][tid];
-  }
+  SubReduce<NUM_SUB>::run(
+    tid, sub, e_i, fx, fy, fz, v_xx, v_yy, v_zz, v_xy, v_xz, v_yz, v_yx, v_zx, v_zy);
   if (!valid || sub != 0) {
     return;
   }
@@ -574,9 +626,24 @@ void DFTD2::initialize(
   num_types_ = static_cast<int>(atomic_numbers.size());
 
   // one block of BLOCK_SIZE threads per SM is enough to fill the device for this kernel
+  int device_id = 0;
+  CHECK(gpuGetDevice(&device_id));
   gpuDeviceProp device_prop;
-  CHECK(gpuGetDeviceProperties(&device_prop, 0));
+  CHECK(gpuGetDeviceProperties(&device_prop, device_id));
   target_threads_ = device_prop.multiProcessorCount * BLOCK_SIZE;
+  // Debugging/testing aid, intentionally undocumented for users: the environment variable
+  // GPUMD_DFTD2_TARGET_THREADS (a positive integer) replaces the target thread count, which fixes
+  // the number of threads per atom (see get_num_sub; target = N * s gives s threads per atom if the
+  // candidate count allows it), so that every instantiation of the pair kernel can be
+  // tested on the same system. The chosen value is then printed once.
+  const char* target_env = std::getenv("GPUMD_DFTD2_TARGET_THREADS");
+  if (target_env != nullptr) {
+    const long long value = std::atoll(target_env);
+    if (value > 0 && value <= 1000000000LL) {
+      target_threads_ = static_cast<int>(value);
+      debug_print_num_sub_ = true;
+    }
+  }
 
   std::vector<float4> table(static_cast<size_t>(num_types_) * num_types_);
   for (int a = 0; a < num_types_; ++a) {
@@ -654,6 +721,9 @@ void DFTD2::compute(
   GPU_Vector<double>& virial_per_atom)
 {
   const int N = type.size();
+  if (N == 0) {
+    return;
+  }
   if (!elements_checked_) {
     check_elements(type);
   }
@@ -755,6 +825,18 @@ void DFTD2::compute(
     sorted_index_.data());
   GPU_CHECK_KERNEL
   const int num_sub = get_num_sub(N, candidates_per_atom, target_threads_);
+  if (debug_print_num_sub_) {
+    printf(
+      "DFTD2 debug: threads per atom = %d, cells = %d %d %d, range = %d %d %d\n",
+      num_sub,
+      grid.n[0],
+      grid.n[1],
+      grid.n[2],
+      grid.k[0],
+      grid.k[1],
+      grid.k[2]);
+    fflush(stdout);
+  }
   const int pair_blocks = (N * num_sub - 1) / BLOCK_SIZE + 1;
 #define DFTD2_LAUNCH_PAIR(NS)                                                                      \
   dftd2_pair_kernel<NS><<<pair_blocks, BLOCK_SIZE>>>(                                              \

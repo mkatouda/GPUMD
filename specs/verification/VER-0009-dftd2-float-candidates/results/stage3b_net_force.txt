@@ -1,0 +1,17 @@
+net D2 force / largest D2 force (water 648 triclinic, s6 = 75, scripts/sumf.py), "fb" = adopted kernel, "fa" = naive float variant (mutant, see README)
+fb tri 12.0 sumF/Fmax = 7.85e-15
+fb trishift 12.0 sumF/Fmax = 6.40e-15
+fb far100 12.0 sumF/Fmax = 4.42e-14
+fb far300 12.0 sumF/Fmax = 4.42e-14
+fb tri 30.0 sumF/Fmax = 1.50e-14
+fb trishift 30.0 sumF/Fmax = 9.37e-15
+fb far100 30.0 sumF/Fmax = 2.18e-14
+fb far300 30.0 sumF/Fmax = 2.18e-14
+fa tri 12.0 sumF/Fmax = 1.43e-05
+fa trishift 12.0 sumF/Fmax = 1.10e-05
+fa far100 12.0 sumF/Fmax = 2.17e-14
+fa far300 12.0 sumF/Fmax = 3.99e-14
+fa tri 30.0 sumF/Fmax = 1.35e-05
+fa trishift 30.0 sumF/Fmax = 1.09e-05
+fa far100 30.0 sumF/Fmax = 2.00e-14
+fa far300 30.0 sumF/Fmax = 2.02e-14

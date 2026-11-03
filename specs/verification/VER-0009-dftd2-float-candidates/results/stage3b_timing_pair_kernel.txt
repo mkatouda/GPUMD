@@ -1,0 +1,3 @@
+sys rc base_ms cand_ms speedup
+w648 30.0 1.894 1.894 1.00x
+w5184 30.0 9.551 9.507 1.00x

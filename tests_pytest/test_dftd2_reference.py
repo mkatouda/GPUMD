@@ -270,6 +270,9 @@ GPU_CASES = {   # name: (s6, rc, description)
 }
 REL_CAP_EV = 2e-6
 REL_CAP_F = 1e-5
+# net D2 force / largest D2 force: measured <= 4.4e-14 (water 648, rc 12 and 30, periodic, shifted, and
+# non-periodic at 100 and 300 A); a pair vector that is not exactly antisymmetric gives >= 1e-8
+NET_FORCE_CAP = 1e-12
 
 
 def _run(workdir, atoms, dftd2_line):
@@ -282,6 +285,7 @@ def _run(workdir, atoms, dftd2_line):
     (workdir / 'run.in').write_text('\n'.join(lines) + '\n')
     result = subprocess.run([str(GPUMD_EXECUTABLE)], cwd=workdir, capture_output=True, text=True)
     assert result.returncode == 0, (result.stdout + result.stderr)[-1500:]
+    _run.last_stdout = result.stdout
     header = (workdir / 'dump.xyz').read_text().splitlines()[1]
     energy = float(re.search(r'energy=([-0-9.eE+]+)', header).group(1))
     virial = np.array(re.search(r'virial="([^"]+)"', header).group(1).split(), float).reshape(3, 3)
@@ -290,18 +294,21 @@ def _run(workdir, atoms, dftd2_line):
 
 
 def _check_against_reference(tmp_path, atoms, s6, rc):
-    """(run with dftd2) - (run without) equals the reference; relative caps only, no floors."""
+    """(run with dftd2) - (run without) equals the reference; relative caps only, no floors.
+    Returns the errors as fractions of the caps (energy, force, virial)."""
     E_ref, F_ref, W_ref = ref.energy_forces_virial(atoms, s6, rc)
     e0, f0, v0 = _run(tmp_path / 'noD2', atoms, None)
     e1, f1, v1 = _run(tmp_path / 'D2', atoms, f'dftd2 {s6} {rc}')
     tol_e = REL_CAP_EV * abs(E_ref)
     tol_f = REL_CAP_F * np.abs(F_ref).max()
     tol_v = REL_CAP_EV * np.abs(W_ref).max()
-    assert abs((e1 - e0) - E_ref) <= tol_e, f'energy error {abs((e1 - e0) - E_ref):.3e} eV (tol {tol_e:.1e})'
+    err_e = abs((e1 - e0) - E_ref)
+    assert err_e <= tol_e, f'energy error {err_e:.3e} eV (tol {tol_e:.1e})'
     err_f = np.abs((f1 - f0) - F_ref).max()
     assert err_f <= tol_f, 'force error %.3e eV/A (tol %.1e)' % (err_f, tol_f)
     err_v = np.abs((v1 - v0) - W_ref).max()
     assert err_v <= tol_v, 'virial error %.3e eV (tol %.1e)' % (err_v, tol_v)
+    return tuple(e / t if t > 0 else 0.0 for e, t in ((err_e, tol_e), (err_f, tol_f), (err_v, tol_v)))
 
 
 @pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
@@ -506,6 +513,12 @@ def _open_far_from_origin():            # non-periodic, absolute coordinates of 
     return atoms
 
 
+def _open_far_300():                    # non-periodic, absolute coordinates of order 300 A
+    atoms = _water((2, 2, 2), pbc=False)
+    atoms.positions += 300.0
+    return atoms
+
+
 def _periodic_off_origin():             # periodic, translated by a non-lattice vector (different wrapping)
     atoms = _water((2, 2, 2), tri=True)
     atoms.positions += np.array([13.3, -41.7, 7.9])
@@ -518,6 +531,8 @@ FLOAT_CASES = {     # name: (builder, rc)
     'big_triclinic_box_rc30': (lambda: _scaled((2, 2, 2), 4, tri=True), 30.0),
     'open_far_from_origin_rc12': (_open_far_from_origin, 12.0),
     'open_far_from_origin_rc30': (_open_far_from_origin, 30.0),
+    'open_far_300_rc12': (_open_far_300, 12.0),
+    'open_far_300_rc30': (_open_far_300, 30.0),
     'periodic_off_origin_rc20': (_periodic_off_origin, 20.0),
 }
 
@@ -526,7 +541,52 @@ FLOAT_CASES = {     # name: (builder, rc)
 @pytest.mark.parametrize('name', list(FLOAT_CASES))
 def test_dftd2_matches_reference_float_positions(name, tmp_path):
     builder, rc = FLOAT_CASES[name]
-    _check_against_reference(tmp_path, builder(), S6_GPU, rc)
+    fractions = _check_against_reference(tmp_path, builder(), S6_GPU, rc)
+    print(name, 'error / cap (E, F, W):', fractions)
+
+
+# The pair vector is (pj - pi) + offset in float; its absolute error is about 6e-8 * (r + cell width).
+# The largest neighbor range of the cell search is 6 cells (cell width about rc / 6): dense water,
+# 2187 atoms in a 27.9 A box with rc = 30 A gives 5 cells per direction and a range of 6.
+# GPUMD_DFTD2_TARGET_THREADS (a test aid, see dftd2.cu) fixes the threads per atom (4 = the value
+# chosen on an 84-SM device) and makes gpumd print the cell counts and the range.
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd2_matches_reference_with_neighbor_range_6(tmp_path, monkeypatch):
+    atoms = structure('water_large')
+    monkeypatch.setenv('GPUMD_DFTD2_TARGET_THREADS', str(4 * len(atoms)))
+    fractions = _check_against_reference(tmp_path, atoms, S6_GPU, 30.0)
+    print('range-6 error / cap (E, F, W):', fractions)
+    assert 'threads per atom = 4, cells = 5 5 5, range = 6 6 6' in _run.last_stdout
+
+
+# Every instantiation of the pair kernel (1, 2, ..., 32 threads per atom, with the shared-memory
+# reduction for more than one) on the same system: agreement with one thread per atom within the
+# AC-1 caps (different summation order only), and bit-identical results from run to run.
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize('rc', [12.0, 30.0])
+def test_dftd2_all_threads_per_atom_agree_and_are_reproducible(rc, tmp_path, monkeypatch):
+    atoms = _water((2, 2, 2))
+    n = len(atoms)
+    e_off, f_off, w_off = _run(tmp_path / 'off', atoms, None)
+    results = {}
+    for num_sub in (1, 2, 4, 8, 16, 32):
+        monkeypatch.setenv('GPUMD_DFTD2_TARGET_THREADS', str(n * num_sub))
+        runs = []
+        for k in range(2):
+            e, f, w = _run(tmp_path / f's{num_sub}_{k}', atoms, f'dftd2 {S6_GPU} {rc}')
+            assert f'threads per atom = {num_sub},' in _run.last_stdout
+            runs.append((e, f, w))
+        (e1, f1, w1), (e2, f2, w2) = runs
+        assert e1 == e2 and np.array_equal(f1, f2) and np.array_equal(w1, w2), num_sub
+        results[num_sub] = (e1 - e_off, f1 - f_off, w1 - w_off)
+    e_ref, f_ref, w_ref = results[1]
+    assert abs(e_ref) > 0
+    for num_sub, (e, f, w) in results.items():
+        err = (abs(e - e_ref) / (REL_CAP_EV * abs(e_ref)),
+               np.abs(f - f_ref).max() / (REL_CAP_F * np.abs(f_ref).max()),
+               np.abs(w - w_ref).max() / (REL_CAP_EV * np.abs(w_ref).max()))
+        print(f'threads per atom {num_sub}, rc {rc}: error / cap (E, F, W) =', err)
+        assert max(err) <= 1.0, (num_sub, err)
 
 
 @pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
@@ -548,7 +608,20 @@ def test_dftd2_is_invariant_under_a_rigid_shift_and_has_zero_net_force(rc, tmp_p
     assert np.abs(fa - fb).max() <= REL_CAP_F * scale_f
     assert np.abs(va - vb).max() <= REL_CAP_EV * np.abs(va).max()
     for f in (fa, fb):
-        assert np.abs(f.sum(axis=0)).max() <= REL_CAP_F * scale_f
+        assert np.abs(f.sum(axis=0)).max() <= NET_FORCE_CAP * scale_f
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize('rc', [12.0, 30.0])
+def test_dftd2_net_force_vanishes_far_from_the_origin(rc, tmp_path):
+    """Non-periodic system 300 A from the origin: the net D2 force is zero to rounding (single-precision
+    absolute coordinates there are only good to about 3e-5 A).  Antisymmetry only; the accuracy of the
+    pair vector at this distance is checked against the reference in the float-position cases."""
+    atoms = _open_far_300()
+    _, f0, _ = _run(tmp_path / 'noD2', atoms, None)
+    _, f1, _ = _run(tmp_path / 'D2', atoms, f'dftd2 {S6_GPU} {rc}')
+    f = f1 - f0
+    assert np.abs(f.sum(axis=0)).max() <= NET_FORCE_CAP * np.abs(f).max()
 
 
 # ---------------------------------------------------------------------------------------------

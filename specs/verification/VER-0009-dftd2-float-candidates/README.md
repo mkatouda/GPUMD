@@ -11,7 +11,9 @@
 - "fb" (adopted): sorted positions float4 relative to the CENTER of the atom's own cell. Per neighbor cell the displacement between the two cell centers
   (`H * diag(len/n) * (ox, oy, oz)`, built hierarchically in double over the oz/oy/ox loops) is rounded once to float: `dx = (pj.x - pi.x) + off.x`.
   The pair vector is exactly antisymmetric in i <-> j (same float operations, signs flipped), so the net force is zero to rounding.
-  Absolute error of dx ~ 1e-7 x cell width (independent of box size and of the distance from the origin).
+  Absolute error of each component of dx ~ 6e-8 x (pair distance r + cell width w), independent of box size and of the distance from the origin
+  (corrected in stage 3b; the original text said "1e-7 x cell width"): the offset (up to k*w ~ rc) is rounded to float and the sum `(pj - pi) + off` is rounded again.
+  For close pairs this is up to (1 + w/r) times the error of rounding the exact double vector once (~6e-8 r), e.g. r = 3 A, w = 12 A: 5x (2e-7 -> 1e-6 A) worse than the pre-2b kernel.
   The periodic shift (`tx`) is no longer used for the geometry: the image cell offset is the unwrapped cell displacement.
 - Everything else (float pair math, double accumulators, NUM_SUB reduction, cell choice) is unchanged.
 
@@ -59,5 +61,39 @@ Speed-up = HEAD / candidate. Gate PASS: 1.49x-1.86x everywhere, no slowdown. Reg
 
 ## 5. Limitations / not verified
 - `--suite full` regression and finite-difference/NVE checks were not run here (kernel math beyond dx is unchanged).
-- Accuracy depends on the cell width: cells are about rc / (1..6) wide; for a very sparse system in a huge box (cells up to L/10) the absolute error grows proportionally (still ~1e-7 of the cell width).
+- Accuracy depends on the cell width and the pair distance: the absolute error of a pair-vector component is ~6e-8 x (r + w) (see sec. 1); cells are about rc / (1..6) wide; for a very sparse system in a huge box (cells up to L/10) w and hence the error grow proportionally.
 - Tuned/measured on one GPU (sm_86, CUDA 12.3). The effect on other architectures (full-rate FP64) is expected to be smaller.
+
+## 6. Stage 3b appendix (independent numerical review, MINOR findings)
+Binary: worktree `wt-d2-phase6e` (base HEAD 22467397), sm_86, RTX A6000, CUDA 12.3. Source changes do not alter any computed value (the pair kernel is unchanged apart from the reduction helper).
+
+### 6.1 Accuracy statement (M1)
+Sec. 1 and sec. 5 corrected: the pair-vector error is ~6e-8 x (r + w), not 1e-7 x w. Dense water 2187 atoms, 27.9 A box, rc = 30 A gives 5 cells per direction and range k = 6 (the largest, cell width 5.6 A);
+new test `test_dftd2_matches_reference_with_neighbor_range_6` (NumPy reference, unchanged AC-1 caps): error / cap = E 0.034, F 0.198, W 0.051 (i.e. 5x margin on the force, the tightest quantity).
+Margins of the float-position cases (error / cap, E, F, W): big cubic box rc 30: 0.052, 0.112, 0.071; rc 12: 0.058, 0.117, 0.066; big triclinic rc 30: 0.017, 0.089, 0.029; non-periodic at +100 A: rc 12 0.003, 0.197, 0.079, rc 30 0.001, 0.195, 0.075;
+at +300 A (new): rc 12 0.003, 0.197, 0.079, rc 30 0.001, 0.195, 0.075 (identical to +100 A to 3 digits); periodic, translated off the origin, rc 20: 0.003, 0.171, 0.035.
+(The force fraction of ~0.2 in the open cases is the same at +100 and +300 A, so it comes from the single-precision pair math, not from the coordinates.)
+
+### 6.2 All NUM_SUB instances (M2)
+`GPUMD_DFTD2_TARGET_THREADS` (environment variable, read once in `DFTD2::initialize`, undocumented in the manual, commented in `dftd2.cu`) replaces the device-derived target thread count; with `target = N * s` the kernel uses s threads per atom.
+When it is set, gpumd prints `DFTD2 debug: threads per atom = s, cells = ..., range = ...`, which the tests check, so each instantiation is really exercised.
+Test `test_dftd2_all_threads_per_atom_agree_and_are_reproducible` (water 648, rc 12 and 30): s = 1, 2, 4, 8, 16, 32, each run twice: bit-identical within each s; agreement with s = 1 in error / cap (F, W): rc 12: <= 1.2e-11, 7.1e-11; rc 30: <= 3.4e-10, 1.4e-10; E identical to the printed precision.
+(The dump header has limited energy precision; the force/virial differences are the order of double-precision summation-order noise.)
+
+### 6.3 Detection power against the naive float variant "fa" (M3)
+- Added: non-periodic cases at +300 A (accuracy vs reference, rc 12/30) and `test_dftd2_net_force_vanishes_far_from_the_origin` (rc 12/30).
+- Net-force cap of the rigid-shift test tightened from 1e-5 to 1e-12 x Fmax (`NET_FORCE_CAP`): measured fb <= 4.4e-14 (results/stage3b_net_force.txt; cap = 23x margin); fa gives 1.1e-5..1.4e-5 for the periodic cases.
+- Mutation check: fa was rebuilt temporarily (sorted positions = absolute float coordinates, `dx = pj + float(t - double(pi))` with the periodic image translation t; source restored afterwards, binary rebuilt, same size as before the mutation).
+  With fa: `test_dftd2_matches_reference_float_positions[open_far_from_origin_rc12 / rc30 / open_far_300_rc12 / rc30]` FAIL (the +100 A cases existed before; they already detected fa), and both rigid-shift tests (rc 12, 30) FAIL on the net force with the new 1e-12 cap (measured 1.1e-5..1.4e-5 would also exceed the old 1e-5 cap, but the old cap was not re-run).
+  The other float cases (big boxes, periodic off origin) pass with fa: they do not discriminate. Net force of non-periodic systems is antisymmetric even for fa (2e-14 at 300 A), so the new net-force-at-300-A test does NOT detect fa; the accuracy cases at 300 A do.
+  Result: 6 failed, 4 passed in the selected set (`-k "float_positions or rigid_shift"`).
+
+### 6.4 Other review items
+- M4: `gpuGetDevice` + `gpuGetDeviceProperties(device_id)` (macro added to `gpu_macro.cuh`; `main_replica` already had it). M6: early return for N = 0.
+- M5: the shared array is now inside `SubReduce<NUM_SUB>` (specialization for 1 is empty), no out-of-range reference. ptxas: pair-kernel instances 89 registers / 13312 B smem (NUM_SUB 2..32) and 88 registers, no smem (NUM_SUB 1), identical before and after.
+  Timing (`scripts/tim.py`, nsys median of 3 alternating, `results/stage3b_timing_pair_kernel.txt`): water 648 rc 30: 1.894 / 1.894 ms (1.00x); water 5184 rc 30: 9.551 / 9.507 ms (1.00x) (before / after).
+- Docs: cost statement updated to the VER-0010 final measurement (648 atoms ~1.1x NEP time, 41,472 atoms ~10x).
+
+### 6.5 Tests after stage 3b
+`pytest -q -s -m "not slow" test_dftd2_reference.py test_dftd2_src_table.py test_dftd2_consistency.py` (existing tests and tolerances unchanged; the new tests above added): 103 passed, 1 deselected (slow), 800 s (`results/stage3b_pytest_final.txt`). A first run had 1 failure caused by a bug in the new return value of the test helper (division by a zero tolerance in a case with E_ref = 0); fixed and rerun in full.
+`--suite full` not run (computed values unchanged).
