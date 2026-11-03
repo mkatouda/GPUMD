@@ -104,3 +104,47 @@ Per-step E_tot time series were not copied into the repository (about 50 files).
 ## Not verified
 HIP build, other GPUs, longer than 10 ps, more than 3-11 runs per case, float vs double. Cutoff scaling beyond 20 A and for
 other densities; cause of the steeper-than-cubic growth at N = 5184, rc >= 16 A.
+
+## D. AC-3 additional runs (water 648, small-box path; added after Section A)
+- Date: 2026-11-04. Candidate = this worktree (`src/` identical to `26c64b77`; `git diff 26c64b77 ebf85206 -- src` empty), built sm_86;
+  baseline = `master-base` `3b2c8db8`. Same NEP89, `dftd3 pbe 12 6`, NVE 0.5 fs, same thermo/fit as Section A. Start structure: the
+  SAME `restart.xyz` as Section A (md5 `5445c3eb...`, reused, not re-equilibrated). Scripts: `scripts/nve.py` (unchanged),
+  `scripts/analyze_ac3.py`. Results: `results/ac3_additional/` (per-run JSON; no time series; `ac3_stats.json/.md`).
+- Sets: (1) protocol B, 10 ps, seeds 1-5 (Section A) + new seeds 6-20 = 20 seeds/binary, same initial velocities for both binaries per seed;
+  (2) protocol A (identical initial condition, `KEEP_VEL=1`), 10 ps, Section A 3 runs + 7 new = 10 runs/binary;
+  (3) protocol B, 20 ps (40000 steps), seeds 1-5 (5 seeds/binary, as requested, no reduction needed; about 2.5 min per run).
+- Statistics: medians/worst over runs; two-sided Mann-Whitney U (base vs cand); paired Wilcoxon signed-rank for protocol B (same seed);
+  95% bootstrap interval (10000 resamples, numpy seed 0) of median(cand)/median(base). No new threshold was introduced.
+
+| set | quantity | n | base median / worst | cand median / worst | cand/base median [95% bootstrap CI] | MWU p | paired Wilcoxon p |
+|---|---|---|---|---|---|---|---|
+| B_10ps_20seeds | std [eV] | 20 | 0.0275 / 0.0612 | 0.0357 / 0.0641 | 1.30 [0.79, 1.75] | 0.490 | 0.189 |
+| B_10ps_20seeds | |drift| [meV/atom/ps] | 20 | 0.0105 / 0.0315 | 0.0157 / 0.0327 | 1.50 [0.71, 2.23] | 0.508 | 0.330 |
+| B_10ps_20seeds | max-min [eV] | 20 | 0.1255 / 0.2545 | 0.1488 / 0.2585 | 1.19 [0.84, 1.55] | 0.756 | 0.674 |
+| A_10ps_10runs | std [eV] | 10 | 0.0452 / 0.0687 | 0.0400 / 0.1135 | 0.89 [0.61, 1.64] | 0.970 | - |
+| A_10ps_10runs | |drift| [meV/atom/ps] | 10 | 0.0194 / 0.0349 | 0.0161 / 0.0589 | 0.83 [0.21, 2.45] | 0.910 | - |
+| A_10ps_10runs | max-min [eV] | 10 | 0.2079 / 0.2896 | 0.1875 / 0.3734 | 0.90 [0.70, 1.38] | 1.000 | - |
+| B_20ps_5seeds | std [eV] | 5 | 0.0935 / 0.1180 | 0.0755 / 0.1334 | 0.81 [0.49, 2.88] | 0.841 | 0.812 |
+| B_20ps_5seeds | |drift| [meV/atom/ps] | 5 | 0.0244 / 0.0296 | 0.0185 / 0.0340 | 0.76 [0.44, 7.23] | 0.690 | 0.625 |
+| B_20ps_5seeds | max-min [eV] | 5 | 0.3211 / 0.3995 | 0.3200 / 0.5005 | 1.00 [0.58, 2.57] | 1.000 | 1.000 |
+
+Baseline self-scatter (protocol A, 10 runs of one binary with one identical initial condition, i.e. GPU non-determinism only;
+these baseline runs are the "baseline repeated" measurement): std min / median / max = 0.0132 / 0.0452 / 0.0687 eV (CV 0.40),
+|drift| 0.0013 / 0.0194 / 0.0349 (CV 0.62). Candidate: std 0.0155 / 0.0400 / 0.1135 (CV 0.57), |drift| 0.0020 / 0.0161 / 0.0589 (CV 0.91).
+So one binary with one fixed initial condition already varies by a factor of about 5 in std. The earlier 3 + new 7 protocol A runs
+(the old 3 had base 0.0254 vs cand 0.0396 median) no longer show candidate worse: median ratio 0.89 (std).
+
+Facts: no quantity in any set is statistically distinguishable between the binaries (all Mann-Whitney and paired Wilcoxon p >= 0.19).
+Protocol B 10 ps: cand/base median ratio 1.30 (std), 1.50 (|drift|), 1.19 (max-min), with 95% intervals containing 1 ([0.79, 1.75],
+[0.71, 2.23], [0.84, 1.55]); the point estimate is above 1 (candidate larger) for all three, worst values are nearly equal
+(0.0612 vs 0.0641 eV). Protocol A: ratios 0.89 / 0.83 / 0.90, intervals contain 1; candidate has the single largest outlier
+(std 0.1135, |drift| 0.0589, from Section A). 20 ps: ratios 0.81 / 0.76 / 1.00, intervals wide (n = 5) and contain 1.
+Verdict per quantity (std, |drift|, max-min), in all three sets: "equivalent" in the sense of not distinguishable (no significantly worse,
+no significantly better). The letter of "no worse than baseline" is shown only at the noise level; the intervals of the
+B-10ps ratios extend to 1.75 / 2.23 / 1.55, so a candidate/baseline degradation up to that size is not excluded by these data.
+Total 54 new NVE runs (about 2 h on one RTX A6000).
+
+Commands: `nve.py CAND BASE NEP water27.xyz WORK water648 20000 $(seq 6 20)` (`OUTTAG=_s6to20`);
+`KEEP_VEL=1 OUTTAG=_A4to10 nve.py ... water648 20000 $(seq 4 10)`; `OUTTAG=_20ps nve.py ... water648 40000 1 2 3 4 5`;
+`analyze_ac3.py results <B.json> <A.json> <20ps.json> results/ac3_additional/ac3_stats`. Each of the three used its own copy of the shared
+equilibrated start.
