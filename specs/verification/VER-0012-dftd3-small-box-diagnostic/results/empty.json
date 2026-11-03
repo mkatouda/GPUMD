@@ -1,0 +1,110 @@
+[
+ {
+  "system": "w81",
+  "rep": 0,
+  "total": 0.003968,
+  "span": 0.006336,
+  "gap": 0.0023690000000000004,
+  "gaps_us": [
+   0.8,
+   0.8,
+   0.8
+  ],
+  "kernels": {
+   "find_neighbor_list_small_box": 0.000992,
+   "find_dftd3_coordination_number_small_box": 0.000992,
+   "add_dftd3_force_small_box": 0.000992,
+   "add_dftd3_force_extra_small_box": 0.000992
+  }
+ },
+ {
+  "system": "w81",
+  "rep": 1,
+  "total": 0.003968,
+  "span": 0.006368,
+  "gap": 0.0023989999999999997,
+  "gaps_us": [
+   0.768,
+   0.8,
+   0.8
+  ],
+  "kernels": {
+   "find_neighbor_list_small_box": 0.000992,
+   "find_dftd3_coordination_number_small_box": 0.000992,
+   "add_dftd3_force_small_box": 0.000992,
+   "add_dftd3_force_extra_small_box": 0.000992
+  }
+ },
+ {
+  "system": "w81",
+  "rep": 2,
+  "total": 0.003968,
+  "span": 0.006368,
+  "gap": 0.002369,
+  "gaps_us": [
+   0.768,
+   0.8,
+   0.8
+  ],
+  "kernels": {
+   "find_neighbor_list_small_box": 0.000992,
+   "find_dftd3_coordination_number_small_box": 0.000992,
+   "add_dftd3_force_small_box": 0.000992,
+   "add_dftd3_force_extra_small_box": 0.000992
+  }
+ },
+ {
+  "system": "w648",
+  "rep": 0,
+  "total": 0.004352,
+  "span": 0.006656,
+  "gap": 0.0023040000000000005,
+  "gaps_us": [
+   0.736,
+   0.8,
+   0.8
+  ],
+  "kernels": {
+   "find_neighbor_list_small_box": 0.001376,
+   "find_dftd3_coordination_number_small_box": 0.000992,
+   "add_dftd3_force_small_box": 0.000992,
+   "add_dftd3_force_extra_small_box": 0.000992
+  }
+ },
+ {
+  "system": "w648",
+  "rep": 1,
+  "total": 0.004352,
+  "span": 0.006656,
+  "gap": 0.0023039999999999996,
+  "gaps_us": [
+   0.736,
+   0.8,
+   0.8
+  ],
+  "kernels": {
+   "find_neighbor_list_small_box": 0.001376,
+   "find_dftd3_coordination_number_small_box": 0.000992,
+   "add_dftd3_force_small_box": 0.000992,
+   "add_dftd3_force_extra_small_box": 0.000992
+  }
+ },
+ {
+  "system": "w648",
+  "rep": 2,
+  "total": 0.004352,
+  "span": 0.006656499999999999,
+  "gap": 0.0023039999999999996,
+  "gaps_us": [
+   0.736,
+   0.8,
+   0.8
+  ],
+  "kernels": {
+   "find_neighbor_list_small_box": 0.001376,
+   "find_dftd3_coordination_number_small_box": 0.000992,
+   "add_dftd3_force_small_box": 0.000992,
+   "add_dftd3_force_extra_small_box": 0.000992
+  }
+ }
+]

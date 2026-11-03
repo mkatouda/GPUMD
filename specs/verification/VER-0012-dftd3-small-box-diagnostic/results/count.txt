@@ -1,0 +1,9 @@
+w81 rc=12: D3COUNT N=81 cells=3x3x3 cand_per_atom=2187 rc=12/6 mean_rad=725.41 max_rad=740 mean_ang=84.57 max_ang=92 MN=10000
+w648 rc=12: D3COUNT N=648 cells=2x2x2 cand_per_atom=5184 rc=12/6 mean_rad=725.41 max_rad=740 mean_ang=84.57 max_ang=92 MN=10000
+w648 rc=20: D3COUNT N=648 cells=3x3x3 cand_per_atom=17496 rc=20/6 mean_rad=3388.77 max_rad=3412 mean_ang=84.57 max_ang=92 MN=10000
+scan_2187 rc=12: D3COUNT N=2187 cells=1x1x1 cand_per_atom=2187 rc=12/6 mean_rad=725.41 max_rad=740 mean_ang=84.57 max_ang=92 MN=10000
+scan_8748 rc=12: D3COUNT N=8748 cells=1x1x1 cand_per_atom=8748 rc=12/6 mean_rad=725.41 max_rad=740 mean_ang=84.57 max_ang=92 MN=10000
+cu864 rc=12: D3COUNT N=864 cells=2x2x2 cand_per_atom=6912 rc=12/6 mean_rad=626.00 max_rad=626 mean_ang=78.00 max_ang=78 MN=10000
+cu864 rc=20: D3COUNT N=864 cells=2x2x2 cand_per_atom=6912 rc=20/6 mean_rad=2898.00 max_rad=2898 mean_ang=78.00 max_ang=78 MN=10000
+c1728 rc=12: D3COUNT N=1728 cells=2x2x2 cand_per_atom=13824 rc=12/6 mean_rad=1290.00 max_rad=1290 mean_ang=158.00 max_ang=158 MN=10000
+c1728 rc=20: D3COUNT N=1728 cells=2x2x2 cand_per_atom=13824 rc=20/6 mean_rad=5850.00 max_rad=5850 mean_ang=158.00 max_ang=158 MN=10000
