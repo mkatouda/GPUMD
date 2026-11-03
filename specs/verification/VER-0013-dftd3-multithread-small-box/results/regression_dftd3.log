@@ -1,0 +1,15 @@
+[dftd3_single_late] A DFT-D3 setting after a run applies to the configured NEP potential
+  run baseline
+  run candidate
+  FAIL: dftd3_single_late:restart.xyz: numeric field 15 differs: 0.15505529603373744 vs 0.1550552960336723 (abs=6.514e-14, rel=4.201e-13, rtol=0.000e+00, atol=1.000e-17)
+dftd3_single_late:thermo.out: text differs; unified diff: .work/20261103T171311168080Z-p1394203/diffs/001-dftd3_single_late_thermo.out.diff
+[dftd3_kspace_one_each] One DFT-D3 setting and one kspace setting may coexist
+  run baseline
+  run candidate
+  FAIL: dftd3_kspace_one_each:restart.xyz: text differs; unified diff: .work/20261103T171311168080Z-p1394203/diffs/002-dftd3_kspace_one_each_restart.xyz.diff
+dftd3_kspace_one_each:thermo.out: text differs; unified diff: .work/20261103T171311168080Z-p1394203/diffs/003-dftd3_kspace_one_each_thermo.out.diff
+[dftd3_duplicate] Reject a second global DFT-D3 setting
+  run baseline
+  run candidate
+  PASS
+Summary: 1 passed, 2 failed; relations: 0 passed, 0 failed, 25 skipped; report: reports/report-20261103T171311168080Z-p1394203.json

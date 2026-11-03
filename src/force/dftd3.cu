@@ -35,6 +35,7 @@ J. Comput. Chem., 32, 1456 (2011).
 #include "utilities/gpu_macro.cuh"
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -78,188 +79,6 @@ void __global__ find_dftd3_coordination_number_small_box(
       cn_temp += 1.0f / (exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f)) + 1.0f);
     }
     g_cn[n1] = cn_temp;
-  }
-}
-
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 600)
-static __device__ __inline__ double atomicAdd(double* address, double val)
-{
-  unsigned long long* address_as_ull = (unsigned long long*)address;
-  unsigned long long old = *address_as_ull, assumed;
-  do {
-    assumed = old;
-    old =
-      atomicCAS(address_as_ull, assumed, __double_as_longlong(val + __longlong_as_double(assumed)));
-
-  } while (assumed != old);
-  return __longlong_as_double(old);
-}
-#endif
-
-void __global__ add_dftd3_force_small_box(
-  DFTD3::DFTD3_Para dftd3_para,
-  const int N,
-  const int* g_NN_radial,
-  const int* g_NL_radial,
-  const int* g_type,
-  const float* g_c6_ref,
-  const float* g_cn,
-  const float* g_x12,
-  const float* g_y12,
-  const float* g_z12,
-  double* g_potential,
-  double* g_fx,
-  double* g_fy,
-  double* g_fz,
-  double* g_virial,
-  float* g_dc6_sum,
-  float* g_dc8_sum)
-{
-  int n1 = blockIdx.x * blockDim.x + threadIdx.x;
-  if (n1 < N) {
-    int z1 = dftd3_para.atomic_number[g_type[n1]];
-    int num_cn_1 = num_cn[z1];
-    float dc6_sum = 0.0f;
-    float dc8_sum = 0.0f;
-    float s_potential = 0.0f;
-    for (int i1 = 0; i1 < g_NN_radial[n1]; ++i1) {
-      int index = i1 * N + n1;
-      int n2 = g_NL_radial[index];
-      int z2 = dftd3_para.atomic_number[g_type[n2]];
-      int z_small = z1, z_large = z2;
-      if (z1 > z2) {
-        z_small = z2;
-        z_large = z1;
-      }
-      int z12 = z_small * max_elem - (z_small * (z_small - 1)) / 2 + (z_large - z_small);
-      float r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
-      float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
-      float d12_4 = d12_2 * d12_2;
-      float d12_6 = d12_4 * d12_2;
-      float d12_8 = d12_6 * d12_2;
-      float c6 = 0.0f;
-      float dc6 = 0.0f;
-      int num_cn_2 = num_cn[z2];
-      if (num_cn_1 == 1 && num_cn_2 == 1) {
-        c6 = g_c6_ref[z12 * max_cn2];
-      } else {
-        float W = 0.0f;
-        float dW = 0.0f;
-        float Z = 0.0f;
-        float dZ = 0.0f;
-        for (int i = 0; i < num_cn_1; ++i) {
-          for (int j = 0; j < num_cn_2; ++j) {
-            float diff_i = g_cn[n1] - cn_ref[z1 * max_cn + i];
-            float diff_j = g_cn[n2] - cn_ref[z2 * max_cn + j];
-            float L_ij = exp(-4.0f * (diff_i * diff_i + diff_j * diff_j));
-            W += L_ij;
-            dW += L_ij * (-8.0f * diff_i);
-            float c6_ref_ij = (z1 < z2) ? g_c6_ref[z12 * max_cn2 + i * max_cn + j]
-                                        : g_c6_ref[z12 * max_cn2 + j * max_cn + i];
-            Z += c6_ref_ij * L_ij;
-            dZ += c6_ref_ij * L_ij * (-8.0f * diff_i);
-          }
-        }
-
-        if (W < 1.0e-30f) {
-          int i = num_cn_1 - 1;
-          int j = num_cn_2 - 1;
-          c6 = (z1 < z2) ? g_c6_ref[z12 * max_cn2 + i * max_cn + j]
-                         : g_c6_ref[z12 * max_cn2 + j * max_cn + i];
-        } else {
-          W = 1.0f / W;
-          c6 = Z * W;
-          dc6 = dZ * W - c6 * dW * W;
-        }
-      }
-      c6 *= HartreeBohr6;
-      dc6 *= HartreeBohr6;
-
-      float c8_over_c6 = 3.0f * r2r4[z1] * r2r4[z2] * Bohr2;
-      float c8 = c6 * c8_over_c6;
-      float damp = dftd3_para.a1 * sqrt(c8_over_c6) + dftd3_para.a2;
-      float damp_2 = damp * damp;
-      float damp_4 = damp_2 * damp_2;
-      float damp_6 = 1.0f / (d12_6 + damp_4 * damp_2);
-      float damp_8 = 1.0f / (d12_8 + damp_4 * damp_4);
-      s_potential -= (dftd3_para.s6 * c6 * damp_6 + dftd3_para.s8 * c8 * damp_8) * 0.5f;
-      float f2 = dftd3_para.s6 * c6 * 3.0f * d12_4 * (damp_6 * damp_6) +
-                 dftd3_para.s8 * c8 * 4.0f * d12_6 * (damp_8 * damp_8);
-      float f12[3] = {r12[0] * f2, r12[1] * f2, r12[2] * f2};
-      atomicAdd(&g_fx[n1], double(f12[0]));
-      atomicAdd(&g_fy[n1], double(f12[1]));
-      atomicAdd(&g_fz[n1], double(f12[2]));
-      atomicAdd(&g_fx[n2], double(-f12[0]));
-      atomicAdd(&g_fy[n2], double(-f12[1]));
-      atomicAdd(&g_fz[n2], double(-f12[2]));
-      atomicAdd(&g_virial[n2 + 0 * N], double(-r12[0] * f12[0]));
-      atomicAdd(&g_virial[n2 + 1 * N], double(-r12[1] * f12[1]));
-      atomicAdd(&g_virial[n2 + 2 * N], double(-r12[2] * f12[2]));
-      atomicAdd(&g_virial[n2 + 3 * N], double(-r12[0] * f12[1]));
-      atomicAdd(&g_virial[n2 + 4 * N], double(-r12[0] * f12[2]));
-      atomicAdd(&g_virial[n2 + 5 * N], double(-r12[1] * f12[2]));
-      atomicAdd(&g_virial[n2 + 6 * N], double(-r12[1] * f12[0]));
-      atomicAdd(&g_virial[n2 + 7 * N], double(-r12[2] * f12[0]));
-      atomicAdd(&g_virial[n2 + 8 * N], double(-r12[2] * f12[1]));
-      dc6_sum += dc6 * dftd3_para.s6 * damp_6;
-      dc8_sum += dc6 * c8_over_c6 * dftd3_para.s8 * damp_8;
-    }
-    g_potential[n1] += s_potential;
-    g_dc6_sum[n1] = dc6_sum;
-    g_dc8_sum[n1] = dc8_sum;
-  }
-}
-
-void __global__ add_dftd3_force_extra_small_box(
-  DFTD3::DFTD3_Para dftd3_para,
-  const int N,
-  const int* g_NN_angular,
-  const int* g_NL_angular,
-  const int* g_type,
-  const float* g_dc6_sum,
-  const float* g_dc8_sum,
-  const float* g_x12,
-  const float* g_y12,
-  const float* g_z12,
-  double* g_fx,
-  double* g_fy,
-  double* g_fz,
-  double* g_virial)
-{
-  int n1 = blockIdx.x * blockDim.x + threadIdx.x;
-  if (n1 < N) {
-    int z1 = dftd3_para.atomic_number[g_type[n1]];
-    float R_cov_1 = Bohr * covalent_radius[z1];
-    float dc6_sum = g_dc6_sum[n1];
-    float dc8_sum = g_dc8_sum[n1];
-    for (int i1 = 0; i1 < g_NN_angular[n1]; ++i1) {
-      int index = i1 * N + n1;
-      int n2 = g_NL_angular[index];
-      int z2 = dftd3_para.atomic_number[g_type[n2]];
-      float R_cov_2 = Bohr * covalent_radius[z2];
-      float r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
-      float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
-      float d12 = sqrt(d12_2);
-      float cn_exp_factor = exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f));
-      float f2 = cn_exp_factor * 16.0f * (R_cov_1 + R_cov_2) * (dc6_sum + dc8_sum); // not 8.0f
-      f2 /= (cn_exp_factor + 1.0f) * (cn_exp_factor + 1.0f) * d12 * d12_2;
-      float f12[3] = {r12[0] * f2, r12[1] * f2, r12[2] * f2};
-      atomicAdd(&g_fx[n1], double(f12[0]));
-      atomicAdd(&g_fy[n1], double(f12[1]));
-      atomicAdd(&g_fz[n1], double(f12[2]));
-      atomicAdd(&g_fx[n2], double(-f12[0]));
-      atomicAdd(&g_fy[n2], double(-f12[1]));
-      atomicAdd(&g_fz[n2], double(-f12[2]));
-      atomicAdd(&g_virial[n2 + 0 * N], double(-r12[0] * f12[0]));
-      atomicAdd(&g_virial[n2 + 1 * N], double(-r12[1] * f12[1]));
-      atomicAdd(&g_virial[n2 + 2 * N], double(-r12[2] * f12[2]));
-      atomicAdd(&g_virial[n2 + 3 * N], double(-r12[0] * f12[1]));
-      atomicAdd(&g_virial[n2 + 4 * N], double(-r12[0] * f12[2]));
-      atomicAdd(&g_virial[n2 + 5 * N], double(-r12[1] * f12[2]));
-      atomicAdd(&g_virial[n2 + 6 * N], double(-r12[1] * f12[0]));
-      atomicAdd(&g_virial[n2 + 7 * N], double(-r12[2] * f12[0]));
-      atomicAdd(&g_virial[n2 + 8 * N], double(-r12[2] * f12[1]));
-    }
   }
 }
 
@@ -556,6 +375,379 @@ reduce_sub_large_box(float (*s_red)[BLOCK_SIZE_LARGE_BOX], const int tid, const 
       }
     }
   }
+}
+
+// Small-box force kernels. num_sub (a power of two, at most the block size) consecutive threads
+// cooperate on one atom n1 and take every num_sub-th entry of its neighbor list; the partial sums
+// are reduced in a fixed tree order in shared memory, so the result does not depend on thread
+// scheduling. The neighbor list is full (every pair appears in the lists of both atoms), so each
+// atom collects its own force and virial from its own list only (no scattered updates of n2).
+constexpr int MAX_NUM_SUB_SMALL_BOX = BLOCK_SIZE_LARGE_BOX;
+
+template <int num_sub>
+__global__ void add_dftd3_force_small_box(
+  DFTD3::DFTD3_Para dftd3_para,
+  const int N,
+  const int* g_NN_radial,
+  const int* g_NL_radial,
+  const int* g_type,
+  const float* g_c6_ref,
+  const float* g_cn,
+  const float* g_x12,
+  const float* g_y12,
+  const float* g_z12,
+  double* g_potential,
+  double* g_fx,
+  double* g_fy,
+  double* g_fz,
+  double* g_virial,
+  float* g_dc6_sum,
+  float* g_dc8_sum)
+{
+  static_assert(
+    num_sub >= 1 && num_sub <= MAX_NUM_SUB_SMALL_BOX && (num_sub & (num_sub - 1)) == 0 &&
+      BLOCK_SIZE_LARGE_BOX % num_sub == 0,
+    "num_sub must be a power of two that divides the block size");
+  const int tid = threadIdx.x;
+  const int sub = tid % num_sub;
+  const int n1 = blockIdx.x * (blockDim.x / num_sub) + tid / num_sub;
+  const bool valid = n1 < N;
+  __shared__ float s_red[NUM_REDUCE_LARGE_BOX][BLOCK_SIZE_LARGE_BOX];
+  const int n1_safe = valid ? n1 : 0;
+  const int z1 = dftd3_para.atomic_number[g_type[n1_safe]];
+  const int num_cn_1 = num_cn[z1];
+  const float cn_1 = g_cn[n1_safe];
+  const int num_pairs = valid ? g_NN_radial[n1] : 0;
+  float dc6_sum = 0.0f;
+  float dc8_sum = 0.0f;
+  float s_pe = 0.0f;
+  float s_fx = 0.0f;
+  float s_fy = 0.0f;
+  float s_fz = 0.0f;
+  float s_sxx = 0.0f;
+  float s_sxy = 0.0f;
+  float s_sxz = 0.0f;
+  float s_syx = 0.0f;
+  float s_syy = 0.0f;
+  float s_syz = 0.0f;
+  float s_szx = 0.0f;
+  float s_szy = 0.0f;
+  float s_szz = 0.0f;
+  for (int i1 = sub; i1 < num_pairs; i1 += num_sub) {
+    const int index = i1 * N + n1;
+    const int n2 = g_NL_radial[index];
+    const int z2 = dftd3_para.atomic_number[g_type[n2]];
+    int z_small = z1, z_large = z2;
+    if (z1 > z2) {
+      z_small = z2;
+      z_large = z1;
+    }
+    const int z12 = z_small * max_elem - (z_small * (z_small - 1)) / 2 + (z_large - z_small);
+    const float r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
+    const float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
+    const float d12_4 = d12_2 * d12_2;
+    const float d12_6 = d12_4 * d12_2;
+    const float d12_8 = d12_6 * d12_2;
+    float c6 = 0.0f;
+    float dc6 = 0.0f;
+    const int num_cn_2 = num_cn[z2];
+    if (num_cn_1 == 1 && num_cn_2 == 1) {
+      c6 = g_c6_ref[z12 * max_cn2];
+    } else {
+      float W = 0.0f;
+      float dW = 0.0f;
+      float Z = 0.0f;
+      float dZ = 0.0f;
+      for (int i = 0; i < num_cn_1; ++i) {
+        for (int j = 0; j < num_cn_2; ++j) {
+          float diff_i = cn_1 - cn_ref[z1 * max_cn + i];
+          float diff_j = g_cn[n2] - cn_ref[z2 * max_cn + j];
+          float L_ij = exp(-4.0f * (diff_i * diff_i + diff_j * diff_j));
+          W += L_ij;
+          dW += L_ij * (-8.0f * diff_i);
+          float c6_ref_ij = (z1 < z2) ? g_c6_ref[z12 * max_cn2 + i * max_cn + j]
+                                      : g_c6_ref[z12 * max_cn2 + j * max_cn + i];
+          Z += c6_ref_ij * L_ij;
+          dZ += c6_ref_ij * L_ij * (-8.0f * diff_i);
+        }
+      }
+
+      if (W < 1.0e-30f) {
+        int i = num_cn_1 - 1;
+        int j = num_cn_2 - 1;
+        c6 = (z1 < z2) ? g_c6_ref[z12 * max_cn2 + i * max_cn + j]
+                       : g_c6_ref[z12 * max_cn2 + j * max_cn + i];
+      } else {
+        W = 1.0f / W;
+        c6 = Z * W;
+        dc6 = dZ * W - c6 * dW * W;
+      }
+    }
+    c6 *= HartreeBohr6;
+    dc6 *= HartreeBohr6;
+
+    float c8_over_c6 = 3.0f * r2r4[z1] * r2r4[z2] * Bohr2;
+    float c8 = c6 * c8_over_c6;
+    float damp = dftd3_para.a1 * sqrt(c8_over_c6) + dftd3_para.a2;
+    float damp_2 = damp * damp;
+    float damp_4 = damp_2 * damp_2;
+    float damp_6 = 1.0f / (d12_6 + damp_4 * damp_2);
+    float damp_8 = 1.0f / (d12_8 + damp_4 * damp_4);
+    s_pe -= (dftd3_para.s6 * c6 * damp_6 + dftd3_para.s8 * c8 * damp_8) * 0.5f;
+    float f2 = dftd3_para.s6 * c6 * 3.0f * d12_4 * (damp_6 * damp_6) +
+               dftd3_para.s8 * c8 * 4.0f * d12_6 * (damp_8 * damp_8);
+    float f12[3] = {r12[0] * f2, r12[1] * f2, r12[2] * f2};
+    s_fx += 2.0f * f12[0];
+    s_fy += 2.0f * f12[1];
+    s_fz += 2.0f * f12[2];
+    s_sxx -= r12[0] * f12[0];
+    s_sxy -= r12[0] * f12[1];
+    s_sxz -= r12[0] * f12[2];
+    s_syx -= r12[1] * f12[0];
+    s_syy -= r12[1] * f12[1];
+    s_syz -= r12[1] * f12[2];
+    s_szx -= r12[2] * f12[0];
+    s_szy -= r12[2] * f12[1];
+    s_szz -= r12[2] * f12[2];
+    dc6_sum += dc6 * dftd3_para.s6 * damp_6;
+    dc8_sum += dc6 * c8_over_c6 * dftd3_para.s8 * damp_8;
+  }
+  if (num_sub > 1) {
+    s_red[0][tid] = s_fx;
+    s_red[1][tid] = s_fy;
+    s_red[2][tid] = s_fz;
+    s_red[3][tid] = s_sxx;
+    s_red[4][tid] = s_sxy;
+    s_red[5][tid] = s_sxz;
+    s_red[6][tid] = s_syx;
+    s_red[7][tid] = s_syy;
+    s_red[8][tid] = s_syz;
+    s_red[9][tid] = s_szx;
+    s_red[10][tid] = s_szy;
+    s_red[11][tid] = s_szz;
+    s_red[12][tid] = s_pe;
+    s_red[13][tid] = dc6_sum;
+    s_red[14][tid] = dc8_sum;
+    reduce_sub_large_box<num_sub, NUM_REDUCE_LARGE_BOX>(s_red, tid, sub);
+  }
+  if (!valid || sub != 0) {
+    return;
+  }
+  if (num_sub > 1) {
+    s_fx = s_red[0][tid];
+    s_fy = s_red[1][tid];
+    s_fz = s_red[2][tid];
+    s_sxx = s_red[3][tid];
+    s_sxy = s_red[4][tid];
+    s_sxz = s_red[5][tid];
+    s_syx = s_red[6][tid];
+    s_syy = s_red[7][tid];
+    s_syz = s_red[8][tid];
+    s_szx = s_red[9][tid];
+    s_szy = s_red[10][tid];
+    s_szz = s_red[11][tid];
+    s_pe = s_red[12][tid];
+    dc6_sum = s_red[13][tid];
+    dc8_sum = s_red[14][tid];
+  }
+  g_fx[n1] += s_fx;
+  g_fy[n1] += s_fy;
+  g_fz[n1] += s_fz;
+  g_virial[n1 + 0 * N] += s_sxx;
+  g_virial[n1 + 1 * N] += s_syy;
+  g_virial[n1 + 2 * N] += s_szz;
+  g_virial[n1 + 3 * N] += s_sxy;
+  g_virial[n1 + 4 * N] += s_sxz;
+  g_virial[n1 + 5 * N] += s_syz;
+  g_virial[n1 + 6 * N] += s_syx;
+  g_virial[n1 + 7 * N] += s_szx;
+  g_virial[n1 + 8 * N] += s_szy;
+  g_potential[n1] += s_pe;
+  g_dc6_sum[n1] = dc6_sum;
+  g_dc8_sum[n1] = dc8_sum;
+}
+
+// The force of the coordination-number term on atom n1 from the pair (n1, n2) is
+// k12 * (D1 + D2) * r12 with D = dc6_sum + dc8_sum of the atom (the two atoms of a pair both
+// contribute), and its virial share (kept per atom as before) is -r12 x r12 * k12 * D2.
+template <int num_sub>
+__global__ void add_dftd3_force_extra_small_box(
+  DFTD3::DFTD3_Para dftd3_para,
+  const int N,
+  const int* g_NN_angular,
+  const int* g_NL_angular,
+  const int* g_type,
+  const float* g_dc6_sum,
+  const float* g_dc8_sum,
+  const float* g_x12,
+  const float* g_y12,
+  const float* g_z12,
+  double* g_fx,
+  double* g_fy,
+  double* g_fz,
+  double* g_virial)
+{
+  static_assert(
+    num_sub >= 1 && num_sub <= MAX_NUM_SUB_SMALL_BOX && (num_sub & (num_sub - 1)) == 0 &&
+      BLOCK_SIZE_LARGE_BOX % num_sub == 0,
+    "num_sub must be a power of two that divides the block size");
+  const int tid = threadIdx.x;
+  const int sub = tid % num_sub;
+  const int n1 = blockIdx.x * (blockDim.x / num_sub) + tid / num_sub;
+  const bool valid = n1 < N;
+  __shared__ float s_red[NUM_REDUCE_LARGE_BOX][BLOCK_SIZE_LARGE_BOX];
+  const int n1_safe = valid ? n1 : 0;
+  const int z1 = dftd3_para.atomic_number[g_type[n1_safe]];
+  const float R_cov_1 = Bohr * covalent_radius[z1];
+  const float dc_sum_1 = g_dc6_sum[n1_safe] + g_dc8_sum[n1_safe];
+  const int num_pairs = valid ? g_NN_angular[n1] : 0;
+  float s_fx = 0.0f;
+  float s_fy = 0.0f;
+  float s_fz = 0.0f;
+  float s_sxx = 0.0f;
+  float s_sxy = 0.0f;
+  float s_sxz = 0.0f;
+  float s_syx = 0.0f;
+  float s_syy = 0.0f;
+  float s_syz = 0.0f;
+  float s_szx = 0.0f;
+  float s_szy = 0.0f;
+  float s_szz = 0.0f;
+  for (int i1 = sub; i1 < num_pairs; i1 += num_sub) {
+    const int index = i1 * N + n1;
+    const int n2 = g_NL_angular[index];
+    const int z2 = dftd3_para.atomic_number[g_type[n2]];
+    const float R_cov_2 = Bohr * covalent_radius[z2];
+    const float r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
+    const float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
+    const float d12 = sqrt(d12_2);
+    const float cn_exp_factor = exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f));
+    const float dc_sum_2 = g_dc6_sum[n2] + g_dc8_sum[n2];
+    float k12 = cn_exp_factor * 16.0f * (R_cov_1 + R_cov_2); // not 8.0f
+    k12 /= (cn_exp_factor + 1.0f) * (cn_exp_factor + 1.0f) * d12 * d12_2;
+    const float f2 = k12 * (dc_sum_1 + dc_sum_2);
+    const float f2_virial = k12 * dc_sum_2;
+    s_fx += r12[0] * f2;
+    s_fy += r12[1] * f2;
+    s_fz += r12[2] * f2;
+    const float f12[3] = {r12[0] * f2_virial, r12[1] * f2_virial, r12[2] * f2_virial};
+    s_sxx -= r12[0] * f12[0];
+    s_sxy -= r12[0] * f12[1];
+    s_sxz -= r12[0] * f12[2];
+    s_syx -= r12[1] * f12[0];
+    s_syy -= r12[1] * f12[1];
+    s_syz -= r12[1] * f12[2];
+    s_szx -= r12[2] * f12[0];
+    s_szy -= r12[2] * f12[1];
+    s_szz -= r12[2] * f12[2];
+  }
+  if (num_sub > 1) {
+    s_red[0][tid] = s_fx;
+    s_red[1][tid] = s_fy;
+    s_red[2][tid] = s_fz;
+    s_red[3][tid] = s_sxx;
+    s_red[4][tid] = s_sxy;
+    s_red[5][tid] = s_sxz;
+    s_red[6][tid] = s_syx;
+    s_red[7][tid] = s_syy;
+    s_red[8][tid] = s_syz;
+    s_red[9][tid] = s_szx;
+    s_red[10][tid] = s_szy;
+    s_red[11][tid] = s_szz;
+    reduce_sub_large_box<num_sub, 12>(s_red, tid, sub);
+  }
+  if (!valid || sub != 0) {
+    return;
+  }
+  if (num_sub > 1) {
+    s_fx = s_red[0][tid];
+    s_fy = s_red[1][tid];
+    s_fz = s_red[2][tid];
+    s_sxx = s_red[3][tid];
+    s_sxy = s_red[4][tid];
+    s_sxz = s_red[5][tid];
+    s_syx = s_red[6][tid];
+    s_syy = s_red[7][tid];
+    s_syz = s_red[8][tid];
+    s_szx = s_red[9][tid];
+    s_szy = s_red[10][tid];
+    s_szz = s_red[11][tid];
+  }
+  g_fx[n1] += s_fx;
+  g_fy[n1] += s_fy;
+  g_fz[n1] += s_fz;
+  g_virial[n1 + 0 * N] += s_sxx;
+  g_virial[n1 + 1 * N] += s_syy;
+  g_virial[n1 + 2 * N] += s_szz;
+  g_virial[n1 + 3 * N] += s_sxy;
+  g_virial[n1 + 4 * N] += s_sxz;
+  g_virial[n1 + 5 * N] += s_syz;
+  g_virial[n1 + 6 * N] += s_syx;
+  g_virial[n1 + 7 * N] += s_szx;
+  g_virial[n1 + 8 * N] += s_szy;
+}
+
+// Number of threads per atom in the small-box force kernels (a power of two, at most
+// MAX_NUM_SUB_SMALL_BOX): the largest value for which the total thread count N * num_sub stays at
+// or below target_threads and every thread still has at least MIN_PAIRS_PER_THREAD expected list
+// entries. expected_pairs is the continuum estimate of the list length per atom. The kernels are
+// latency bound (a serial chain of dependent loads per list entry), so the target is several
+// resident threads per core: TARGET_THREADS_PER_SM was tuned on an RTX A6000 (84 SMs) with water
+// systems of 81 to 34,992 atoms; more threads per atom than this also split the list reads of one
+// warp over many rows and slow the kernels down for N above a few thousand.
+constexpr int TARGET_THREADS_PER_SM = 640;
+constexpr int MIN_PAIRS_PER_THREAD = 4;
+
+static int get_num_sub_small_box(const int N, const double expected_pairs, const int target_threads)
+{
+  int num_sub = 1;
+  while (num_sub < MAX_NUM_SUB_SMALL_BOX &&
+         static_cast<long long>(N) * (2 * num_sub) <= target_threads &&
+         expected_pairs >= MIN_PAIRS_PER_THREAD * (2 * num_sub)) {
+    num_sub *= 2;
+  }
+  return num_sub;
+}
+
+// Test aid, intentionally undocumented for users: the environment variable
+// GPUMD_DFTD3_SMALL_BOX_NUM_SUB (a power of two from 1 to MAX_NUM_SUB_SMALL_BOX) fixes the number
+// of threads per atom of the small-box force kernels, so that every instantiation can be tested
+// on the same system. A message with the chosen value is then printed once.
+static int get_forced_num_sub_small_box()
+{
+  static const int forced = []() {
+    const char* env = std::getenv("GPUMD_DFTD3_SMALL_BOX_NUM_SUB");
+    if (env == nullptr) {
+      return 0;
+    }
+    const long value = std::atol(env);
+    if (value >= 1 && value <= MAX_NUM_SUB_SMALL_BOX && (value & (value - 1)) == 0) {
+      return static_cast<int>(value);
+    }
+    return 0;
+  }();
+  return forced;
+}
+
+static int get_num_sub_small_box_for_device(const int N, const double expected_pairs)
+{
+  const int forced = get_forced_num_sub_small_box();
+  if (forced > 0) {
+    static bool printed = false;
+    if (!printed) {
+      printed = true;
+      std::cout << "DFT-D3 small box: threads per atom = " << forced << std::endl;
+    }
+    return forced;
+  }
+  static const int target_threads = []() {
+    int device_id = 0;
+    CHECK(gpuGetDevice(&device_id));
+    gpuDeviceProp device_prop;
+    CHECK(gpuGetDeviceProperties(&device_prop, device_id));
+    return device_prop.multiProcessorCount * TARGET_THREADS_PER_SM;
+  }();
+  return get_num_sub_small_box(N, expected_pairs, target_threads);
 }
 
 template <int num_sub>
@@ -1115,41 +1307,112 @@ void DFTD3::compute_small_box(
     cn.data());
   GPU_CHECK_KERNEL
 
-  add_dftd3_force_small_box<<<(N - 1) / 64 + 1, 64>>>(
-    dftd3_para,
-    N,
-    NN_radial.data(),
-    NL_radial.data(),
-    type.data(),
-    c6_ref.data(),
-    cn.data(),
-    r12.data(),
-    r12.data() + size_x12,
-    r12.data() + size_x12 * 2,
-    potential_per_atom.data(),
-    force_per_atom.data(),
-    force_per_atom.data() + N,
-    force_per_atom.data() + N * 2,
-    virial_per_atom.data(),
-    dc6_sum.data(),
+  if (N == 0) { // the force kernels read the atom 0 of every block
+    return;
+  }
+  // expected list lengths from the mean density (full lists: every pair is in both atoms' lists)
+  const double sphere = 4.0 / 3.0 * 3.14159265358979 / box.get_volume() * N;
+  const int num_sub_force =
+    get_num_sub_small_box_for_device(N, sphere * rc_radial * rc_radial * rc_radial);
+  const int num_sub_extra =
+    get_num_sub_small_box_for_device(N, sphere * rc_angular * rc_angular * rc_angular);
+  // one-thread-per-atom launches use smaller blocks (more blocks for small N)
+  const int block_force = (num_sub_force == 1) ? 64 : BLOCK_SIZE_LARGE_BOX;
+  const int blocks_force = (N * num_sub_force + block_force - 1) / block_force;
+  const int block_extra = (num_sub_extra == 1) ? 64 : BLOCK_SIZE_LARGE_BOX;
+  const int blocks_extra = (N * num_sub_extra + block_extra - 1) / block_extra;
+
+#define DFTD3_LAUNCH_FORCE_SMALL_BOX(NS)                                                           \
+  add_dftd3_force_small_box<NS><<<blocks_force, block_force>>>(                                    \
+    dftd3_para,                                                                                    \
+    N,                                                                                             \
+    NN_radial.data(),                                                                              \
+    NL_radial.data(),                                                                              \
+    type.data(),                                                                                   \
+    c6_ref.data(),                                                                                 \
+    cn.data(),                                                                                     \
+    r12.data(),                                                                                    \
+    r12.data() + size_x12,                                                                         \
+    r12.data() + size_x12 * 2,                                                                     \
+    potential_per_atom.data(),                                                                     \
+    force_per_atom.data(),                                                                         \
+    force_per_atom.data() + N,                                                                     \
+    force_per_atom.data() + N * 2,                                                                 \
+    virial_per_atom.data(),                                                                        \
+    dc6_sum.data(),                                                                                \
     dc8_sum.data());
+  switch (num_sub_force) {
+    case 1:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(1)
+      break;
+    case 2:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(2)
+      break;
+    case 4:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(4)
+      break;
+    case 8:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(8)
+      break;
+    case 16:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(16)
+      break;
+    case 32:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(32)
+      break;
+    case 64:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(64)
+      break;
+    default:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(128)
+      break;
+  }
+#undef DFTD3_LAUNCH_FORCE_SMALL_BOX
   GPU_CHECK_KERNEL
 
-  add_dftd3_force_extra_small_box<<<(N - 1) / 64 + 1, 64>>>(
-    dftd3_para,
-    N,
-    NN_angular.data(),
-    NL_angular.data(),
-    type.data(),
-    dc6_sum.data(),
-    dc8_sum.data(),
-    r12.data() + size_x12 * 3,
-    r12.data() + size_x12 * 4,
-    r12.data() + size_x12 * 5,
-    force_per_atom.data(),
-    force_per_atom.data() + N,
-    force_per_atom.data() + N * 2,
+#define DFTD3_LAUNCH_EXTRA_SMALL_BOX(NS)                                                           \
+  add_dftd3_force_extra_small_box<NS><<<blocks_extra, block_extra>>>(                              \
+    dftd3_para,                                                                                    \
+    N,                                                                                             \
+    NN_angular.data(),                                                                             \
+    NL_angular.data(),                                                                             \
+    type.data(),                                                                                   \
+    dc6_sum.data(),                                                                                \
+    dc8_sum.data(),                                                                                \
+    r12.data() + size_x12 * 3,                                                                     \
+    r12.data() + size_x12 * 4,                                                                     \
+    r12.data() + size_x12 * 5,                                                                     \
+    force_per_atom.data(),                                                                         \
+    force_per_atom.data() + N,                                                                     \
+    force_per_atom.data() + N * 2,                                                                 \
     virial_per_atom.data());
+  switch (num_sub_extra) {
+    case 1:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(1)
+      break;
+    case 2:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(2)
+      break;
+    case 4:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(4)
+      break;
+    case 8:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(8)
+      break;
+    case 16:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(16)
+      break;
+    case 32:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(32)
+      break;
+    case 64:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(64)
+      break;
+    default:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(128)
+      break;
+  }
+#undef DFTD3_LAUNCH_EXTRA_SMALL_BOX
   GPU_CHECK_KERNEL
 }
 

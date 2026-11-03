@@ -42,7 +42,7 @@ The coordination numbers use the pairs within :attr:`coordination_number_cutoff`
 
 Two code paths are used, chosen automatically every step:
 
-* **Small-box path** (any periodic direction with a box thickness of at most 2.5 :math:`r_\mathrm{c}`): the box is replicated to cover the cutoff and a neighbor list is built for each atom. The neighbor list has room for 10000 neighbors per atom; this limit is not checked, so keep the number of neighbors within :math:`r_\mathrm{c}` below it (for water about :math:`r_\mathrm{c}` < 28 Å). A periodic box with a thickness of less than 2.5 cutoffs in one direction and more than 10 cutoffs in another direction is rejected with an error.
+* **Small-box path** (any periodic direction with a box thickness of at most 2.5 :math:`r_\mathrm{c}`): the box is replicated to cover the cutoff and a neighbor list is built for each atom. The neighbor list has room for 10000 neighbors per atom; this limit is not checked, so keep the number of neighbors within :math:`r_\mathrm{c}` below it (for water about :math:`r_\mathrm{c}` < 28 Å). A periodic box with a thickness of less than 2.5 cutoffs in one direction and more than 10 cutoffs in another direction is rejected with an error. Several GPU threads share one atom when the number of atoms is small.
 * **Large-box path** (all periodic directions thicker than 2.5 :math:`r_\mathrm{c}`, and non-periodic systems): a cell list with cells of about half the cutoff is used, and no neighbor list is stored. Several GPU threads share one atom when the number of atoms is small.
 
 The following extra times per MD step were measured on an RTX A6000 (CUDA 12.3, NEP89, NVE, time step 0.5 fs).
