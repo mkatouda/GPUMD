@@ -144,6 +144,7 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
   (needs a C6 share >= 16.7%), so Phase 2' is DROPPED under the gate as written (human decision
   2026-11-03: keep the Cu 4,000 gate). Water systems would benefit (upper bounds above); revisit only
   if the gate is changed by a human decision. Results are diagnostic only (scratch variant, not merged).
+  Re-opened 2026-11-04 by a human decision (gate change) as item (v) of Phase 7, see there.
 
 ### Phase 5: conditional extras (causes C, E; only if still justified after Phases 2-4)
 - C: half neighbor list (needs atomics; keep only if measured faster).
@@ -187,6 +188,27 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
   Gate per item: >= 1.2x on the D3 total at N = 81 or 648 (or >= 1.1x at N = 41,472 for items affecting the
   large-box path), no case slower than 1.03x, AC-1 tolerances met, `dftd3_*` cases within the AC-2 tolerance,
   warning-clean build, determinism not worse than now.
+- Stage 1 outcome (2026-11-04, VER-0012, nsys, RTX A6000 sm_86): gate passed via (a) and (d); (e) and (f) not met.
+  (a) the small-box force kernel takes 1.34-1.44 ms for N = 81..972, independent of N (101x / 12.6x the time
+  expected from the large-N throughput at N = 81 / 648): one thread per atom, 2 / 11 blocks of 64, about 740
+  accepted pairs per atom processed serially. (b) 48 registers, no spills. (c) accepted/visited 0.14-0.33; the
+  `MN = 10000` limit is reached only at rc about 24-30 A (margin 1.7x for diamond C at rc = 20 A). (d) C6
+  interpolation share of the force kernel: 47% (N = 81), 38% (648), 34% (2,187), 12% (8,748), 59% (cluster 972,
+  large-box path), 23.5% (water 41,472). (e) float variants of the pair loop: <= 1.14x at N <= 648. (f) launch gaps
+  about 2 us per step (0.4%). The explicit-list build (NL) grows as N^2 and exceeds the force kernel above
+  N about 2,900. The 972-atom non-periodic cluster uses the large-box path, not the small-box path.
+- Stage 2 scope (human decision 2026-11-04, replaces the list above): (i) several threads per atom with a
+  fixed-order reduction on the small-box force kernel is done first; (ii) cell/list parameters of the small-box
+  path is decided after (i) from its measured result; (iii) float candidate loop and (iv) kernel fusion are
+  dropped from Stage 2 (Stage 1: <= 1.14x at N <= 648, launch floor 0.4%). (v) NEW, the factorized C6 weights of
+  Phase 2' are re-evaluated, delegated after (i) (same file, GPU): the C6 interpolation weight separates as
+  L_ij = exp(-4 diff_i^2) exp(-4 diff_j^2); per-atom tables remove most exponentials in the pair loop.
+  Gate change (human decision 2026-11-04): the Phase 2' gate (>= 1.2x force kernel on Cu 4,000, which was
+  unreachable: upper bound 1.16x) is replaced for (v) by: D3 total at N = 41,472 <= 6.0 ms (DR-001 AC-4 target;
+  the measured variant upper bound is 5.59 ms) AND >= 1.2x on the D3 total at water 648 or 5,184, AND no case
+  (including Cu 4,000) slower than 1.03x, AC-1 tolerances unchanged and met, `dftd3_*` cases within the AC-2
+  tolerance, determinism not worse than now, warning-clean build, memory increase of the per-atom tables reported.
+  The results change at round-off level; the AC-1 and AC-2 rules above apply unchanged.
 - Stage 3: re-measure VER-0004 section 3 and the VER-0001 slope method, `--suite full` against the `master`
   baseline, independent numerical review of the changed kernels, NVE with the VER-0011 protocol (single
   trajectory is not enough; see VER-0011), then record AC-4 per target point (met/unmet) and let the human
