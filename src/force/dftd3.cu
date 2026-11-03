@@ -53,6 +53,115 @@ const std::string ELEMENTS[NUM_ELEMENTS] = {
   "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W",  "Re", "Os", "Ir", "Pt", "Au", "Hg",
   "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U",  "Np", "Pu"};
 
+// The Gaussian weight of the C6 reference interpolation separates,
+//   L_ij = exp(-4 (cn_1 - cn_ref_i)^2 - 4 (cn_2 - cn_ref_j)^2) = w_1[i] * w_2[j],
+// so the weights w[k] = exp(-4 (cn - cn_ref_k)^2) of every atom are computed once (after its
+// coordination number is known) and the pair loops only multiply and sum. The table holds
+// max_cn weights per atom; weights of reference points beyond num_cn are not read.
+static __device__ __forceinline__ void
+store_cn_weights(const int z1, const float cn, const int n1, float* g_cn_weight)
+{
+  const int num_cn_1 = num_cn[z1];
+  for (int k = 0; k < max_cn; ++k) {
+    float w = 0.0f;
+    if (k < num_cn_1) {
+      const float diff = cn - cn_ref[z1 * max_cn + k];
+      w = exp(-4.0f * diff * diff);
+    }
+    g_cn_weight[n1 * max_cn + k] = w;
+  }
+}
+
+// Weights of the central atom n1: w, dw = w * (-8 diff) (derivative of L with respect to its
+// coordination number up to the factor of the other atom), and their sums.
+struct CnWeights {
+  float w[max_cn];
+  float dw[max_cn];
+  float sum_w;
+  float sum_dw;
+};
+
+static __device__ __forceinline__ void
+load_cn_weights(const int z1, const float cn_1, const float* g_cn_weight_1, CnWeights& cw)
+{
+  const int num_cn_1 = num_cn[z1];
+  cw.sum_w = 0.0f;
+  cw.sum_dw = 0.0f;
+#pragma unroll
+  for (int a = 0; a < max_cn; ++a) {
+    float w = 0.0f;
+    float dw = 0.0f;
+    if (a < num_cn_1) {
+      const float diff = cn_1 - cn_ref[z1 * max_cn + a];
+      w = g_cn_weight_1[a];
+      dw = w * (-8.0f * diff);
+    }
+    cw.w[a] = w;
+    cw.dw[a] = dw;
+    cw.sum_w += w;
+    cw.sum_dw += dw;
+  }
+}
+
+// C6 and its derivative with respect to the coordination number of atom 1 for one pair.
+static __device__ __forceinline__ void get_c6_factorized(
+  const int z1,
+  const int z2,
+  const int z12,
+  const int num_cn_1,
+  const CnWeights& cw,
+  const float* g_cn_weight_2,
+  const float* g_c6_ref,
+  float& c6,
+  float& dc6)
+{
+  c6 = 0.0f;
+  dc6 = 0.0f;
+  const int num_cn_2 = num_cn[z2];
+  if (num_cn_1 == 1 && num_cn_2 == 1) {
+    c6 = g_c6_ref[z12 * max_cn2];
+    return;
+  }
+  float w2[max_cn];
+  float sum_w2 = 0.0f;
+#pragma unroll
+  for (int b = 0; b < max_cn; ++b) {
+    w2[b] = (b < num_cn_2) ? g_cn_weight_2[b] : 0.0f;
+    sum_w2 += w2[b];
+  }
+  // g_c6_ref is stored for the pair (z_small, z_large); the first index runs over atom 1's
+  // references if z1 < z2 and over atom 2's otherwise.
+  const bool order = z1 < z2;
+  const int stride_a = order ? max_cn : 1;
+  const int stride_b = order ? 1 : max_cn;
+  const float* c6_pair = g_c6_ref + z12 * max_cn2;
+  float Z = 0.0f;
+  float dZ = 0.0f;
+#pragma unroll
+  for (int a = 0; a < max_cn; ++a) {
+    if (a < num_cn_1) {
+      float t = 0.0f;
+#pragma unroll
+      for (int b = 0; b < max_cn; ++b) {
+        if (b < num_cn_2) {
+          t += c6_pair[a * stride_a + b * stride_b] * w2[b];
+        }
+      }
+      Z += cw.w[a] * t;
+      dZ += cw.dw[a] * t;
+    }
+  }
+  float W = cw.sum_w * sum_w2;
+  const float dW = cw.sum_dw * sum_w2;
+  if (W < 1.0e-30f) {
+    c6 = c6_pair[(num_cn_1 - 1) * stride_a + (num_cn_2 - 1) * stride_b];
+  } else {
+    W = 1.0f / W;
+    c6 = Z * W;
+    dc6 = dZ * W - c6 * dW * W;
+  }
+}
+
 void __global__ find_dftd3_coordination_number_small_box(
   DFTD3::DFTD3_Para dftd3_para,
   const int N,
@@ -62,7 +171,8 @@ void __global__ find_dftd3_coordination_number_small_box(
   const float* g_x12,
   const float* g_y12,
   const float* g_z12,
-  float* g_cn)
+  float* g_cn,
+  float* g_cn_weight)
 {
   int n1 = blockIdx.x * blockDim.x + threadIdx.x;
   if (n1 < N) {
@@ -79,6 +189,7 @@ void __global__ find_dftd3_coordination_number_small_box(
       cn_temp += 1.0f / (exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f)) + 1.0f);
     }
     g_cn[n1] = cn_temp;
+    store_cn_weights(z1, cn_temp, n1, g_cn_weight);
   }
 }
 
@@ -393,6 +504,7 @@ __global__ void add_dftd3_force_small_box(
   const int* g_type,
   const float* g_c6_ref,
   const float* g_cn,
+  const float* g_cn_weight,
   const float* g_x12,
   const float* g_y12,
   const float* g_z12,
@@ -417,6 +529,8 @@ __global__ void add_dftd3_force_small_box(
   const int z1 = dftd3_para.atomic_number[g_type[n1_safe]];
   const int num_cn_1 = num_cn[z1];
   const float cn_1 = g_cn[n1_safe];
+  CnWeights cw;
+  load_cn_weights(z1, cn_1, g_cn_weight + n1_safe * max_cn, cw);
   const int num_pairs = valid ? g_NN_radial[n1] : 0;
   float dc6_sum = 0.0f;
   float dc8_sum = 0.0f;
@@ -448,41 +562,9 @@ __global__ void add_dftd3_force_small_box(
     const float d12_4 = d12_2 * d12_2;
     const float d12_6 = d12_4 * d12_2;
     const float d12_8 = d12_6 * d12_2;
-    float c6 = 0.0f;
-    float dc6 = 0.0f;
-    const int num_cn_2 = num_cn[z2];
-    if (num_cn_1 == 1 && num_cn_2 == 1) {
-      c6 = g_c6_ref[z12 * max_cn2];
-    } else {
-      float W = 0.0f;
-      float dW = 0.0f;
-      float Z = 0.0f;
-      float dZ = 0.0f;
-      for (int i = 0; i < num_cn_1; ++i) {
-        for (int j = 0; j < num_cn_2; ++j) {
-          float diff_i = cn_1 - cn_ref[z1 * max_cn + i];
-          float diff_j = g_cn[n2] - cn_ref[z2 * max_cn + j];
-          float L_ij = exp(-4.0f * (diff_i * diff_i + diff_j * diff_j));
-          W += L_ij;
-          dW += L_ij * (-8.0f * diff_i);
-          float c6_ref_ij = (z1 < z2) ? g_c6_ref[z12 * max_cn2 + i * max_cn + j]
-                                      : g_c6_ref[z12 * max_cn2 + j * max_cn + i];
-          Z += c6_ref_ij * L_ij;
-          dZ += c6_ref_ij * L_ij * (-8.0f * diff_i);
-        }
-      }
-
-      if (W < 1.0e-30f) {
-        int i = num_cn_1 - 1;
-        int j = num_cn_2 - 1;
-        c6 = (z1 < z2) ? g_c6_ref[z12 * max_cn2 + i * max_cn + j]
-                       : g_c6_ref[z12 * max_cn2 + j * max_cn + i];
-      } else {
-        W = 1.0f / W;
-        c6 = Z * W;
-        dc6 = dZ * W - c6 * dW * W;
-      }
-    }
+    float c6;
+    float dc6;
+    get_c6_factorized(z1, z2, z12, num_cn_1, cw, g_cn_weight + n2 * max_cn, g_c6_ref, c6, dc6);
     c6 *= HartreeBohr6;
     dc6 *= HartreeBohr6;
 
@@ -766,7 +848,8 @@ __global__ void find_dftd3_coordination_number_large_box(
   const double* g_x,
   const double* g_y,
   const double* g_z,
-  float* g_cn)
+  float* g_cn,
+  float* g_cn_weight)
 {
   static_assert(
     num_sub >= 1 && num_sub <= 16 && (num_sub & (num_sub - 1)) == 0 &&
@@ -839,6 +922,7 @@ __global__ void find_dftd3_coordination_number_large_box(
     cn_temp = s_red[0][tid];
   }
   g_cn[n1] = cn_temp;
+  store_cn_weights(atomic_number_1, cn_temp, n1, g_cn_weight);
 }
 
 template <int num_sub>
@@ -856,6 +940,7 @@ __global__ void find_dftd3_force_large_box(
   const int* g_cell_contents,
   const float* g_c6_ref,
   const float* g_cn,
+  const float* g_cn_weight,
   const double* g_x,
   const double* g_y,
   const double* g_z,
@@ -882,6 +967,8 @@ __global__ void find_dftd3_force_large_box(
   const int n1_safe = valid ? n1 : 0;
   int atomic_number_1 = dftd3_para.atomic_number[g_type[n1_safe]];
   int num_cn_1 = num_cn[atomic_number_1];
+  CnWeights cw;
+  load_cn_weights(atomic_number_1, g_cn[n1_safe], g_cn_weight + n1_safe * max_cn, cw);
   float dc6_sum = 0.0f;
   float dc8_sum = 0.0f;
   float s_pe = 0.0f;
@@ -945,41 +1032,18 @@ __global__ void find_dftd3_force_large_box(
             float d12_4 = d12_2 * d12_2;
             float d12_6 = d12_4 * d12_2;
             float d12_8 = d12_6 * d12_2;
-            float c6 = 0.0f;
-            float dc6 = 0.0f;
-            int num_cn_2 = num_cn[atomic_number_2];
-            if (num_cn_1 == 1 && num_cn_2 == 1) {
-              c6 = g_c6_ref[z12 * max_cn2];
-            } else {
-              float W = 0.0f;
-              float dW = 0.0f;
-              float Z = 0.0f;
-              float dZ = 0.0f;
-              for (int i = 0; i < num_cn_1; ++i) {
-                for (int j = 0; j < num_cn_2; ++j) {
-                  float diff_i = g_cn[n1] - cn_ref[atomic_number_1 * max_cn + i];
-                  float diff_j = g_cn[n2] - cn_ref[atomic_number_2 * max_cn + j];
-                  float L_ij = exp(-4.0f * (diff_i * diff_i + diff_j * diff_j));
-                  W += L_ij;
-                  dW += L_ij * (-8.0f * diff_i);
-                  float c6_ref_ij = (atomic_number_1 < atomic_number_2)
-                                      ? g_c6_ref[z12 * max_cn2 + i * max_cn + j]
-                                      : g_c6_ref[z12 * max_cn2 + j * max_cn + i];
-                  Z += c6_ref_ij * L_ij;
-                  dZ += c6_ref_ij * L_ij * (-8.0f * diff_i);
-                }
-              }
-              if (W < 1.0e-30f) {
-                int i = num_cn_1 - 1;
-                int j = num_cn_2 - 1;
-                c6 = (atomic_number_1 < atomic_number_2) ? g_c6_ref[z12 * max_cn2 + i * max_cn + j]
-                                                         : g_c6_ref[z12 * max_cn2 + j * max_cn + i];
-              } else {
-                W = 1.0f / W;
-                c6 = Z * W;
-                dc6 = dZ * W - c6 * dW * W;
-              }
-            }
+            float c6;
+            float dc6;
+            get_c6_factorized(
+              atomic_number_1,
+              atomic_number_2,
+              z12,
+              num_cn_1,
+              cw,
+              g_cn_weight + n2 * max_cn,
+              g_c6_ref,
+              c6,
+              dc6);
             c6 *= HartreeBohr6;
             dc6 *= HartreeBohr6;
 
@@ -1261,6 +1325,7 @@ void DFTD3::compute_small_box(
   const int size_x12 = N * MN;
   if (NN_radial.size() == 0) {
     cn.resize(N);
+    cn_weight.resize(N * max_cn);
     dc6_sum.resize(N);
     dc8_sum.resize(N);
 
@@ -1304,7 +1369,8 @@ void DFTD3::compute_small_box(
     r12.data() + size_x12 * 3,
     r12.data() + size_x12 * 4,
     r12.data() + size_x12 * 5,
-    cn.data());
+    cn.data(),
+    cn_weight.data());
   GPU_CHECK_KERNEL
 
   if (N == 0) { // the force kernels read the atom 0 of every block
@@ -1331,6 +1397,7 @@ void DFTD3::compute_small_box(
     type.data(),                                                                                   \
     c6_ref.data(),                                                                                 \
     cn.data(),                                                                                     \
+    cn_weight.data(),                                                                              \
     r12.data(),                                                                                    \
     r12.data() + size_x12,                                                                         \
     r12.data() + size_x12 * 2,                                                                     \
@@ -1434,6 +1501,7 @@ void DFTD3::compute_large_box(
   const int num_blocks = (N * num_sub + block_size - 1) / block_size;
   if (cn.size() == 0) {
     cn.resize(N);
+    cn_weight.resize(N * max_cn);
     dc6_sum.resize(N);
     dc8_sum.resize(N);
     cell_count_radial.resize(N);
@@ -1482,7 +1550,8 @@ void DFTD3::compute_large_box(
     position_per_atom.data(),                                                                      \
     position_per_atom.data() + N,                                                                  \
     position_per_atom.data() + N * 2,                                                              \
-    cn.data());
+    cn.data(),                                                                                     \
+    cn_weight.data());
   switch (num_sub) {
     case 1:
       DFTD3_LAUNCH_CN_LARGE_BOX(1)
@@ -1521,6 +1590,7 @@ void DFTD3::compute_large_box(
     cell_contents_radial.data(),                                                                   \
     c6_ref.data(),                                                                                 \
     cn.data(),                                                                                     \
+    cn_weight.data(),                                                                              \
     position_per_atom.data(),                                                                      \
     position_per_atom.data() + N,                                                                  \
     position_per_atom.data() + N * 2,                                                              \
