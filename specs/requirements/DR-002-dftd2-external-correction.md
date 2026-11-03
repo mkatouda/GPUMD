@@ -82,5 +82,8 @@ AC-6 (no regression). Without `dftd2`, results of `pytest -m "not slow"` and
   `run_regression.py --suite full` are unchanged (known non-deterministic cases excepted).
 AC-7 (performance). D2 extra time per step is reported (slope method) for N = 81 .. 41,472;
   target: no worse than 0.5x of the D3 time on the same system (informative, not a gate).
+  Result (2026-11-03, VER-0010): target NOT met at the default rc = 30 A (D2/D3 = 0.66 at N = 81 up to 9.3
+  at N = 41,472); met only at rc = 12 A for N = 81 and 648. Accepted as an informative miss by the human
+  (status implemented, 2026-11-03).
 AC-8 (docs). The manual page states formula, units, the shift, default cutoff and its basis,
   cost scaling, the "external correction" caveat, and element coverage.
