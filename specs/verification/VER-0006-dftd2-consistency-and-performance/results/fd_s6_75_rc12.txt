@@ -1,0 +1,45 @@
+# s6=75.0 rc=12.0  tolerances: force 0.0002*max|F|, virial 0.0002*max|W|; nominal h 0.01 A, 0.001
+## water27_cubic: E_D2=-284.248418 eV  max|F|=3.6939 eV/A  max|W|=401.5596 eV; repeat diff: dE=0.00e+00 dF=0.00e+00 dW=0.00e+00
+  force h=0.0025  max|F_fd-F_gpu|=4.873e-04 eV/A  rel=1.32e-04
+  force h=0.005   max|F_fd-F_gpu|=9.915e-05 eV/A  rel=2.68e-05
+  force h=0.01    max|F_fd-F_gpu|=7.988e-05 eV/A  rel=2.16e-05 <- nominal
+  force h=0.02    max|F_fd-F_gpu|=6.696e-05 eV/A  rel=1.81e-05
+  force h=0.04    max|F_fd-F_gpu|=9.390e-04 eV/A  rel=2.54e-04
+  virial h=0.00025 max|W_fd-W_gpu|=1.242e-02 eV  rel=3.09e-05
+  virial h=0.0005  max|W_fd-W_gpu|=7.198e-03 eV  rel=1.79e-05
+  virial h=0.001   max|W_fd-W_gpu|=3.059e-03 eV  rel=7.62e-06 <- nominal
+  virial h=0.002   max|W_fd-W_gpu|=1.982e-03 eV  rel=4.94e-06
+  virial h=0.004   max|W_fd-W_gpu|=1.738e-03 eV  rel=4.33e-06
+## water27_triclinic: E_D2=-320.866651 eV  max|F|=3.3646 eV/A  max|W|=462.0940 eV; repeat diff: dE=0.00e+00 dF=0.00e+00 dW=0.00e+00
+  force h=0.0025  max|F_fd-F_gpu|=3.200e-04 eV/A  rel=9.51e-05
+  force h=0.005   max|F_fd-F_gpu|=2.438e-04 eV/A  rel=7.25e-05
+  force h=0.01    max|F_fd-F_gpu|=8.306e-05 eV/A  rel=2.47e-05 <- nominal
+  force h=0.02    max|F_fd-F_gpu|=1.292e-04 eV/A  rel=3.84e-05
+  force h=0.04    max|F_fd-F_gpu|=1.309e-03 eV/A  rel=3.89e-04
+  virial h=0.00025 max|W_fd-W_gpu|=1.230e-02 eV  rel=2.66e-05
+  virial h=0.0005  max|W_fd-W_gpu|=8.178e-03 eV  rel=1.77e-05
+  virial h=0.001   max|W_fd-W_gpu|=2.324e-03 eV  rel=5.03e-06 <- nominal
+  virial h=0.002   max|W_fd-W_gpu|=1.773e-03 eV  rel=3.84e-06
+  virial h=0.004   max|W_fd-W_gpu|=1.143e-03 eV  rel=2.47e-06
+## water27_open: E_D2=-171.332719 eV  max|F|=3.3551 eV/A  max|W|=222.8042 eV; repeat diff: dE=0.00e+00 dF=0.00e+00 dW=0.00e+00
+  force h=0.0025  max|F_fd-F_gpu|=2.373e-04 eV/A  rel=7.07e-05
+  force h=0.005   max|F_fd-F_gpu|=1.034e-04 eV/A  rel=3.08e-05
+  force h=0.01    max|F_fd-F_gpu|=6.248e-05 eV/A  rel=1.86e-05 <- nominal
+  force h=0.02    max|F_fd-F_gpu|=4.195e-05 eV/A  rel=1.25e-05
+  force h=0.04    max|F_fd-F_gpu|=5.756e-04 eV/A  rel=1.72e-04
+  virial h=0.00025 max|W_fd-W_gpu|=8.311e-03 eV  rel=3.73e-05
+  virial h=0.0005  max|W_fd-W_gpu|=8.496e-03 eV  rel=3.81e-05
+  virial h=0.001   max|W_fd-W_gpu|=2.273e-03 eV  rel=1.02e-05 <- nominal
+  virial h=0.002   max|W_fd-W_gpu|=1.088e-03 eV  rel=4.88e-06
+  virial h=0.004   max|W_fd-W_gpu|=1.242e-03 eV  rel=5.57e-06
+## water27_slab_TTF: E_D2=-243.467599 eV  max|F|=3.6415 eV/A  max|W|=368.0030 eV; repeat diff: dE=0.00e+00 dF=0.00e+00 dW=0.00e+00
+  force h=0.0025  max|F_fd-F_gpu|=2.860e-04 eV/A  rel=7.85e-05
+  force h=0.005   max|F_fd-F_gpu|=9.787e-05 eV/A  rel=2.69e-05
+  force h=0.01    max|F_fd-F_gpu|=7.111e-05 eV/A  rel=1.95e-05 <- nominal
+  force h=0.02    max|F_fd-F_gpu|=5.473e-05 eV/A  rel=1.50e-05
+  force h=0.04    max|F_fd-F_gpu|=8.144e-04 eV/A  rel=2.24e-04
+  virial h=0.00025 max|W_fd-W_gpu|=6.920e-03 eV  rel=1.88e-05
+  virial h=0.0005  max|W_fd-W_gpu|=8.802e-03 eV  rel=2.39e-05
+  virial h=0.001   max|W_fd-W_gpu|=2.683e-03 eV  rel=7.29e-06 <- nominal
+  virial h=0.002   max|W_fd-W_gpu|=1.429e-03 eV  rel=3.88e-06
+  virial h=0.004   max|W_fd-W_gpu|=1.713e-03 eV  rel=4.65e-06

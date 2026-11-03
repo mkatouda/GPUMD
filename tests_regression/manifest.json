@@ -4252,6 +4252,47 @@
       "input_style": "intentional_invalid"
     },
     {
+      "id": "dftd2_basic",
+      "description": "NEP89 with the DFT-D2 external correction (shifted-force, cutoff 12 A): short NVE run",
+      "suites": [
+        "potential",
+        "full"
+      ],
+      "fixture": "nep89_carbon",
+      "input": "package:cases/dftd2/dftd2_basic.in",
+      "covers": [
+        "ensemble:nve",
+        "potential:nep89",
+        "command:dftd2"
+      ],
+      "expect": "success",
+      "outputs": [
+        "neighbor.out",
+        "thermo.out",
+        "restart.xyz"
+      ],
+      "input_style": "canonical"
+    },
+    {
+      "id": "dftd2_dftd3_exclusive",
+      "description": "Reject dftd2 combined with dftd3",
+      "suites": [
+        "full"
+      ],
+      "fixture": "nep89_carbon",
+      "input": "package:cases/dftd2/dftd2_dftd3_exclusive.in",
+      "covers": [
+        "potential:nep89",
+        "command:dftd2",
+        "command:dftd3"
+      ],
+      "expect": "failure",
+      "expected_returncode": 1,
+      "stderr_contains": "dftd2 and dftd3 cannot be used together",
+      "outputs": [],
+      "input_style": "intentional_invalid"
+    },
+    {
       "id": "kspace_duplicate",
       "description": "Reject a second global kspace setting",
       "suites": [

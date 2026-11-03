@@ -1,0 +1,4 @@
+potential nep89_20250409.txt
+dftd2 0.75 12
+dftd3 pbe 12 6
+unreachable_after_dftd2_dftd3

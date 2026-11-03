@@ -1,0 +1,9 @@
+potential nep89_20250409.txt
+dftd2 0.75 12
+velocity 300 seed 20261103
+time_step 0.5
+
+ensemble nve
+dump_thermo 1
+dump_restart 5
+run 5

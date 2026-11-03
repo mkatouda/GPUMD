@@ -1,0 +1,12 @@
+== mutation A
+E       AssertionError: force error 5.148e+00 eV/A > 7.388e-04
+E       AssertionError: force error 6.564e+00 eV/A > 6.710e-04
+FAILED test_dftd2_consistency.py::test_dftd2_force_is_minus_energy_gradient[cubic]
+FAILED test_dftd2_consistency.py::test_dftd2_force_is_minus_energy_gradient[open]
+2 failed, 2 passed, 460 warnings in 126.84s (0:02:06)
+== mutation B
+E       AssertionError: virial error 8.031e+02 eV > 8.031e-02
+E       AssertionError: virial error 8.797e+02 eV > 9.242e-02
+FAILED test_dftd2_consistency.py::test_dftd2_virial_is_strain_derivative[cubic-comps0]
+FAILED test_dftd2_consistency.py::test_dftd2_virial_is_strain_derivative[triclinic-comps1]
+2 failed, 2 passed, 460 warnings in 126.63s (0:02:06)
