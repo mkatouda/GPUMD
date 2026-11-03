@@ -1,0 +1,2 @@
+noD2    : E_tot mean -3213.4912 eV, std 0.08430 eV, max-min 0.29618 eV, drift 27.276 meV/ps (= 0.04209 meV/atom/ps), T mean 306.1 K
+D2_rc30 : E_tot mean -3236.2516 eV, std 0.05939 eV, max-min 0.26097 eV, drift 18.973 meV/ps (= 0.02928 meV/atom/ps), T mean 303.1 K
