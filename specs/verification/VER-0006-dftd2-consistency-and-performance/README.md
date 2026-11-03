@@ -72,3 +72,11 @@ Water, NVE dt 0.5 fs, per-step time = (T(n2) - T(n1)) / (n2 - n1) of the whole p
 - FD checks use rc = 12 A and s6 = 75 only; rc = 30 A and s6 = 0.75 are covered by AC-1 (comparison with the NumPy reference), not by FD on the GPU.
 - Float noise sets the FD floor (relative ~1e-5); the tolerances 2e-4 are therefore ~10 x looser than the AC-1 values and test consistency only, not accuracy.
 - NVE: a single trajectory per case; no statistics. No GPU other than RTX A6000 sm_86.
+
+## Addendum (2026-11-03): velocity seed in the NVE protocol
+VER-0011 found that when `model.xyz` carries a velocity column (as `restart.xyz` from the NVT equilibration does),
+`gpumd` ignores `velocity ... seed` (`Velocity::initialize_cpu`, `src/main_gpumd/velocity.cu`; not investigated further).
+The NVE runs of this record (and of VER-0010) restart from such a file, so the seed did not change the initial
+velocities: each system was one trajectory from one initial condition (the "identical start" above), not an ensemble
+over seeds. The conclusions are unchanged in kind (a single-trajectory comparison, which was already stated as
+"no evidence of improved conservation"), but the NVE comparison has no statistics across initial velocities.

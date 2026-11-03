@@ -46,3 +46,8 @@ No case outside the known list failed, so no re-runs were needed. The exact list
 
 ## Limitations
 - One GPU (sm_86). FD at rc = 30 uses s6 = 75 (not 0.75); float noise floor sets the 1e-5 relative level. NVE: single trajectories. Slow-marked tests were not run here. Heavy elements covered by FD: Cu, Au only.
+
+## Addendum (2026-11-03): velocity seed in the NVE protocol
+See the addendum of VER-0006: `velocity ... seed` is ignored when the start file has a velocity column, so the NVE
+runs here are single trajectories from one initial condition (as stated above), with GPU non-determinism as the only
+source of difference between repeated runs.
