@@ -158,6 +158,40 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
 - Upstream: cherry-pick only code, tests and `doc/` changes (no `specs/`, `.claude/`, process
   rules); open the PR from a branch based on `upstream/master`.
 
+### Phase 7: small-box path and largest-system performance (draft 2026-11-03; needs human approval)
+- Why: after Phases 3 and 4 (VER-0004 section 3) AC-4 is unmet at N = 81 (D3 total 1.46 ms vs 1.0) and
+  N = 41,472 (6.96 ms vs 6.0). On the small-box path the force kernel is about 1.4 ms at N = 81, 648 and
+  972 (non-periodic cluster 1.0x), i.e. independent of N: the GPU is under-filled or latency-bound. The
+  DFT-D2 work (DES-0002 Phase 6) gained 15x at N = 648 from a cost-based cell count, several threads per
+  atom with a fixed-order reduction, and a cell-centre-relative float candidate loop; the D3 small-box
+  path has not had the equivalent treatment (Phase 3 `num_sub` covers the large-box path).
+- Constraints: AC-1 tolerances (DR-001) unchanged and met; AC-2 `dftd3_*` tolerance rule unchanged; results
+  stay deterministic where they are now; CUDA/HIP via `gpu_macro.cuh`; default numerics unchanged.
+- Stage 1 (cheap diagnostic, no code in `src/`; scratch variants and nsys only; ncu counters are not
+  available): on water 81, 648, cluster 972 and water 41,472 at `dftd3 pbe 12 6`,
+  (a) kernel time versus N at fixed rc for the small-box force kernel (fill/latency test: time expected from
+  the large-N throughput versus measured), (b) registers, spills and occupancy from the compiler report,
+  (c) candidate pairs visited versus accepted pairs (r < rc) per atom and the explicit-list length versus the
+  `MN = 10000` limit, (d) share of the force kernel spent in the C6 interpolation exponentials (variant with
+  the interpolation replaced by a constant, timing only), (e) share of FP64 work in the pair loop (variant
+  with float coordinate differences, timing only; accuracy not checked), (f) launch/latency floor: time of the
+  empty-kernel sequence of one D3 step (neighbor, CN, force, extras).
+  Gate for continuing to Stage 2: at least one of (a) measured time >= 2x the time expected from the large-N
+  throughput at N <= 648, (d) share >= 25%, (e) float variant >= 1.2x, (f) launch/latency floor >= 40% of the
+  D3 total at N = 81. If none holds, stop and record AC-4 at N = 81 and 41,472 as unmet.
+- Stage 2 (candidates, each separately, in this order, each with its own gate): (i) several threads per atom with
+  a fixed-order reduction on the small-box force kernel (as in DR-001 Phase 3 and DES-0002 Phase 6), (ii) a
+  cost-based choice of the cell/list parameters for the small-box path, (iii) cell-centre-relative float
+  candidate loop (only with an accuracy study against the AC-1 tolerances: gate 1/3 of the tolerance on all
+  cases), (iv) fusing kernels of one D3 step to cut launches (only if (f) shows a latency floor).
+  Gate per item: >= 1.2x on the D3 total at N = 81 or 648 (or >= 1.1x at N = 41,472 for items affecting the
+  large-box path), no case slower than 1.03x, AC-1 tolerances met, `dftd3_*` cases within the AC-2 tolerance,
+  warning-clean build, determinism not worse than now.
+- Stage 3: re-measure VER-0004 section 3 and the VER-0001 slope method, `--suite full` against the `master`
+  baseline, independent numerical review of the changed kernels, NVE with the VER-0011 protocol (single
+  trajectory is not enough; see VER-0011), then record AC-4 per target point (met/unmet) and let the human
+  decide whether remaining targets are dropped (DR-001 AC-4 allows this).
+
 ## 6. Risks
 - Results change at round-off level (float summation order); `--update-golden` must not be
   used to hide a real change.
