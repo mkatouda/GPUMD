@@ -1,0 +1,130 @@
+{
+ "steps": 96,
+ "kernels": [
+  {
+   "name": "find_cell_counts",
+   "full": "find_cell_counts(Box, int, int *, const double *, const double *, const double *, int, int, int, double)",
+   "median_ms": 0.0077445,
+   "min_ms": 0.007488,
+   "max_ms": 0.00832,
+   "grid": 162,
+   "block": 256,
+   "regs": 18,
+   "local": 0
+  },
+  {
+   "name": "cub::CUB_200200_860_NS::DeviceScanInitKernel<cub::CUB_200200_860_NS::ScanTileState<int, ",
+   "full": "void cub::CUB_200200_860_NS::DeviceScanInitKernel<cub::CUB_200200_860_NS::ScanTileState<int, (bool)1>>(T1, int)",
+   "median_ms": 0.001056,
+   "min_ms": 0.001023,
+   "max_ms": 0.00112,
+   "grid": 1,
+   "block": 128,
+   "regs": 16,
+   "local": 0
+  },
+  {
+   "name": "cub::CUB_200200_860_NS::DeviceScanKernel<cub::CUB_200200_860_NS::DeviceScanPolicy<int, thrust::plus<void>>::Policy900, int *, int *, cub::CUB_200200_860_NS::ScanTileState<int, ",
+   "full": "void cub::CUB_200200_860_NS::DeviceScanKernel<cub::CUB_200200_860_NS::DeviceScanPolicy<int, thrust::plus<void>>::Policy900, int *, int *, cub::CUB_200200_860_NS::ScanTileState<int, (bool)1>, thrust::p",
+   "median_ms": 0.002176,
+   "min_ms": 0.00208,
+   "max_ms": 0.002273,
+   "grid": 1,
+   "block": 128,
+   "regs": 56,
+   "local": 0
+  },
+  {
+   "name": "find_cell_contents",
+   "full": "find_cell_contents(Box, int, int *, const int *, int *, const double *, const double *, const double *, int, int, int, double)",
+   "median_ms": 0.008544,
+   "min_ms": 0.008384,
+   "max_ms": 0.008992,
+   "grid": 162,
+   "block": 256,
+   "regs": 18,
+   "local": 0
+  },
+  {
+   "name": "find_cell_counts",
+   "full": "find_cell_counts(Box, int, int *, const double *, const double *, const double *, int, int, int, double)",
+   "median_ms": 0.004896,
+   "min_ms": 0.004768,
+   "max_ms": 0.005152,
+   "grid": 162,
+   "block": 256,
+   "regs": 18,
+   "local": 0
+  },
+  {
+   "name": "cub::CUB_200200_860_NS::DeviceScanInitKernel<cub::CUB_200200_860_NS::ScanTileState<int, ",
+   "full": "void cub::CUB_200200_860_NS::DeviceScanInitKernel<cub::CUB_200200_860_NS::ScanTileState<int, (bool)1>>(T1, int)",
+   "median_ms": 0.001024,
+   "min_ms": 0.00096,
+   "max_ms": 0.001088,
+   "grid": 1,
+   "block": 128,
+   "regs": 16,
+   "local": 0
+  },
+  {
+   "name": "cub::CUB_200200_860_NS::DeviceScanKernel<cub::CUB_200200_860_NS::DeviceScanPolicy<int, thrust::plus<void>>::Policy900, int *, int *, cub::CUB_200200_860_NS::ScanTileState<int, ",
+   "full": "void cub::CUB_200200_860_NS::DeviceScanKernel<cub::CUB_200200_860_NS::DeviceScanPolicy<int, thrust::plus<void>>::Policy900, int *, int *, cub::CUB_200200_860_NS::ScanTileState<int, (bool)1>, thrust::p",
+   "median_ms": 0.002592,
+   "min_ms": 0.002528,
+   "max_ms": 0.002752,
+   "grid": 8,
+   "block": 128,
+   "regs": 56,
+   "local": 0
+  },
+  {
+   "name": "find_cell_contents",
+   "full": "find_cell_contents(Box, int, int *, const int *, int *, const double *, const double *, const double *, int, int, int, double)",
+   "median_ms": 0.005217,
+   "min_ms": 0.00512,
+   "max_ms": 0.005504,
+   "grid": 162,
+   "block": 256,
+   "regs": 18,
+   "local": 0
+  },
+  {
+   "name": "find_dftd3_coordination_number_large_box<",
+   "full": "void <unnamed>::find_dftd3_coordination_number_large_box<(int)8>(DFTD3::DFTD3_Para, float, int, int, int, int, Box, const int *, const int *, const int *, const int *, const double *, const double *, ",
+   "median_ms": 0.6927755,
+   "min_ms": 0.652679,
+   "max_ms": 0.747976,
+   "grid": 2592,
+   "block": 128,
+   "regs": 50,
+   "local": 0
+  },
+  {
+   "name": "find_dftd3_force_large_box<",
+   "full": "void <unnamed>::find_dftd3_force_large_box<(int)8>(DFTD3::DFTD3_Para, float, int, int, int, int, Box, const int *, const int *, const int *, const int *, const float *, const float *, const float *, c",
+   "median_ms": 4.718368999999999,
+   "min_ms": 4.6084,
+   "max_ms": 5.014228,
+   "grid": 2592,
+   "block": 128,
+   "regs": 79,
+   "local": 0
+  },
+  {
+   "name": "find_dftd3_force_extra_large_box<",
+   "full": "void <unnamed>::find_dftd3_force_extra_large_box<(int)8>(DFTD3::DFTD3_Para, float, int, int, int, int, Box, const int *, const int *, const int *, const int *, const float *, const float *, const doub",
+   "median_ms": 0.7411595,
+   "min_ms": 0.700039,
+   "max_ms": 0.786152,
+   "grid": 2592,
+   "block": 128,
+   "regs": 63,
+   "local": 0
+  }
+ ],
+ "extra_out": [],
+ "d3_total_ms_median": 6.1978075,
+ "d3_total_ms_min": 6.035071,
+ "d3_total_ms_max": 6.500579
+}

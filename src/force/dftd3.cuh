@@ -40,6 +40,8 @@ public:
   GPU_Vector<float> c6_ref;
   GPU_Vector<float> dc6_sum;
   GPU_Vector<float> dc8_sum;
+  GPU_Vector<int> cn_list;       // accepted angular partners per (atom, thread) slot, large box
+  GPU_Vector<int> cn_list_count; // number of accepted partners per slot
 
   GPU_Vector<int> NN_radial;
   GPU_Vector<int> NL_radial;

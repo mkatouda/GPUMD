@@ -456,8 +456,28 @@ constexpr int NUM_REDUCE_LARGE_BOX = 15;
 // total thread count N * num_sub is kept at or below 3.4e5, and one thread per atom is used for N
 // >= 1e5, where the GPU is already saturated. The number of threads per atom is also limited by the
 // number of neighbor cells an atom visits (5 per periodic axis, 1 otherwise).
+//
+// Test aid, intentionally undocumented for users: the environment variable
+// GPUMD_DFTD3_LARGE_BOX_NUM_SUB (1, 2, 4, 8 or 16) fixes the number of threads per atom, so that
+// every instantiation can be tested on the same system. A message is then printed once.
 static int get_num_sub_large_box(const int N, const Box& box)
 {
+  static const int forced = []() {
+    const char* env = std::getenv("GPUMD_DFTD3_LARGE_BOX_NUM_SUB");
+    if (env == nullptr) {
+      return 0;
+    }
+    const long value = std::atol(env);
+    return (value >= 1 && value <= 16 && (value & (value - 1)) == 0) ? static_cast<int>(value) : 0;
+  }();
+  if (forced > 0) {
+    static bool printed = false;
+    if (!printed) {
+      printed = true;
+      std::cout << "DFT-D3 large box: threads per atom = " << forced << std::endl;
+    }
+    return forced;
+  }
   int num_sub = 1;
   if (N < 100000) {
     const int max_sub = (N <= 4125) ? 16 : 8;
@@ -832,6 +852,47 @@ static int get_num_sub_small_box_for_device(const int N, const double expected_p
   return get_num_sub_small_box(N, expected_pairs, target_threads);
 }
 
+// The CN kernel stores the partners it accepts (r < rc_angular) in a list per (atom, thread) slot,
+// so that the extra kernel, which needs exactly the same pairs, does not repeat the cell traversal
+// (about four candidates are visited per accepted pair). The capacity per slot follows from the
+// mean number of partners (continuum estimate); a slot whose partners do not all fit is handled by
+// the extra kernel with the cell traversal, so a too small capacity costs time, never accuracy. The
+// list is not used (capacity 0) when it would take more than MAX_CN_LIST_BYTES.
+constexpr size_t MAX_CN_LIST_BYTES = size_t(256) << 20;
+
+// Test aid, intentionally undocumented for users: the environment variable
+// GPUMD_DFTD3_LARGE_BOX_LIST_CAPACITY (0 or larger) fixes the capacity per slot (0 switches the
+// list off). A message with the chosen value is printed once.
+static int
+get_cn_list_capacity(const int N, const int num_sub, const double rc_angular, const Box& box)
+{
+  static const int forced = []() {
+    const char* env = std::getenv("GPUMD_DFTD3_LARGE_BOX_LIST_CAPACITY");
+    if (env == nullptr) {
+      return -1;
+    }
+    const long value = std::atol(env);
+    return (value >= 0 && value <= 4096) ? static_cast<int>(value) : -1;
+  }();
+  int capacity = forced;
+  if (capacity >= 0) {
+    static bool printed = false;
+    if (!printed) {
+      printed = true;
+      std::cout << "DFT-D3 large box: neighbor list capacity per thread = " << capacity
+                << std::endl;
+    }
+  } else {
+    const double expected_pairs = N / box.get_volume() * (4.0 / 3.0) * 3.14159265358979323846 *
+                                  rc_angular * rc_angular * rc_angular;
+    capacity = static_cast<int>(1.5 * expected_pairs / num_sub) + 8;
+  }
+  if (static_cast<size_t>(N) * num_sub * capacity * sizeof(int) > MAX_CN_LIST_BYTES) {
+    capacity = 0;
+  }
+  return capacity;
+}
+
 template <int num_sub>
 __global__ void find_dftd3_coordination_number_large_box(
   const DFTD3::DFTD3_Para dftd3_para,
@@ -849,7 +910,10 @@ __global__ void find_dftd3_coordination_number_large_box(
   const double* g_y,
   const double* g_z,
   float* g_cn,
-  float* g_cn_weight)
+  float* g_cn_weight,
+  int* g_list,
+  int* g_list_count,
+  const int list_capacity)
 {
   static_assert(
     num_sub >= 1 && num_sub <= 16 && (num_sub & (num_sub - 1)) == 0 &&
@@ -865,6 +929,9 @@ __global__ void find_dftd3_coordination_number_large_box(
   int atomic_number_1 = dftd3_para.atomic_number[g_type[n1_safe]];
   float R_cov_1 = Bohr * covalent_radius[atomic_number_1];
   float cn_temp = 0.0f;
+  const size_t num_slots = static_cast<size_t>(N) * num_sub;
+  const size_t slot = static_cast<size_t>(n1_safe) * num_sub + sub;
+  int num_accepted = 0;
   double x1 = g_x[n1_safe];
   double y1 = g_y[n1_safe];
   double z1 = g_z[n1_safe];
@@ -906,10 +973,17 @@ __global__ void find_dftd3_coordination_number_large_box(
             float R_cov_2 = Bohr * covalent_radius[atomic_number_2];
             float d12 = sqrt(d12_2);
             cn_temp += 1.0f / (exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f)) + 1.0f);
+            if (num_accepted < list_capacity) {
+              g_list[num_accepted * num_slots + slot] = n2;
+            }
+            ++num_accepted;
           }
         }
       }
     }
+  }
+  if (valid && list_capacity > 0) {
+    g_list_count[slot] = num_accepted;
   }
   if (num_sub > 1) {
     s_red[0][tid] = cn_temp;
@@ -1153,7 +1227,10 @@ __global__ void find_dftd3_force_extra_large_box(
   double* g_fx,
   double* g_fy,
   double* g_fz,
-  double* g_virial)
+  double* g_virial,
+  const int* g_list,
+  const int* g_list_count,
+  const int list_capacity)
 {
   static_assert(
     num_sub >= 1 && num_sub <= 16 && (num_sub & (num_sub - 1)) == 0 &&
@@ -1190,59 +1267,71 @@ __global__ void find_dftd3_force_extra_large_box(
   int cell_id_z;
   find_cell_id(box, x1, y1, z1, 2.0f / rc, nx, ny, nz, cell_id_x, cell_id_y, cell_id_z, cell_id);
 
-  const int z_lim = box.pbc_z ? 2 : 0;
-  const int y_lim = box.pbc_y ? 2 : 0;
-  const int x_lim = box.pbc_x ? 2 : 0;
-  const int num_x = 2 * x_lim + 1;
-  const int num_y = 2 * y_lim + 1;
-  const int num_z = 2 * z_lim + 1;
-  for (int c = valid ? sub : num_x * num_y * num_z; c < num_x * num_y * num_z; c += num_sub) {
-    const int xx = c % num_x - x_lim;
-    const int yy = (c / num_x) % num_y - y_lim;
-    const int zz = c / (num_x * num_y) - z_lim;
-    {
-      {
-        int neighbor_cell =
-          find_neighbor_cell(cell_id, cell_id_x, cell_id_y, cell_id_z, nx, ny, nz, xx, yy, zz);
-        const int num_atoms_neighbor_cell = g_cell_count[neighbor_cell];
-        const int num_atoms_previous_cells = g_cell_count_sum[neighbor_cell];
-        for (int m = 0; m < num_atoms_neighbor_cell; ++m) {
-          const int n2 = g_cell_contents[num_atoms_previous_cells + m];
-          if (n1 == n2) {
-            continue;
-          }
-          float x12 = g_x[n2] - x1;
-          float y12 = g_y[n2] - y1;
-          float z12 = g_z[n2] - z1;
-          apply_mic(box, x12, y12, z12);
-          float r12[3] = {x12, y12, z12};
-          float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
-          if (d12_2 < rc * rc) {
-            int atomic_number_2 = dftd3_para.atomic_number[g_type[n2]];
-            float R_cov_2 = Bohr * covalent_radius[atomic_number_2];
-            float d12 = sqrt(d12_2);
-            float cn_exp_factor = exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f));
-            float f12_factor = cn_exp_factor * 16.0f * (R_cov_1 + R_cov_2);
-            f12_factor /= (cn_exp_factor + 1.0f) * (cn_exp_factor + 1.0f) * d12 * d12_2;
-            float f21_factor = f12_factor;
-            f12_factor *= dc6_sum_plus_dc8_sum_1;
-            f21_factor *= -(g_dc6_sum[n2] + g_dc8_sum[n2]);
-            float f12[3] = {r12[0] * f12_factor, r12[1] * f12_factor, r12[2] * f12_factor};
-            float f21[3] = {r12[0] * f21_factor, r12[1] * f21_factor, r12[2] * f21_factor};
-            s_fx += f12[0] - f21[0];
-            s_fy += f12[1] - f21[1];
-            s_fz += f12[2] - f21[2];
-            s_sxx += r12[0] * f21[0];
-            s_sxy += r12[0] * f21[1];
-            s_sxz += r12[0] * f21[2];
-            s_syx += r12[1] * f21[0];
-            s_syy += r12[1] * f21[1];
-            s_syz += r12[1] * f21[2];
-            s_szx += r12[2] * f21[0];
-            s_szy += r12[2] * f21[1];
-            s_szz += r12[2] * f21[2];
-          }
-        }
+  // Accepted partners of this (atom, sub) slot stored by the CN kernel in the order of the same
+  // traversal; they are used when they all fitted into the list, otherwise the cell traversal is
+  // repeated. Both give the same pairs in the same order.
+  const size_t num_slots = static_cast<size_t>(N) * num_sub;
+  const size_t slot = static_cast<size_t>(n1_safe) * num_sub + sub;
+  const int num_listed = (valid && list_capacity > 0) ? g_list_count[slot] : -1;
+
+  auto add_pair = [&](const int n2) {
+    if (n1 == n2) {
+      return;
+    }
+    float x12 = g_x[n2] - x1;
+    float y12 = g_y[n2] - y1;
+    float z12 = g_z[n2] - z1;
+    apply_mic(box, x12, y12, z12);
+    float r12[3] = {x12, y12, z12};
+    float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
+    if (d12_2 < rc * rc) {
+      int atomic_number_2 = dftd3_para.atomic_number[g_type[n2]];
+      float R_cov_2 = Bohr * covalent_radius[atomic_number_2];
+      float d12 = sqrt(d12_2);
+      float cn_exp_factor = exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f));
+      float f12_factor = cn_exp_factor * 16.0f * (R_cov_1 + R_cov_2);
+      f12_factor /= (cn_exp_factor + 1.0f) * (cn_exp_factor + 1.0f) * d12 * d12_2;
+      float f21_factor = f12_factor;
+      f12_factor *= dc6_sum_plus_dc8_sum_1;
+      f21_factor *= -(g_dc6_sum[n2] + g_dc8_sum[n2]);
+      float f12[3] = {r12[0] * f12_factor, r12[1] * f12_factor, r12[2] * f12_factor};
+      float f21[3] = {r12[0] * f21_factor, r12[1] * f21_factor, r12[2] * f21_factor};
+      s_fx += f12[0] - f21[0];
+      s_fy += f12[1] - f21[1];
+      s_fz += f12[2] - f21[2];
+      s_sxx += r12[0] * f21[0];
+      s_sxy += r12[0] * f21[1];
+      s_sxz += r12[0] * f21[2];
+      s_syx += r12[1] * f21[0];
+      s_syy += r12[1] * f21[1];
+      s_syz += r12[1] * f21[2];
+      s_szx += r12[2] * f21[0];
+      s_szy += r12[2] * f21[1];
+      s_szz += r12[2] * f21[2];
+    }
+  };
+
+  if (num_listed >= 0 && num_listed <= list_capacity) {
+    for (int k = 0; k < num_listed; ++k) {
+      add_pair(g_list[k * num_slots + slot]);
+    }
+  } else {
+    const int z_lim = box.pbc_z ? 2 : 0;
+    const int y_lim = box.pbc_y ? 2 : 0;
+    const int x_lim = box.pbc_x ? 2 : 0;
+    const int num_x = 2 * x_lim + 1;
+    const int num_y = 2 * y_lim + 1;
+    const int num_z = 2 * z_lim + 1;
+    for (int c = valid ? sub : num_x * num_y * num_z; c < num_x * num_y * num_z; c += num_sub) {
+      const int xx = c % num_x - x_lim;
+      const int yy = (c / num_x) % num_y - y_lim;
+      const int zz = c / (num_x * num_y) - z_lim;
+      const int neighbor_cell =
+        find_neighbor_cell(cell_id, cell_id_x, cell_id_y, cell_id_z, nx, ny, nz, xx, yy, zz);
+      const int num_atoms_neighbor_cell = g_cell_count[neighbor_cell];
+      const int num_atoms_previous_cells = g_cell_count_sum[neighbor_cell];
+      for (int m = 0; m < num_atoms_neighbor_cell; ++m) {
+        add_pair(g_cell_contents[num_atoms_previous_cells + m]);
       }
     }
   }
@@ -1511,6 +1600,17 @@ void DFTD3::compute_large_box(
     cell_count_sum_angular.resize(N);
     cell_contents_angular.resize(N);
   }
+  const int list_capacity = get_cn_list_capacity(N, num_sub, rc_angular, box);
+  if (list_capacity > 0) {
+    // grow only: the capacity follows the box volume, which changes in a constant-pressure run
+    const size_t num_slots = static_cast<size_t>(N) * num_sub;
+    if (cn_list.size() < num_slots * list_capacity) {
+      cn_list.resize(num_slots * list_capacity);
+    }
+    if (cn_list_count.size() < num_slots) {
+      cn_list_count.resize(num_slots);
+    }
+  }
 
   int num_bins_radial[3];
   int num_bins_angular[3];
@@ -1551,7 +1651,10 @@ void DFTD3::compute_large_box(
     position_per_atom.data() + N,                                                                  \
     position_per_atom.data() + N * 2,                                                              \
     cn.data(),                                                                                     \
-    cn_weight.data());
+    cn_weight.data(),                                                                              \
+    cn_list.data(),                                                                                \
+    cn_list_count.data(),                                                                          \
+    list_capacity);
   switch (num_sub) {
     case 1:
       DFTD3_LAUNCH_CN_LARGE_BOX(1)
@@ -1645,7 +1748,10 @@ void DFTD3::compute_large_box(
     force_per_atom.data(),                                                                         \
     force_per_atom.data() + N,                                                                     \
     force_per_atom.data() + N * 2,                                                                 \
-    virial_per_atom.data());
+    virial_per_atom.data(),                                                                        \
+    cn_list.data(),                                                                                \
+    cn_list_count.data(),                                                                          \
+    list_capacity);
   switch (num_sub) {
     case 1:
       DFTD3_LAUNCH_EXTRA_LARGE_BOX(1)

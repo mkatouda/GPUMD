@@ -237,6 +237,13 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
   kernels (only if the 6a data support it). If the resulting D3 total at water 41,472 is <= 6.0 ms, the AC-4
   target there is met again (the human decision of 2026-11-04 to drop it remains valid but is then moot).
   Stage 3 below is run after (vi), once, on the final code.
+- Item (vi) outcome (2026-11-04, VER-0015): 6a gate passed (index-cache upper bound -0.48 ms at water 41,472, 1.44x at
+  water 5,184). Items (1) and (2) already exist (Phase 3: num_sub 1..16, fixed-order reduction; a num_sub scan found the
+  current rule within 3% of the best fixed value), so nothing was changed there. Item (3) adopted: the CN kernel stores the
+  accepted partners, the extra kernel reuses the list (fallback to cell traversal on overflow; identical pair order).
+  Extra kernel 0.76 -> 0.20 ms; D3 total water 41,472 6.346 -> 5.853 ms (AC-4 target <= 6.0 ms met again), water 5,184
+  1.04x, Cu 4,000 1.07x, cluster 972 1.28x, small box unchanged; AC-1 and AC-2 met. Candidate not yet decided (human):
+  float pre-filter of the CN/extra candidate loops (upper bound CN 0.70 -> 0.37 ms, extra 0.75 -> 0.52 ms).
 - Stage 3: re-measure VER-0004 section 3 and the VER-0001 slope method, `--suite full` against the `master`
   baseline, independent numerical review of the changed kernels, NVE with the VER-0011 protocol (single
   trajectory is not enough; see VER-0011), then record AC-4 per target point (met/unmet) and let the human

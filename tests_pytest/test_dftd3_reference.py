@@ -21,7 +21,7 @@ import subprocess
 
 import numpy as np
 import pytest
-from ase.io import read
+from ase.io import read, write
 
 from conftest import GPUMD_EXECUTABLE, REPO_ROOT
 
@@ -144,3 +144,82 @@ def test_dftd3_large_box_ignores_small_box_num_sub(name, tmp_path, monkeypatch):
     ref = REFERENCE[name]
     _run(tmp_path / 'D3', FIXTURE_DIR / f'{name}.xyz', (ref['potential_cutoff'], ref['cn_cutoff']))
     assert 'threads per atom' not in _run.last_stdout
+
+
+# Large-box path: the CN kernel stores the partners it accepts in a per-thread list that the extra
+# kernel reuses instead of repeating the cell traversal; a slot whose partners do not all fit is
+# handled by the traversal. GPUMD_DFTD3_LARGE_BOX_LIST_CAPACITY (a test aid, see dftd3.cu) fixes the
+# capacity per thread (0 switches the list off), GPUMD_DFTD3_LARGE_BOX_NUM_SUB fixes the number of
+# threads per atom. The list is built in the order of the traversal, so list, overflow fallback and
+# plain traversal must give identical numbers.
+LIST_CAPACITIES = (None, '0', '1', '4')   # None = default rule
+
+
+def _large_box_env(monkeypatch, num_sub, capacity):
+    for key, value in (('GPUMD_DFTD3_LARGE_BOX_NUM_SUB', num_sub),
+                       ('GPUMD_DFTD3_LARGE_BOX_LIST_CAPACITY', capacity)):
+        if value is None:
+            monkeypatch.delenv(key, raising=False)
+        else:
+            monkeypatch.setenv(key, str(value))
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd3_large_box_neighbor_list_is_exact_and_reproducible(tmp_path, monkeypatch):
+    # 24 atoms in a 40 A periodic box: large-box path, one warp, so the order of the cell lists (and
+    # with it the summation order) is the same in every run and the numbers can be compared bitwise.
+    atoms = read(FIXTURE_DIR / 'water27.xyz')[:24]
+    atoms.set_cell([40.0, 40.0, 40.0])
+    atoms.set_pbc(True)
+    atoms.center()
+    structure = tmp_path / 'tiny24.xyz'
+    write(structure, atoms, format='extxyz')
+    _large_box_env(monkeypatch, None, None)
+    e0, f0, v0 = _run(tmp_path / 'noD3', structure, None)
+    results = {}
+    for num_sub in (1, 2, 4, 8, 16):
+        reference = None
+        for capacity in LIST_CAPACITIES:
+            _large_box_env(monkeypatch, num_sub, capacity)
+            runs = [_run(tmp_path / f's{num_sub}_c{capacity}_{k}', structure, (12.0, 6.0))
+                    for k in range(2 if capacity is None else 1)]
+            assert f'threads per atom = {num_sub}' in _run.last_stdout
+            if capacity is not None:
+                assert f'capacity per thread = {capacity}' in _run.last_stdout
+            if len(runs) == 2:
+                assert runs[0][0] == runs[1][0] and np.array_equal(runs[0][1], runs[1][1]) \
+                    and np.array_equal(runs[0][2], runs[1][2]), (num_sub, 'not reproducible')
+            e1, f1, v1 = runs[0]
+            if reference is None:
+                reference = (e1, f1, v1)
+            assert e1 == reference[0] and np.array_equal(f1, reference[1]) \
+                and np.array_equal(v1, reference[2]), (num_sub, capacity)
+        results[num_sub] = (reference[0] - e0, reference[1] - f0, reference[2] - v0)
+    e_ref, f_ref, v_ref = results[1]
+    for num_sub, (e, f, v) in results.items():
+        assert abs(e - e_ref) <= REL_CAP * abs(e_ref), num_sub
+        assert np.abs(f - f_ref).max() <= FORCE_CAP, num_sub
+        assert np.abs(v - v_ref).max() <= REL_CAP * np.abs(v_ref).max(), num_sub
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize('name', LARGE_BOX_CASES)
+def test_dftd3_large_box_neighbor_list_capacities_agree(name, tmp_path, monkeypatch):
+    ref = REFERENCE[name]
+    structure = FIXTURE_DIR / f'{name}.xyz'
+    _large_box_env(monkeypatch, None, None)
+    e0, f0, v0 = _run(tmp_path / 'noD3', structure, None)
+    results = {}
+    for capacity in LIST_CAPACITIES:
+        _large_box_env(monkeypatch, None, capacity)
+        e1, f1, v1 = _run(tmp_path / f'c{capacity}', structure,
+                          (ref['potential_cutoff'], ref['cn_cutoff']))
+        results[capacity] = (e1 - e0, f1 - f0, v1 - v0)
+    e_ref, f_ref, v_ref = results['0']
+    for capacity, (e, f, v) in results.items():
+        assert abs(e - ref['energy']) <= tolerance(name, 'energy'), capacity
+        assert np.abs(f - np.array(ref['forces'])).max() <= tolerance(name, 'force'), capacity
+        assert np.abs(v - np.array(ref['virial'])).max() <= tolerance(name, 'virial'), capacity
+        assert abs(e - e_ref) <= REL_CAP * abs(ref['energy']), capacity
+        assert np.abs(f - f_ref).max() <= FORCE_CAP, capacity
+        assert np.abs(v - v_ref).max() <= REL_CAP * np.abs(np.array(ref['virial'])).max(), capacity
