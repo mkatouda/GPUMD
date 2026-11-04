@@ -15,8 +15,8 @@ requirements:
     source: specs/requirements/DR-002-dftd2-external-correction.md
     design: specs/design/DES-0002-dftd2-implementation-plan.md
     adrs: []
-    verification: [specs/verification/VER-0003-dftd2-parameters-and-oracle, specs/verification/VER-0005-dftd2-cutoff-study, specs/verification/VER-0006-dftd2-consistency-and-performance, specs/verification/VER-0007-dftd2-review-fixes, specs/verification/VER-0008-dftd2-optimization, specs/verification/VER-0009-dftd2-float-candidates, specs/verification/VER-0010-dftd2-final-verification]
-    tests: [tests_pytest/test_dftd2_reference.py, tests_pytest/test_dftd2_src_table.py, tests_pytest/test_dftd2_consistency.py]   # AC-1..6 and 8 met; AC-4 FD at rc=12 and 30 A (VER-0010). AC-7 NOT met (measured, informative, not a gate): D2/D3 extra time <= 0.5 only at rc=12 A for N=81/648; at the default rc=30 A it is 0.66-9.3 (VER-0010). Independent reviews: no open BLOCKER/MAJOR (VER-0007, stage 3b)
+    verification: [specs/verification/VER-0003-dftd2-parameters-and-oracle, specs/verification/VER-0005-dftd2-cutoff-study, specs/verification/VER-0006-dftd2-consistency-and-performance, specs/verification/VER-0007-dftd2-review-fixes, specs/verification/VER-0008-dftd2-optimization, specs/verification/VER-0009-dftd2-float-candidates, specs/verification/VER-0010-dftd2-final-verification, specs/verification/VER-0021-dftd2-vs-dftd3-timing]
+    tests: [tests_pytest/test_dftd2_reference.py, tests_pytest/test_dftd2_src_table.py, tests_pytest/test_dftd2_consistency.py]   # AC-1..6 and 8 met; AC-4 FD at rc=12 and 30 A (VER-0010). AC-7 NOT met (measured, informative, not a gate; re-measured 2026-11-04 against the optimized D3 in VER-0021: met only at water 648 rc=12 A (D2 at noise level), not met elsewhere, never at rc=30 A): D2/D3 extra time <= 0.5 only at rc=12 A for N=81/648; at the default rc=30 A it is 0.66-9.3 (VER-0010). Independent reviews: no open BLOCKER/MAJOR (VER-0007, stage 3b)
     status: implemented
 # Example entry:
 # - id: DR-001
