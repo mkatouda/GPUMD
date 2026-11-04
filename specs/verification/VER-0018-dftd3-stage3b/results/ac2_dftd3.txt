@@ -1,0 +1,28 @@
+deform_npt_tri           thermo.out   FAIL  max abs diff 1.139e+00  max rel diff 9.923e+00 
+deform_npt_tri           restart.xyz  FAIL  max abs diff 0.000e+00  max rel diff 0.000e+00 token 'Lattice="61.45731298638642' != 'Lattice="61.456661277101325'
+dftd3_kspace_one_each    thermo.out   PASS  max abs diff 3.723e-07  max rel diff 1.456e-06 
+dftd3_kspace_one_each    restart.xyz  PASS  max abs diff 1.741e-12  max rel diff 2.623e-08 
+dftd3_single_late        thermo.out   PASS  max abs diff 4.100e-07  max rel diff 2.641e-07 
+dftd3_single_late        restart.xyz  PASS  max abs diff 3.727e-11  max rel diff 1.583e-07 
+graphene_hac             thermo.out   FAIL  max abs diff 6.989e+00  max rel diff 3.002e+02 
+graphene_hnemd_shc       thermo.out   FAIL  max abs diff 6.534e+00  max rel diff 6.924e+01 
+graphene_nemd_shc        thermo.out   FAIL  max abs diff 1.195e+01  max rel diff 8.357e+00 
+heat_bdp                 restart.xyz  FAIL  max abs diff 4.764e-05  max rel diff 4.343e+01 
+ilp_nep_compute          thermo.out   FAIL  max abs diff 1.535e-02  max rel diff 1.173e+00 
+ilp_nep_compute          restart.xyz  FAIL  max abs diff 2.130e+01  max rel diff 1.202e+24 
+ilp_tersoff_compute      thermo.out   FAIL  max abs diff 1.309e-02  max rel diff 1.245e+00 
+ilp_tersoff_compute      restart.xyz  FAIL  max abs diff 2.130e+01  max rel diff 2.307e+24 
+ilp_tmd_sw_compute       thermo.out   FAIL  max abs diff 1.026e-02  max rel diff 3.445e+00 
+ilp_tmd_sw_compute       restart.xyz  FAIL  max abs diff 1.896e+01  max rel diff 9.801e+24 
+npt_scr_iso              thermo.out   FAIL  max abs diff 2.647e+00  max rel diff 1.802e-02 
+npt_scr_iso              restart.xyz  FAIL  max abs diff 0.000e+00  max rel diff 0.000e+00 token 'Lattice="43.380554975321786' != 'Lattice="43.378611963701843'
+nvt_bdp                  thermo.out   FAIL  max abs diff 1.022e+00  max rel diff 3.349e-03 
+nvt_bdp                  restart.xyz  FAIL  max abs diff 4.353e-06  max rel diff 2.565e-03 
+pimd_scr                 thermo.out   FAIL  max abs diff 5.640e-03  max rel diff 3.319e-02 
+pimd_scr                 restart.xyz  FAIL  max abs diff 0.000e+00  max rel diff 0.000e+00 token 'Lattice="43.3791836359689' != 'Lattice="43.380412869797418'
+replicate_default_velocity thermo.out   FAIL  max abs diff 1.725e-01  max rel diff 4.321e+00 
+replicate_default_velocity restart.xyz  FAIL  max abs diff 1.446e+01  max rel diff 1.166e+24 
+replicate_velocity_unseeded thermo.out   FAIL  max abs diff 1.449e-01  max rel diff 9.232e+00 
+replicate_velocity_unseeded restart.xyz  FAIL  max abs diff 1.446e+01  max rel diff 1.000e+24 
+silicon_liquid_transport restart.xyz  FAIL  max abs diff 0.000e+00  max rel diff 0.000e+00 token 'Lattice="54.603695080054393' != 'Lattice="54.703104597053645'
+AC-2 (rtol 1e-5, atol 1e-12): FAIL

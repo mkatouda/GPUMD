@@ -1,0 +1,8 @@
+w81        rc 12 cn  6 noD3 1.320 ms  extra base 2.456  new 0.152  x16.17  new runs [0.211, 0.031, 0.152]
+w648       rc 12 cn  6 noD3 1.626 ms  extra base 4.417  new 0.459  x9.63  new runs [0.358, 0.531, 0.459]
+scan_2187  rc 12 cn  6 noD3 1.726 ms  extra base 3.266  new 0.750  x4.36  new runs [0.75, 0.636, 0.784]
+w5184      rc 12 cn  6 noD3 1.775 ms  extra base 4.568  new 0.846  x5.40  new runs [0.846, 0.846, 0.839]
+scan_8748  rc 12 cn  6 noD3 2.087 ms  extra base 11.782  new 8.274  x1.42  new runs [8.158, 8.274, 8.286]
+w41472     rc 12 cn  6 noD3 6.830 ms  extra base 8.398  new 6.193  x1.36  new runs [6.175, 6.256, 6.193]
+cu4000     rc 12 cn  6 noD3 1.295 ms  extra base 3.612  new 0.554  x6.52  new runs [0.596, 0.448, 0.554]
+clus972    rc 12 cn  6 noD3 1.411 ms  extra base 1.717  new 1.216  x1.41  new runs [1.15, 1.216, 1.303]

@@ -1,0 +1,41 @@
+........................................................................ [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 16%]
+...................ss.......ss.......ss.......ss.......ss............... [ 21%]
+...s.....ssssssssssssssssssssssssssssssssssss........................... [ 26%]
+........................................................................ [ 32%]
+......................ssssssssssssssssssssss............................ [ 37%]
+...............s..........s..........sssss..s....ssss.............ss.... [ 43%]
+.....ssssss..................s.....ssssssssss........................... [ 48%]
+....ss.......ss.......ss.......ss........ss......ssss..s...ss.......ss.. [ 53%]
+.....ss..................ssssssssssssssssssss........................... [ 59%]
+..................................ss...........ssssssssss............... [ 64%]
+...............sssssssssssssssssssssssssssssssssssssssssssssssssssssssss [ 69%]
+ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss [ 75%]
+ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss [ 80%]
+ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss [ 86%]
+ssssssssssssssssssssssssssssssssssssssssssssssssssss.ss................. [ 91%]
+........................................................................ [ 96%]
+...........................................                              [100%]
+=============================== warnings summary ===============================
+test_active.py: 133 warnings
+test_dftd2_consistency.py: 460 warnings
+test_dftd2_reference.py: 649 warnings
+test_dftd3_reference.py: 254 warnings
+test_dump_observer.py: 140 warnings
+test_force_energy_consistency.py: 507 warnings
+test_invariances.py: 319 warnings
+test_io_basic_setup.py: 310 warnings
+test_io_compute_commands.py: 317 warnings
+test_io_dump_commands.py: 1327 warnings
+test_io_tnep_commands.py: 4 warnings
+test_kspace_consistency.py: 115 warnings
+test_nep_train_outputs.py: 8 warnings
+test_regression.py: 14 warnings
+test_tnep_invariances.py: 10 warnings
+  /home/katouda/.local/lib/python3.12/site-packages/ase/atoms.py:432: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    a.shape = (-1,) + shape
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+859 passed, 480 skipped, 10 deselected, 4567 warnings in 1571.96s (0:26:11)

@@ -53,9 +53,13 @@ N=5,184, and 6.0 ms at N=41,472; also, after Phase 0 (`VER-0002`), at most 2.0 m
 N=648 (small-box path; baseline 4.37 ms) and for fcc Cu N=4,000 (baseline 3.65 ms); no case is
 slower than baseline by more than 3%.
 Targets for a phase may be dropped by the human if a phase gate in DES-0001 fails.
-Result (2026-11-04, VER-0013/0014): met at N = 81 (0.10 ms), 648 (0.50 ms) and 5,184 (0.77 ms); NOT met at
-N = 41,472 (6.32 ms vs 6.0 ms). The N = 41,472 target is dropped by the human decision of 2026-11-04.
-Update (2026-11-04, VER-0015): after Phase 7 item (vi) (CN/extra traversal sharing) N = 41,472 is 5.85 ms, i.e. met again.
+Result (2026-11-04, slope method as defined above, VER-0018; supersedes the nsys-based figures of VER-0013/0014/0015):
+D3 extra time per step (median of 3, master-base -> optimized): N = 81 0.152 ms (target 1.0, met), water 648 0.459 (2.0, met),
+Cu 4,000 0.554 (2.0, met), water 5,184 0.846 (2.0, met); N = 41,472 6.19 ms (target 6.0): NOT met by the slope method
+(the per-step sum of D3 kernel times from nsys is 5.88 ms, which would meet it, but nsys totals are not the AC-4 definition).
+No case is slower than baseline. The N = 41,472 target stays dropped by the human decision of 2026-11-04 (reaffirmed 2026-11-04 after VER-0018).
+Earlier notes in VER-0013/0014/0015 that quote 0.10/0.50/0.77/5.85 ms are nsys sums.
+
 
 AC-5 (portability). The code builds warning-clean with CUDA; any new construct goes through
 `gpu_macro.cuh` so the HIP build is not broken; the `sm_60`-and-older `atomicAdd` fallback

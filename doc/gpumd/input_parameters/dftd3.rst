@@ -46,8 +46,8 @@ Two code paths are used, chosen automatically every step:
 * **Large-box path** (all periodic directions thicker than 2.5 :math:`r_\mathrm{c}`, and non-periodic systems): a cell list with cells of about half the cutoff is used, and no neighbor list is stored. Several GPU threads share one atom when the number of atoms is small.
 
 The following extra times per MD step were measured on an RTX A6000 (CUDA 12.3, NEP89, NVE, time step 0.5 fs).
-The extra time is the time per step with the correction minus the time per step without it; each time per step is the slope between runs of 100 and 500 steps (the minimum of two runs each), which removes the start-up cost.
-They are single measurements on one GPU and are accurate to about 0.1-0.5 ms; other GPUs and other systems will differ.
+The extra time is the time per step with the correction minus the time per step without it; each time per step is the slope between runs of 100 and 500 steps, which removes the start-up cost; the values are medians of three repetitions.
+They are measurements on one GPU and are accurate to about 0.1-0.5 ms (the scatter of the repetitions is at most about 0.2 ms for the small systems and 0.1 ms for the largest); other GPUs and other systems will differ.
 
 Cutoffs 12 Å (potential) and 6 Å (coordination number), the example above (``dftd3 pbe 12 6``):
 
@@ -61,23 +61,38 @@ Cutoffs 12 Å (potential) and 6 Å (coordination number), the example above (``d
    * - water
      - 81
      - small box
-     - 1.5
+     - 0.15
    * - water
      - 648
      - small box
-     - 1.9
+     - 0.46
+   * - water
+     - 2187
+     - small box
+     - 0.75
    * - water
      - 5184
      - large box
-     - 1.1
+     - 0.85
+   * - water
+     - 8748
+     - small box
+     - 8.3
    * - water
      - 41472
      - large box
-     - 7.5
-   * - fcc Cu (4000 atoms, :math:`a` = 3.615 Å)
+     - 6.2
+   * - fcc Cu (4000 atoms, :math:`a` = 3.61 Å)
      - 4000
      - large box
-     - 0.53
+     - 0.55
+   * - water cluster (non-periodic)
+     - 972
+     - large box
+     - 1.2
+
+The small-box path is fast for few atoms (0.15-0.75 ms for 81-2187 atoms) but its cost grows faster than linearly with the number of atoms (the time of building the explicit neighbor list grows roughly with the square of the number of atoms): the 8748-atom box (thickness 27.9 Å, below 2.5 :math:`r_\mathrm{c}` = 30 Å in one direction) costs 8.3 ms, more than the 5184-atom large-box system.
+The large-box path scales with the number of atoms at fixed density: 0.85 ms for 5184 atoms and 6.2 ms for 41472 atoms.
 
 Dependence on the potential cutoff (coordination number cutoff 6 Å):
 
@@ -91,18 +106,18 @@ Dependence on the potential cutoff (coordination number cutoff 6 Å):
    * - water, 648 atoms
      - 8 / 12 / 16 / 20
      - small box
-     - 0.63 / 1.9 / 3.9 / 7.8
+     - 0.11 / 0.46 / 0.55 / 1.6
    * - water, 5184 atoms
      - 8 / 12
      - large box
-     - 0.56 / 1.1
+     - 0.45 / 0.85
    * - water, 5184 atoms
      - 16 / 20
      - small box
-     - 7.2 / 31
+     - 3.3 / 23
 
-For 648 atoms the time grows by 4.0 when going from 12 to 20 Å (the cubic law gives 4.6).
-For 5184 atoms the time from 16 to 20 Å grows by 4.2, which is more than the cubic law (1.95); it also increases by a factor of 6.6 from 12 to 16 Å, where the path changes from large box to small box (the box thickness is 37.2 Å, which is below 2.5 :math:`r_\mathrm{c}` = 40 Å at 16 Å).
+For 648 atoms the time grows by 3.4 when going from 12 to 20 Å (the cubic law gives 4.6).
+For 5184 atoms the time from 16 to 20 Å grows by 6.9, which is more than the cubic law (1.95); it also increases by a factor of 3.9 from 12 to 16 Å, where the path changes from large box to small box (the box thickness is 37.2 Å, which is below 2.5 :math:`r_\mathrm{c}` = 40 Å at 16 Å).
 The cause of the faster growth was not investigated; do not extrapolate the table to other cutoffs or box sizes by the cubic law alone, and measure the cost for your system.
 
 Dependence on the coordination number cutoff (potential cutoff 12 Å):
@@ -115,12 +130,12 @@ Dependence on the coordination number cutoff (potential cutoff 12 Å):
      - D3 extra time (ms/step)
    * - water, 648 atoms
      - 3 / 6 / 12
-     - 1.8 / 1.9 / 2.9
+     - 0.44 / 0.46 / 0.87
    * - water, 5184 atoms
      - 3 / 6 / 12
-     - 0.98 / 1.1 / 1.9
+     - 0.83 / 0.85 / 1.4
 
-The NEP evaluation itself takes about 1.6 ms/step for 648 atoms, 1.8 ms/step for 5184 atoms, 6.8 ms/step for 41472 atoms and 1.4 ms/step for 4000 Cu atoms in the same measurement.
+The NEP evaluation itself takes about 1.6 ms/step for 648 atoms, 1.8 ms/step for 5184 atoms, 6.8 ms/step for 41472 atoms and 1.3 ms/step for 4000 Cu atoms in the same measurement.
 For the cost of the :ref:`dftd2 <kw_dftd2>` correction, see the section "Cost" on its page.
 
 Tips

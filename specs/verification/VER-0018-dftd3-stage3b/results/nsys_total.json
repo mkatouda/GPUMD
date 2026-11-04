@@ -1,0 +1,266 @@
+[
+ {
+  "system": "w81",
+  "base_ms": 2.6301615,
+  "new_ms": 0.097409,
+  "base_runs": [
+   2.6175695,
+   2.6301615,
+   2.642017
+  ],
+  "new_runs": [
+   0.097409,
+   0.0974095,
+   0.097297
+  ],
+  "kernels": {
+   "base": {
+    "find_neighbor_list_small_box": 1.1684785,
+    "find_dftd3_coordination_number_small_box": 0.032384,
+    "add_dftd3_force_small_box": 1.3607855,
+    "add_dftd3_force_extra_small_box": 0.06648
+   },
+   "new": {
+    "find_neighbor_list_small_box": 0.039329,
+    "find_dftd3_coordination_number_small_box": 0.033761,
+    "add_dftd3_force_small_box": 0.015329,
+    "add_dftd3_force_extra_small_box": 0.00896
+   }
+  },
+  "speedup": 27.00121652003408
+ },
+ {
+  "system": "w648",
+  "base_ms": 4.2469655,
+  "new_ms": 0.503847,
+  "base_runs": [
+   4.2469655,
+   4.2461804999999995,
+   4.2475725
+  ],
+  "new_runs": [
+   0.50279,
+   0.504006,
+   0.503847
+  ],
+  "kernels": {
+   "base": {
+    "find_neighbor_list_small_box": 2.747635,
+    "find_dftd3_coordination_number_small_box": 0.047328999999999996,
+    "add_dftd3_force_small_box": 1.355729,
+    "add_dftd3_force_extra_small_box": 0.095393
+   },
+   "new": {
+    "find_neighbor_list_small_box": 0.399941,
+    "find_dftd3_coordination_number_small_box": 0.0540965,
+    "add_dftd3_force_small_box": 0.037728,
+    "add_dftd3_force_extra_small_box": 0.011984
+   }
+  },
+  "speedup": 8.4290776763581
+ },
+ {
+  "system": "scan_2187",
+  "base_ms": 3.1827435,
+  "new_ms": 0.7289844999999999,
+  "base_runs": [
+   3.1832875,
+   3.1827435,
+   3.181415
+  ],
+  "new_runs": [
+   0.7289844999999999,
+   0.729368,
+   0.685464
+  ],
+  "kernels": {
+   "base": {
+    "find_neighbor_list_small_box": 1.478834,
+    "find_dftd3_coordination_number_small_box": 0.0563205,
+    "add_dftd3_force_small_box": 1.5480835000000002,
+    "add_dftd3_force_extra_small_box": 0.10104199999999999
+   },
+   "new": {
+    "find_neighbor_list_small_box": 0.569975,
+    "find_dftd3_coordination_number_small_box": 0.057825,
+    "add_dftd3_force_small_box": 0.080513,
+    "add_dftd3_force_extra_small_box": 0.0198725
+   }
+  },
+  "speedup": 4.365996122002595
+ },
+ {
+  "system": "scan_8748",
+  "base_ms": 11.461053,
+  "new_ms": 8.186517,
+  "base_runs": [
+   11.455757,
+   11.461053,
+   11.5228465
+  ],
+  "new_runs": [
+   8.186517,
+   8.1865645,
+   8.185732999999999
+  ],
+  "kernels": {
+   "base": {
+    "find_neighbor_list_small_box": 9.101040000000001,
+    "find_dftd3_coordination_number_small_box": 0.058529,
+    "add_dftd3_force_small_box": 2.113498,
+    "add_dftd3_force_extra_small_box": 0.189394
+   },
+   "new": {
+    "find_neighbor_list_small_box": 7.8028005,
+    "find_dftd3_coordination_number_small_box": 0.0591845,
+    "add_dftd3_force_small_box": 0.284051,
+    "add_dftd3_force_extra_small_box": 0.0403045
+   }
+  },
+  "speedup": 1.3999913516334235
+ },
+ {
+  "system": "clus972",
+  "base_ms": 1.8318631584158416,
+  "new_ms": 1.198530777227723,
+  "base_runs": [
+   1.8331127376237624,
+   1.7346842673267329,
+   1.8318631584158416
+  ],
+  "new_runs": [
+   1.2655182475247526,
+   1.1955631732673266,
+   1.198530777227723
+  ],
+  "kernels": {
+   "base": {
+    "find_cell_counts": 0.00352,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001056,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.00192,
+    "find_cell_contents": 0.003808,
+    "find_dftd3_coordination_number_large_box": 0.287796,
+    "find_dftd3_force_large_box": 1.194543,
+    "find_dftd3_force_extra_large_box": 0.3281
+   },
+   "new": {
+    "find_cell_counts": 0.00336,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001056,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.001888,
+    "find_cell_contents": 0.003648,
+    "find_dftd3_coordination_number_large_box": 0.2760355,
+    "find_dftd3_force_large_box": 0.834106,
+    "find_dftd3_force_extra_large_box": 0.06769700000000001
+   }
+  },
+  "speedup": 1.5284239614213797
+ },
+ {
+  "system": "w5184",
+  "base_ms": 3.7905510346534648,
+  "new_ms": 0.7376690841584159,
+  "base_runs": [
+   3.7905145792079207,
+   3.7905510346534648,
+   3.8154796980198022
+  ],
+  "new_runs": [
+   0.7396671881188119,
+   0.7376690841584159,
+   0.7286246782178217
+  ],
+  "kernels": {
+   "base": {
+    "find_cell_counts": 0.003296,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001024,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.002016,
+    "find_cell_contents": 0.003568,
+    "find_dftd3_coordination_number_large_box": 0.22723349999999998,
+    "find_dftd3_force_large_box": 3.287241,
+    "find_dftd3_force_extra_large_box": 0.2555055
+   },
+   "new": {
+    "find_cell_counts": 0.0034720000000000003,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001056,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.002112,
+    "find_cell_contents": 0.0037595,
+    "find_dftd3_coordination_number_large_box": 0.068192,
+    "find_dftd3_force_large_box": 0.618195,
+    "find_dftd3_force_extra_large_box": 0.0294885
+   }
+  },
+  "speedup": 5.138552117821216
+ },
+ {
+  "system": "w41472",
+  "base_ms": 8.112049074257426,
+  "new_ms": 5.875143094059406,
+  "base_runs": [
+   8.112049074257426,
+   8.108261336633664,
+   8.122804485148515
+  ],
+  "new_runs": [
+   5.851334212871286,
+   5.875143094059406,
+   5.892266138613862
+  ],
+  "kernels": {
+   "base": {
+    "find_cell_counts": 0.005168000000000001,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001024,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.002496,
+    "find_cell_contents": 0.005537,
+    "find_dftd3_coordination_number_large_box": 0.7950605,
+    "find_dftd3_force_large_box": 6.441283,
+    "find_dftd3_force_extra_large_box": 0.845988
+   },
+   "new": {
+    "find_cell_counts": 0.0051525,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001056,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.0026555,
+    "find_cell_contents": 0.0055525,
+    "find_dftd3_coordination_number_large_box": 0.717972,
+    "find_dftd3_force_large_box": 4.9266375,
+    "find_dftd3_force_extra_large_box": 0.200417
+   }
+  },
+  "speedup": 1.380740680590375
+ },
+ {
+  "system": "cu4000",
+  "base_ms": 3.5768281237623762,
+  "new_ms": 0.5070504257425742,
+  "base_runs": [
+   3.5834034653465348,
+   3.5768281237623762,
+   3.57652346039604
+  ],
+  "new_runs": [
+   0.5070504257425742,
+   0.5063757524752476,
+   0.5078177574257425
+  ],
+  "kernels": {
+   "base": {
+    "find_cell_counts": 0.0033924999999999997,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001024,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.002016,
+    "find_cell_contents": 0.0036639999999999997,
+    "find_dftd3_coordination_number_large_box": 0.24800149999999999,
+    "find_dftd3_force_large_box": 3.0208195,
+    "find_dftd3_force_extra_large_box": 0.289586
+   },
+   "new": {
+    "find_cell_counts": 0.003408,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001057,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.00208,
+    "find_cell_contents": 0.0036485,
+    "find_dftd3_coordination_number_large_box": 0.06048,
+    "find_dftd3_force_large_box": 0.395682,
+    "find_dftd3_force_extra_large_box": 0.030144
+   }
+  },
+  "speedup": 7.0541862153534725
+ }
+]

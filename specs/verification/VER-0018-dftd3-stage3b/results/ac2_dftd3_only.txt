@@ -1,0 +1,4 @@
+dftd3_kspace_one_each    thermo.out   PASS  max abs diff 3.723e-07  max rel diff 1.456e-06 
+dftd3_kspace_one_each    restart.xyz  PASS  max abs diff 1.741e-12  max rel diff 2.623e-08 
+dftd3_single_late        thermo.out   PASS  max abs diff 4.100e-07  max rel diff 2.641e-07 
+dftd3_single_late        restart.xyz  PASS  max abs diff 3.727e-11  max rel diff 1.583e-07 
