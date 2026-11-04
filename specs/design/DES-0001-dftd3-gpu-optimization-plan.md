@@ -244,6 +244,16 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
   Extra kernel 0.76 -> 0.20 ms; D3 total water 41,472 6.346 -> 5.853 ms (AC-4 target <= 6.0 ms met again), water 5,184
   1.04x, Cu 4,000 1.07x, cluster 972 1.28x, small box unchanged; AC-1 and AC-2 met. Candidate not yet decided (human):
   float pre-filter of the CN/extra candidate loops (upper bound CN 0.70 -> 0.37 ms, extra 0.75 -> 0.52 ms).
+- Item (vii) NEW (human instruction 2026-11-04): float pre-filter in the large-box CN kernel (and, if it helps, the
+  extra kernel's fallback traversal): candidate differences in float relative to the cell centre (as D2 Stage 2b), the
+  r < rc test in float with a guard band, and the exact double distance recomputed only for pairs that pass or lie within
+  the band, so that the accepted pair set and the double arithmetic of accepted pairs are unchanged. Gate: accepted set
+  identical to HEAD on all test systems (count check), AC-1/AC-2 unchanged, CN kernel >= 1.2x at water 41,472 and
+  5,184 and no case slower than 1.03x on D3 total, determinism not worse; otherwise revert and report.
+- Item (vii) outcome (2026-11-04, VER-0016): S1 gate NOT met, rejected, no src change kept. A float pre-filter with exact double
+  fallback made the CN kernel slower (water 41,472 0.93x, water 5,184 0.86-0.92x): about 22% of candidates are accepted, so
+  almost every warp (1-0.78^32 > 99.9%) still executes the double path. The timing-only upper bound (CN 0.71 -> 0.37 ms)
+  needs warp-level compaction of accepted candidates or a float-only decision (changes results); not pursued.
 - Stage 3: re-measure VER-0004 section 3 and the VER-0001 slope method, `--suite full` against the `master`
   baseline, independent numerical review of the changed kernels, NVE with the VER-0011 protocol (single
   trajectory is not enough; see VER-0011), then record AC-4 per target point (met/unmet) and let the human
