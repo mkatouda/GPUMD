@@ -1,0 +1,1 @@
+54:force/eam_alloy.cu:42:7: warning: potential null pointer dereference [-Wnull-dereference]

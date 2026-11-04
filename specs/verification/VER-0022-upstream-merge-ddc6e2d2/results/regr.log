@@ -1,0 +1,1155 @@
+[neighbor_alias_aliased] Periodic cell aliases do not duplicate a neighbor candidate
+  run baseline
+  run candidate
+  PASS
+[neighbor_alias_control] Translated coordinates provide a control without periodic cell aliasing
+  run baseline
+  run candidate
+  PASS
+[nve] NVE reference trajectory
+  run baseline
+  run candidate
+  PASS
+[nvt_ber] Berendsen NVT with a temperature ramp
+  run baseline
+  run candidate
+  PASS
+[nvt_nhc] Nose-Hoover-chain NVT with a temperature ramp
+  run baseline
+  run candidate
+  PASS
+[nvt_lan] Langevin NVT with a temperature ramp
+  run baseline
+  run candidate
+  PASS
+[nvt_bdp] Bussi-Donadio-Parrinello NVT with a temperature ramp
+  run baseline
+  run candidate
+  FAIL: nvt_bdp:final.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/001-nvt_bdp_final.xyz.diff
+nvt_bdp:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/002-nvt_bdp_restart.xyz.diff
+nvt_bdp:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/003-nvt_bdp_thermo.out.diff
+[nvt_bao] BAOAB Langevin NVT with a temperature ramp
+  run baseline
+  run candidate
+  PASS
+[nvt_qtb] Quantum thermal bath NVT
+  run baseline
+  run candidate
+  PASS
+[npt_ber_iso] Berendsen NPT with isotropic pressure control
+  run baseline
+  run candidate
+  PASS
+[npt_ber_ortho] Berendsen NPT with three orthogonal pressure components
+  run baseline
+  run candidate
+  PASS
+[npt_ber_tri] Berendsen NPH limit with all six triclinic pressure components
+  run baseline
+  run candidate
+  PASS
+[npt_scr_iso] Stochastic cell rescaling with isotropic pressure control
+  run baseline
+  run candidate
+  FAIL: npt_scr_iso:final.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/004-npt_scr_iso_final.xyz.diff
+npt_scr_iso:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/005-npt_scr_iso_restart.xyz.diff
+npt_scr_iso:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/006-npt_scr_iso_thermo.out.diff
+[nvt_mttk] MTTK NVT with explicit thermostat period
+  run baseline
+  run candidate
+  PASS
+[npt_mttk_iso] MTTK NPT with isotropic pressure control
+  run baseline
+  run candidate
+  PASS
+[npt_mttk_aniso] MTTK NPT with anisotropic orthogonal pressure control
+  run baseline
+  run candidate
+  PASS
+[npt_mttk_tri] MTTK NPT with triclinic pressure control
+  run baseline
+  run candidate
+  PASS
+[nph_mttk] MTTK NPH with isotropic pressure control
+  run baseline
+  run candidate
+  PASS
+[mttk_couple_xyz] MTTK NPT with xyz pressure coupling
+  run baseline
+  run candidate
+  PASS
+[mttk_couple_xy] MTTK NPT with xy pressure coupling
+  run baseline
+  run candidate
+  PASS
+[mttk_couple_yz] MTTK NPT with yz pressure coupling
+  run baseline
+  run candidate
+  PASS
+[mttk_couple_xz] MTTK NPT with xz pressure coupling
+  run baseline
+  run candidate
+  PASS
+[npt_qtb] Quantum thermal bath NPT
+  run baseline
+  run candidate
+  PASS
+[adaptive_npt_mttk] MTTK NPT with displacement-limited adaptive time stepping
+  run baseline
+  run candidate
+  PASS
+[adaptive_npt_qtb] Quantum thermal bath NPT with displacement-limited adaptive time stepping
+  run baseline
+  run candidate
+  PASS
+[adaptive_nphug] NPHug with displacement-limited adaptive time stepping
+  run baseline
+  run candidate
+  PASS
+[adaptive_msst] MSST with displacement-limited adaptive time stepping
+  run baseline
+  run candidate
+  PASS
+[heat_nhc] Nose-Hoover-chain heat transport in the graphene NEMD system
+  run baseline
+  run candidate
+  PASS
+[heat_lan_group] Langevin heat transport in the graphene NEMD system
+  run baseline
+  run candidate
+  PASS
+[heat_lan_region] Langevin source and sink selected by fractional regions
+  run baseline
+  run candidate
+  PASS
+[heat_bdp] BDP heat transport in the graphene NEMD system
+  run baseline
+  run candidate
+  FAIL: heat_bdp:compute.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/007-heat_bdp_compute.out.diff
+heat_bdp:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/008-heat_bdp_restart.xyz.diff
+[heat_nhc_power] Fixed-power source and sink velocity scaling
+  run baseline
+  run candidate
+  PASS
+[heat_hybrid] Hybrid NHC and Langevin thermostats on three groups
+  run baseline
+  run candidate
+  PASS
+[ttm_uniform] Two-temperature model with a uniform initial electron temperature
+  run baseline
+  run candidate
+  PASS
+[ttm_profile] TTM file input, active cells, source term, and per-cell properties
+  run baseline
+  run candidate
+  PASS
+[heat_ttm] Non-overlapping Langevin heat baths and two-temperature metal group
+  run baseline
+  run candidate
+  PASS
+[pimd_nvt] Four-bead canonical PIMD
+  run baseline
+  run candidate
+  PASS
+[pimd_eco] Four-bead canonical PIMD with economised internal-mode frequencies
+  run baseline
+  run candidate
+  PASS
+[pimd_npt] Four-bead PIMD with pressure control
+  run baseline
+  run candidate
+  PASS
+[pimd_scr] Four-bead PIMD with stochastic cell rescaling
+  run baseline
+  run candidate
+  FAIL: pimd_scr:final.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/009-pimd_scr_final.xyz.diff
+pimd_scr:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/010-pimd_scr_restart.xyz.diff
+pimd_scr:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/011-pimd_scr_thermo.out.diff
+[rpmd_after_pimd] RPMD after initialization by PIMD with the same bead count
+  run baseline
+  run candidate
+  PASS
+[trpmd_after_pimd] TRPMD after initialization by PIMD with the same bead count
+  run baseline
+  run candidate
+  PASS
+[pimd_bead_dump] PIMD bead trajectory dump
+  run baseline
+  run candidate
+  PASS
+[msst_short] Short-run MSST regression
+  run baseline
+  run candidate
+  PASS
+[nphug_short] Short-run NPHug regression
+  run baseline
+  run candidate
+  PASS
+[wall_piston] Moving piston wall with explicit velocity and thickness
+  run baseline
+  run candidate
+  PASS
+[wall_mirror] Moving mirror wall with explicit velocity
+  run baseline
+  run candidate
+  PASS
+[wall_harmonic] Moving harmonic wall with explicit velocity and spring constant
+  run baseline
+  run candidate
+  PASS
+[ti_fixed] Fixed-lambda thermodynamic integration against Einstein springs
+  run baseline
+  run candidate
+  PASS
+[ti_spring_explicit] Einstein-spring TI followed by Berendsen NVT replacement
+  run baseline
+  run candidate
+  PASS
+[ti_spring_auto_k] Switching TI to Einstein springs with automatic spring constants
+  run baseline
+  run candidate
+  PASS
+[ti_rs] Reversible-scaling temperature integration
+  run baseline
+  run candidate
+  PASS
+[ti_as] Adiabatic-switching pressure integration
+  run baseline
+  run candidate
+  PASS
+[ti_liquid] Liquid reference TI using NEP radial neighbor data
+  run baseline
+  run candidate
+  PASS
+[same_nvt_two_runs] Create a fresh Berendsen NVT for each run and clear late fix/move settings
+  run baseline
+  run candidate
+  PASS
+[nvt_ber_fix_move_before] Apply fixed and moving groups specified before Berendsen NVT
+  run baseline
+  run candidate
+  PASS
+[switch_nvt_nve] Destroy and replace NVT with NVE across run blocks
+  run baseline
+  run candidate
+  PASS
+[fix_move] Integrator interaction with fixed and externally moved groups
+  run baseline
+  run candidate
+  PASS
+[deform_nve_shear] NVE interaction with xy box deformation
+  run baseline
+  run candidate
+  PASS
+[deform_npt_ortho] Orthogonal NPT interaction with xx deformation
+  run baseline
+  run candidate
+  PASS
+[npt_ber_deform_before] Apply xx deformation specified before Berendsen NPT
+  run baseline
+  run candidate
+  PASS
+[deform_npt_tri] Triclinic stochastic-cell-rescaling interaction with xy deformation
+  run baseline
+  run candidate
+  FAIL: deform_npt_tri:final.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/012-deform_npt_tri_final.xyz.diff
+deform_npt_tri:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/013-deform_npt_tri_restart.xyz.diff
+deform_npt_tri:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/014-deform_npt_tri_thermo.out.diff
+[invalid_unknown_ensemble] Reject an unknown ensemble keyword
+  run baseline
+  run candidate
+  PASS
+[invalid_mttk_couple] Reject an invalid MTTK pressure-coupling value
+  run baseline
+  run candidate
+  PASS
+[invalid_heat_same_group] Reject identical heat source and sink groups
+  run baseline
+  run candidate
+  PASS
+[invalid_pimd_odd_beads] Reject an odd PIMD bead count
+  run baseline
+  run candidate
+  PASS
+[invalid_move_without_fix] Reject moving a group that is not fixed
+  run baseline
+  run candidate
+  PASS
+[invalid_ttm_overlap] Reject overlap between a heat bath and the TTM metal group
+  run baseline
+  run candidate
+  PASS
+[invalid_nve_parameter] Reject an extra NVE parameter
+  run baseline
+  run candidate
+  PASS
+[invalid_nvt_ber_parameter_count] Reject an invalid NVT-Berendsen parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_nvt_ber_coupling] Reject an invalid NVT-Berendsen temperature coupling
+  run baseline
+  run candidate
+  PASS
+[invalid_npt_ber_parameter_count] Reject an invalid NPT-Berendsen parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_npt_ber_modulus] Reject a non-positive NPT-Berendsen elastic modulus
+  run baseline
+  run candidate
+  PASS
+[invalid_nvt_nhc_parameter_count] Reject an invalid NVT-NHC parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_nvt_bdp_parameter_count] Reject an invalid NVT-BDP parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_nvt_lan_parameter_count] Reject an invalid NVT-Langevin parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_nvt_bao_parameter_count] Reject an invalid NVT-BAOAB parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_heat_lan_region_overlap] Reject overlapping Langevin heat-source and heat-sink regions
+  run baseline
+  run candidate
+  PASS
+[invalid_nvt_qtb_parameter_count] Reject an invalid NVT-QTB parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_npt_scr_parameter_count] Reject an invalid NPT-SCR parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_heat_hybrid_parameter_count] Reject an invalid hybrid-heat parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_ttm_parameter_count] Reject an invalid TTM parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_pimd_parameter_count] Reject an invalid PIMD parameter count
+  run baseline
+  run candidate
+  PASS
+[invalid_rpmd_before_pimd] Reject RPMD before bead state has been initialized by PIMD
+  run baseline
+  run candidate
+  PASS
+[invalid_pimd_change_beads] Reject changing the bead count between PIMD runs
+  run baseline
+  run candidate
+  PASS
+[invalid_run_without_ensemble] Require an ensemble before every run
+  run baseline
+  run candidate
+  PASS
+[invalid_second_run_without_ensemble] Do not reuse an ensemble for a second run
+  run baseline
+  run candidate
+  PASS
+[invalid_duplicate_ensemble] Reject two ensemble commands before one run
+  run baseline
+  run candidate
+  PASS
+[invalid_ensemble_without_run] Reject an ensemble not followed by a run
+  run baseline
+  run candidate
+  PASS
+[parser_comments_whitespace] Leading comments, blank lines, tabs, trailing comments, and base-zero integer parsing
+  run baseline
+  run candidate
+  PASS
+[parser_invalid_integer_tail] Integer parser rejects a valid prefix followed by trailing characters
+  run baseline
+  run candidate
+  PASS
+[parser_invalid_real_tail] Real parser rejects a valid prefix followed by trailing characters
+  run baseline
+  run candidate
+  PASS
+[parser_32_tokens_dispatches] A command containing exactly 32 tokens reaches normal keyword dispatch
+  run baseline
+  run candidate
+  PASS
+[parser_33_tokens_rejected] A command containing 33 tokens is rejected by the top-level token limit
+  run baseline
+  run candidate
+  PASS
+[nep89_two_runs] NEP89 large-box trajectory across two run blocks
+  run baseline
+  run candidate
+  PASS
+[multi_nep_observer] Two NEP potentials with average observer mode
+  run baseline
+  run candidate
+  PASS
+[action_before_ensemble] Actions appearing before ensemble are collected for the following run
+  run baseline
+  run candidate
+  PASS
+[two_run_state_contract] Actions clear after run while time step and global time propagate
+  run baseline
+  run candidate
+  PASS
+[compute_chunk_single_1d] First standalone control for the multiple compute_chunk contract
+  run baseline
+  run candidate
+  PASS
+[compute_chunk_single_2d] Second standalone control for the multiple compute_chunk contract
+  run baseline
+  run candidate
+  PASS
+[compute_chunk_multiple] Two compute_chunk Actions execute in input order within one run
+  run baseline
+  run candidate
+  PASS
+[dos_only] Standalone DOS control for DOS and SDC coexistence
+  run baseline
+  run candidate
+  PASS
+[sdc_only] Standalone SDC control for DOS and SDC coexistence
+  run baseline
+  run candidate
+  PASS
+[dos_then_sdc] DOS and SDC coexist with DOS first
+  run baseline
+  run candidate
+  PASS
+[sdc_then_dos] DOS and SDC coexist with SDC first
+  run baseline
+  run candidate
+  PASS
+[temperature_nep_two_run_ramp] Temperature-dependent NEP follows the temperature ramp and resets between two runs
+  run baseline
+  run candidate
+  PASS
+[phonon_clean] Canonical phonon control with replicate as the first effective command
+  run baseline
+  run candidate
+  PASS
+[phonon_comments_before_replicate] Phonon finds replicate after leading blank and comment lines
+  run baseline
+  run candidate
+  PASS
+[phonon_single_atom_replicate] Phonon calculation accepts a one-atom primitive cell when replicate expands it before GPU initialization
+  run baseline
+  run candidate
+  PASS
+[qnep_ewald_future_bec] qNEP Ewald with BEC and virial consumers appearing only in a later run
+  run baseline
+  run candidate
+  PASS
+[qnep_pppm_future_bec] qNEP PPPM with BEC and virial consumers appearing only in a later run
+  run baseline
+  run candidate
+  PASS
+[compact_mc_before_potential] MC and electric-field Actions before a two-UNEP potential block honor the complete potential setup
+  run baseline
+  run candidate
+  PASS
+[qnep_actions_before_potential] qNEP BEC and virial Actions before potential use the first configured potential
+  run baseline
+  run candidate
+  PASS
+[deposition_no_initial_velocity] File deposition builds a pristine subrun before deposition when the initial model has no velocities
+  run baseline
+  run candidate
+  PASS
+[deposition_with_initial_velocity] File deposition occurs before the only subrun when the initial model already has velocities
+  run baseline
+  run candidate
+  PASS
+[hnemdec_standard] HNEMDEC configured after its NVT ensemble
+  run baseline
+  run candidate
+  PASS
+[hnemdec_before_ensemble] HNEMDEC before ensemble uses the following run temperature
+  run baseline
+  run candidate
+  PASS
+[hnemdec_invalid_type] HNEMDEC rejects a positive type index above the actual type count
+  run baseline
+  run candidate
+  PASS
+[observer_average_two_runs] Average observer mode does not leak into the following run
+  run baseline
+  run candidate
+  PASS
+[observer_average_then_observe_control] Explicit observe mode controls the second run after an average-observer run
+  run baseline
+  run candidate
+  PASS
+[replicate_first_after_comments] Replicate is accepted as the first command after ignored blank and comment lines
+  run baseline
+  run candidate
+  PASS
+[replicate_default_velocity] Replicate initializes the default 300 K velocity on the final replicated system
+  run baseline
+  run candidate
+  FAIL: replicate_default_velocity:final.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/015-replicate_default_velocity_final.xyz.diff
+replicate_default_velocity:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/016-replicate_default_velocity_restart.xyz.diff
+replicate_default_velocity:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/017-replicate_default_velocity_thermo.out.diff
+[replicate_velocity_unseeded] Unseeded velocity reset follows default initialization of the final replicated system
+  run baseline
+  run candidate
+  FAIL: replicate_velocity_unseeded:final.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/018-replicate_velocity_unseeded_final.xyz.diff
+replicate_velocity_unseeded:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/019-replicate_velocity_unseeded_restart.xyz.diff
+replicate_velocity_unseeded:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/020-replicate_velocity_unseeded_thermo.out.diff
+[replicate_model_velocity] Replicate preserves explicit model.xyz velocities before device initialization
+  run baseline
+  run candidate
+  PASS
+[replicate_after_potential] Reject replicate after potential when that command is reached
+  run baseline
+  run candidate
+  PASS
+[replicate_after_velocity] Reject replicate after velocity when that command is reached
+  run baseline
+  run candidate
+  PASS
+[replicate_after_run] A late replicate is rejected only after the preceding run completes
+  run baseline
+  run candidate
+  PASS
+[replicate_duplicate] Reject a second replicate while accepting the first
+  run baseline
+  run candidate
+  PASS
+[dftd3_single_late] A DFT-D3 setting after a run applies to the configured NEP potential
+  run baseline
+  run candidate
+  FAIL: dftd3_single_late:restart.xyz: numeric field 15 differs: 0.15505529603373744 vs 0.15505529603338986 (abs=3.476e-13, rel=2.242e-12, rtol=0.000e+00, atol=1.000e-17)
+dftd3_single_late:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/021-dftd3_single_late_thermo.out.diff
+[kspace_single_late] A kspace setting after a run applies to the configured qNEP potential
+  run baseline
+  run candidate
+  PASS
+[dftd3_kspace_one_each] One DFT-D3 setting and one kspace setting may coexist
+  run baseline
+  run candidate
+  FAIL: dftd3_kspace_one_each:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/022-dftd3_kspace_one_each_restart.xyz.diff
+dftd3_kspace_one_each:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/023-dftd3_kspace_one_each_thermo.out.diff
+[dftd3_duplicate] Reject a second global DFT-D3 setting
+  run baseline
+  run candidate
+  PASS
+[dftd2_basic] NEP89 with the DFT-D2 external correction (shifted-force, cutoff 12 A): short NVE run
+  run baseline
+  run candidate
+  FAIL: dftd2_basic:baseline: expected exit 0, got 1
+[dftd2_dftd3_exclusive] Reject dftd2 combined with dftd3
+  run baseline
+  run candidate
+  FAIL: dftd2_dftd3_exclusive:baseline: stderr does not contain expected diagnostic 'dftd2 and dftd3 cannot be used together'
+[kspace_duplicate] Reject a second global kspace setting
+  run baseline
+  run candidate
+  PASS
+[qnep_force_accessors] qNEP charge and BEC data drive electric-field forces and XYZ output
+  run baseline
+  run candidate
+  PASS
+[rdf_angular_classical] Classical RDF and angular RDF are produced during NVE dynamics
+  run baseline
+  run candidate
+  PASS
+[active_multi_nep] Active learning evaluates every NEP potential in a multiple-potential calculation
+  run baseline
+  run candidate
+  PASS
+[observer_fix_move_grouping] Observer thermodynamics excludes atoms in fixed and moving groups
+  run baseline
+  run candidate
+  PASS
+[minimize_fixed_group] Minimization honors the fixed atom group
+  run baseline
+  run candidate
+  PASS
+[ilp_nep_compute] Hybrid NEP+ILP forces produce a one-step NVE trajectory
+  run baseline
+  run candidate
+  FAIL: ilp_nep_compute:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/024-ilp_nep_compute_restart.xyz.diff
+ilp_nep_compute:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/025-ilp_nep_compute_thermo.out.diff
+[ilp_tersoff_compute] Hybrid Tersoff+ILP forces produce a one-step NVE trajectory
+  run baseline
+  run candidate
+  FAIL: ilp_tersoff_compute:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/026-ilp_tersoff_compute_restart.xyz.diff
+ilp_tersoff_compute:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/027-ilp_tersoff_compute_thermo.out.diff
+[ilp_tmd_sw_compute] Hybrid SW+ILP forces produce a one-step NVE trajectory
+  run baseline
+  run candidate
+  FAIL: ilp_tmd_sw_compute:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/028-ilp_tmd_sw_compute_restart.xyz.diff
+ilp_tmd_sw_compute:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/029-ilp_tmd_sw_compute_thermo.out.diff
+[parsing_bare_ensemble] Reject a bare ensemble keyword without indexing beyond its tokens
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_msst_required] Reject MSST without its required direction and shock velocity
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_msst_qmass] Reject an MSST qmass option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_mttk_tperiod] Reject an MTTK tperiod option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_mttk_temp_pair] Reject an incomplete MTTK temperature pair
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_ti_as_tswitch] Reject a TI adiabatic-switching tswitch option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_ti_rs_tequil] Reject a TI reversible-scaling tequil option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_nphug_p0] Reject an NPHUG p0 option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_ti_spring_pair] Reject a TI spring element without its force constant
+  run baseline
+  run candidate
+  PASS
+[parsing_empty_ti_spring_alias] Reject a TI-spring keyword without any type and force-constant pair
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_ti_liquid_sigmasqrd] Reject a TI-liquid sigmasqrd option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_wall_mirror_vp] Reject a mirror-wall vp option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_wall_piston_thickness] Reject a piston-wall thickness option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_wall_harmonic_k] Reject a harmonic-wall k option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dangling_extrapolation_nep_file] Reject an extrapolation nep_file option without a value
+  run baseline
+  run candidate
+  PASS
+[parsing_dump_dipole_zero] Reject a zero dipole dump interval before modulo evaluation
+  run baseline
+  run candidate
+  PASS
+[parsing_dump_dipole_negative] Reject a negative dipole dump interval
+  run baseline
+  run candidate
+  PASS
+[parsing_dump_polarizability_zero] Reject a zero polarizability dump interval before modulo evaluation
+  run baseline
+  run candidate
+  PASS
+[parsing_dump_polarizability_negative] Reject a negative polarizability dump interval
+  run baseline
+  run candidate
+  PASS
+[parsing_extrapolation_check_zero] Reject a zero extrapolation check interval before modulo evaluation
+  run baseline
+  run candidate
+  PASS
+[parsing_extrapolation_check_negative] Reject a negative extrapolation check interval
+  run baseline
+  run candidate
+  PASS
+[parsing_extrapolation_dump_zero] Reject a zero extrapolation dump interval
+  run baseline
+  run candidate
+  PASS
+[parsing_extrapolation_dump_negative] Reject a negative extrapolation dump interval
+  run baseline
+  run candidate
+  PASS
+[msd_options_canonical] MSD accepts all_groups followed by save_every
+  run baseline
+  run candidate
+  PASS
+[msd_options_reversed] MSD accepts save_every followed by all_groups
+  run baseline
+  run candidate
+  PASS
+[msd_missing_group_value] Reject an MSD group option missing its group id
+  run baseline
+  run candidate
+  PASS
+[msd_missing_all_groups_value] Reject an MSD all_groups option missing its grouping method
+  run baseline
+  run candidate
+  PASS
+[msd_missing_save_every_value] Reject an MSD save_every option missing its interval
+  run baseline
+  run candidate
+  PASS
+[msd_duplicate_all_groups] Reject a repeated MSD all_groups option
+  run baseline
+  run candidate
+  PASS
+[msd_duplicate_save_every] Reject a repeated MSD save_every option
+  run baseline
+  run candidate
+  PASS
+[msd_group_all_groups_conflict] Reject MSD group followed by all_groups
+  run baseline
+  run candidate
+  PASS
+[msd_all_groups_group_conflict] Reject MSD all_groups followed by group
+  run baseline
+  run candidate
+  PASS
+[msd_save_every_zero] Reject a zero MSD save_every interval
+  run baseline
+  run candidate
+  PASS
+[msd_save_every_negative] Reject a negative MSD save_every interval
+  run baseline
+  run candidate
+  PASS
+[graphene_hac] HAC measurement on the established 8640-atom TTF graphene system
+  run baseline
+  run candidate
+  FAIL: graphene_hac:hac.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/030-graphene_hac_hac.out.diff
+graphene_hac:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/031-graphene_hac_thermo.out.diff
+[graphene_nemd_shc] SHC measurement during Langevin NEMD on the established grouped TTF graphene system
+  run baseline
+  run candidate
+  FAIL: graphene_nemd_shc:compute.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/032-graphene_nemd_shc_compute.out.diff
+graphene_nemd_shc:shc.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/033-graphene_nemd_shc_shc.out.diff
+graphene_nemd_shc:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/034-graphene_nemd_shc_thermo.out.diff
+[graphene_hnemd_shc] HNEMD and SHC on the established grouped TTF graphene system
+  run baseline
+  run candidate
+  FAIL: graphene_hnemd_shc:kappa.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/035-graphene_hnemd_shc_kappa.out.diff
+graphene_hnemd_shc:shc.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/036-graphene_hnemd_shc_shc.out.diff
+graphene_hnemd_shc:thermo.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/037-graphene_hnemd_shc_thermo.out.diff
+[silicon_liquid_transport] SDC, MSD, viscosity, RDF, and ADF on the established 8000-atom liquid-Si system
+  run baseline
+  run candidate
+  FAIL: silicon_liquid_transport:adf.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/038-silicon_liquid_transport_adf.out.diff
+silicon_liquid_transport:msd.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/039-silicon_liquid_transport_msd.out.diff
+silicon_liquid_transport:rdf.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/040-silicon_liquid_transport_rdf.out.diff
+silicon_liquid_transport:restart.xyz: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/041-silicon_liquid_transport_restart.xyz.diff
+silicon_liquid_transport:sdc.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/042-silicon_liquid_transport_sdc.out.diff
+silicon_liquid_transport:viscosity.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/043-silicon_liquid_transport_viscosity.out.diff
+[active_no_threshold] Active uncertainty matches six observer-force predictions and dumps every checked structure
+  run baseline
+  run candidate
+  PASS
+[active_interval_10] Active uncertainty sampling every tenth step matches observer-force predictions
+  run baseline
+  run candidate
+  PASS
+[active_low_threshold] Active threshold writes only structures above the low uncertainty threshold
+  run baseline
+  run candidate
+  PASS
+[active_high_threshold] Active high threshold writes no selected structures
+  run baseline
+  run candidate
+  PASS
+[active_no_fields] Active output can omit velocities and forces while retaining uncertainty
+  run baseline
+  run candidate
+  PASS
+[active_without_observer] Active uncertainty is unchanged when dump_observer is absent
+  run baseline
+  run candidate
+  PASS
+[dump_dipole] Dipole response output
+  run baseline
+  run candidate
+  PASS
+[dump_dipole_control] Control trajectory without dipole response output
+  run baseline
+  run candidate
+  PASS
+[dump_dipole_replicated] Dipole response remains valid on a replicated system
+  run baseline
+  run candidate
+  PASS
+[dump_dipole_invalid_model] Reject a non-dipole response model
+  run baseline
+  run candidate
+  PASS
+[dump_dipole_missing_model] Reject dump_dipole without a response model
+  run baseline
+  run candidate
+  PASS
+[dump_observer_species_mismatch] Reject multiple potentials with inconsistent atomic species ordering
+  run baseline
+  run candidate
+  PASS
+[dump_polarizability] Polarizability response output
+  run baseline
+  run candidate
+  PASS
+[dump_polarizability_control] Control trajectory without polarizability response output
+  run baseline
+  run candidate
+  PASS
+[dump_polarizability_replicated] Polarizability reduction is exercised on a 2560-atom replicated system
+  run baseline
+  run candidate
+  PASS
+[dump_polarizability_invalid_model] Reject a non-polarizability response model
+  run baseline
+  run candidate
+  PASS
+[dump_polarizability_missing_model] Reject dump_polarizability without a response model
+  run baseline
+  run candidate
+  PASS
+[msd_all_groups_numpy] All-groups MSD agrees with a NumPy calculation from dumped unwrapped positions
+  run baseline
+  run candidate
+  PASS
+[msd_group_0_numpy] Single-group MSD agrees with a NumPy calculation
+  run baseline
+  run candidate
+  PASS
+[msd_all_atoms_numpy] Whole-system MSD agrees with a NumPy calculation
+  run baseline
+  run candidate
+  PASS
+[predict_nep_pbte_batch] NEP prediction from a fixed model on the three-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  PASS
+[train_nep_pbte_full] NEP training on the full-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_nep_pbte_full:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/044-train_nep_pbte_full_loss.out.diff
+train_nep_pbte_full:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/045-train_nep_pbte_full_nep.restart.diff
+train_nep_pbte_full:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/046-train_nep_pbte_full_nep.txt.diff
+train_nep_pbte_full:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/047-train_nep_pbte_full_stdout.diff
+[train_nep_pbte_batch] NEP training on the three-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_nep_pbte_batch:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/048-train_nep_pbte_batch_loss.out.diff
+train_nep_pbte_batch:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/049-train_nep_pbte_batch_nep.restart.diff
+train_nep_pbte_batch:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/050-train_nep_pbte_batch_nep.txt.diff
+train_nep_pbte_batch:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/051-train_nep_pbte_batch_stdout.diff
+[train_nep_pbte_ediff] NEP energy-difference loss across batches with and without combinations, including test-set reporting
+  run baseline
+  run candidate
+  FAIL: train_nep_pbte_ediff:energy_test.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/052-train_nep_pbte_ediff_energy_test.out.diff
+train_nep_pbte_ediff:force_test.out: numeric field 1 differs: 0.13720099999999999 vs 0.157414 (abs=2.021e-02, rel=1.284e-01, rtol=1.000e-05, atol=2.000e-07)
+train_nep_pbte_ediff:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/053-train_nep_pbte_ediff_loss.out.diff
+train_nep_pbte_ediff:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/054-train_nep_pbte_ediff_nep.restart.diff
+train_nep_pbte_ediff:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/055-train_nep_pbte_ediff_nep.txt.diff
+train_nep_pbte_ediff:stress_test.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/056-train_nep_pbte_ediff_stress_test.out.diff
+train_nep_pbte_ediff:virial_test.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/057-train_nep_pbte_ediff_virial_test.out.diff
+train_nep_pbte_ediff:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/058-train_nep_pbte_ediff_stdout.diff
+[train_qnep1_pbte_full] QNEP charge mode 1 training on the full-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_qnep1_pbte_full:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/059-train_qnep1_pbte_full_loss.out.diff
+train_qnep1_pbte_full:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/060-train_qnep1_pbte_full_nep.restart.diff
+train_qnep1_pbte_full:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/061-train_qnep1_pbte_full_nep.txt.diff
+train_qnep1_pbte_full:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/062-train_qnep1_pbte_full_stdout.diff
+[train_qnep1_pbte_batch] QNEP charge mode 1 training on the three-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_qnep1_pbte_batch:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/063-train_qnep1_pbte_batch_loss.out.diff
+train_qnep1_pbte_batch:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/064-train_qnep1_pbte_batch_nep.restart.diff
+train_qnep1_pbte_batch:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/065-train_qnep1_pbte_batch_nep.txt.diff
+train_qnep1_pbte_batch:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/066-train_qnep1_pbte_batch_stdout.diff
+[train_qnep2_pbte_full] QNEP charge mode 2 training on the full-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_qnep2_pbte_full:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/067-train_qnep2_pbte_full_loss.out.diff
+train_qnep2_pbte_full:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/068-train_qnep2_pbte_full_nep.restart.diff
+train_qnep2_pbte_full:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/069-train_qnep2_pbte_full_nep.txt.diff
+train_qnep2_pbte_full:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/070-train_qnep2_pbte_full_stdout.diff
+[train_qnep2_pbte_batch] QNEP charge mode 2 training on the three-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_qnep2_pbte_batch:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/071-train_qnep2_pbte_batch_loss.out.diff
+train_qnep2_pbte_batch:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/072-train_qnep2_pbte_batch_nep.restart.diff
+train_qnep2_pbte_batch:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/073-train_qnep2_pbte_batch_nep.txt.diff
+train_qnep2_pbte_batch:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/074-train_qnep2_pbte_batch_stdout.diff
+[train_vdw_pbte_full] NEP-vdW training on the full-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_vdw_pbte_full:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/075-train_vdw_pbte_full_loss.out.diff
+train_vdw_pbte_full:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/076-train_vdw_pbte_full_nep.restart.diff
+train_vdw_pbte_full:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/077-train_vdw_pbte_full_nep.txt.diff
+train_vdw_pbte_full:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/078-train_vdw_pbte_full_stdout.diff
+[train_vdw_pbte_batch] NEP-vdW training on the three-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_vdw_pbte_batch:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/079-train_vdw_pbte_batch_loss.out.diff
+train_vdw_pbte_batch:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/080-train_vdw_pbte_batch_nep.restart.diff
+train_vdw_pbte_batch:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/081-train_vdw_pbte_batch_nep.txt.diff
+train_vdw_pbte_batch:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/082-train_vdw_pbte_batch_stdout.diff
+[train_charge_vdw_pbte_full] charge-vdW training on the full-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_charge_vdw_pbte_full:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/083-train_charge_vdw_pbte_full_loss.out.diff
+train_charge_vdw_pbte_full:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/084-train_charge_vdw_pbte_full_nep.restart.diff
+train_charge_vdw_pbte_full:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/085-train_charge_vdw_pbte_full_nep.txt.diff
+train_charge_vdw_pbte_full:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/086-train_charge_vdw_pbte_full_stdout.diff
+[train_charge_vdw_pbte_batch] charge-vdW training on the three-batch PbTe TTT dataset
+  run baseline
+  run candidate
+  FAIL: train_charge_vdw_pbte_batch:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/087-train_charge_vdw_pbte_batch_loss.out.diff
+train_charge_vdw_pbte_batch:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/088-train_charge_vdw_pbte_batch_nep.restart.diff
+train_charge_vdw_pbte_batch:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/089-train_charge_vdw_pbte_batch_nep.txt.diff
+train_charge_vdw_pbte_batch:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/090-train_charge_vdw_pbte_batch_stdout.diff
+[train_tnep_dipole_full] TNEP dipole training on the 120-structure full batch
+  run baseline
+  run candidate
+  FAIL: train_tnep_dipole_full:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/091-train_tnep_dipole_full_loss.out.diff
+train_tnep_dipole_full:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/092-train_tnep_dipole_full_nep.restart.diff
+train_tnep_dipole_full:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/093-train_tnep_dipole_full_nep.txt.diff
+train_tnep_dipole_full:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/094-train_tnep_dipole_full_stdout.diff
+[train_tnep_dipole_batch] TNEP dipole training on two batches of 61 and 59 structures
+  run baseline
+  run candidate
+  FAIL: train_tnep_dipole_batch:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/095-train_tnep_dipole_batch_loss.out.diff
+train_tnep_dipole_batch:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/096-train_tnep_dipole_batch_nep.restart.diff
+train_tnep_dipole_batch:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/097-train_tnep_dipole_batch_nep.txt.diff
+train_tnep_dipole_batch:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/098-train_tnep_dipole_batch_stdout.diff
+[train_tnep_pol_full] TNEP polarizability training on the 120-structure full batch
+  run baseline
+  run candidate
+  FAIL: train_tnep_pol_full:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/099-train_tnep_pol_full_loss.out.diff
+train_tnep_pol_full:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/100-train_tnep_pol_full_nep.restart.diff
+train_tnep_pol_full:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/101-train_tnep_pol_full_nep.txt.diff
+train_tnep_pol_full:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/102-train_tnep_pol_full_stdout.diff
+[train_tnep_pol_batch] TNEP polarizability training on two batches of 61 and 59 structures
+  run baseline
+  run candidate
+  FAIL: train_tnep_pol_batch:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/103-train_tnep_pol_batch_loss.out.diff
+train_tnep_pol_batch:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/104-train_tnep_pol_batch_nep.restart.diff
+train_tnep_pol_batch:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/105-train_tnep_pol_batch_nep.txt.diff
+train_tnep_pol_batch:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/106-train_tnep_pol_batch_stdout.diff
+[train_qnep1_water_fff] QNEP charge mode 1 training on the three-batch 12-atom water FFF dataset
+  run baseline
+  run candidate
+  FAIL: train_qnep1_water_fff:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/107-train_qnep1_water_fff_loss.out.diff
+train_qnep1_water_fff:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/108-train_qnep1_water_fff_nep.restart.diff
+train_qnep1_water_fff:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/109-train_qnep1_water_fff_nep.txt.diff
+train_qnep1_water_fff:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/110-train_qnep1_water_fff_stdout.diff
+[train_qnep2_water_fff] QNEP charge mode 2 training on the three-batch 12-atom water FFF dataset
+  run baseline
+  run candidate
+  FAIL: train_qnep2_water_fff:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/111-train_qnep2_water_fff_loss.out.diff
+train_qnep2_water_fff:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/112-train_qnep2_water_fff_nep.restart.diff
+train_qnep2_water_fff:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/113-train_qnep2_water_fff_nep.txt.diff
+train_qnep2_water_fff:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/114-train_qnep2_water_fff_stdout.diff
+[train_vdw_water_fff] NEP-vdW training on the three-batch 12-atom water FFF dataset
+  run baseline
+  run candidate
+  FAIL: train_vdw_water_fff:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/115-train_vdw_water_fff_loss.out.diff
+train_vdw_water_fff:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/116-train_vdw_water_fff_nep.restart.diff
+train_vdw_water_fff:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/117-train_vdw_water_fff_nep.txt.diff
+train_vdw_water_fff:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/118-train_vdw_water_fff_stdout.diff
+[train_charge_vdw_water_fff] charge-vdW training on the three-batch 12-atom water FFF dataset
+  run baseline
+  run candidate
+  FAIL: train_charge_vdw_water_fff:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/119-train_charge_vdw_water_fff_loss.out.diff
+train_charge_vdw_water_fff:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/120-train_charge_vdw_water_fff_nep.restart.diff
+train_charge_vdw_water_fff:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/121-train_charge_vdw_water_fff_nep.txt.diff
+train_charge_vdw_water_fff:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/122-train_charge_vdw_water_fff_stdout.diff
+[train_qnep1_mixed] QNEP charge mode 1 training on the two-batch PbTe TTT + water FFF dataset
+  run baseline
+  run candidate
+  FAIL: train_qnep1_mixed:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/123-train_qnep1_mixed_loss.out.diff
+train_qnep1_mixed:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/124-train_qnep1_mixed_nep.restart.diff
+train_qnep1_mixed:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/125-train_qnep1_mixed_nep.txt.diff
+train_qnep1_mixed:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/126-train_qnep1_mixed_stdout.diff
+[train_qnep2_mixed] QNEP charge mode 2 training on the two-batch PbTe TTT + water FFF dataset
+  run baseline
+  run candidate
+  FAIL: train_qnep2_mixed:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/127-train_qnep2_mixed_loss.out.diff
+train_qnep2_mixed:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/128-train_qnep2_mixed_nep.restart.diff
+train_qnep2_mixed:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/129-train_qnep2_mixed_nep.txt.diff
+train_qnep2_mixed:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/130-train_qnep2_mixed_stdout.diff
+[train_vdw_mixed] NEP-vdW training on the two-batch PbTe TTT + water FFF dataset
+  run baseline
+  run candidate
+  FAIL: train_vdw_mixed:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/131-train_vdw_mixed_loss.out.diff
+train_vdw_mixed:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/132-train_vdw_mixed_nep.restart.diff
+train_vdw_mixed:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/133-train_vdw_mixed_nep.txt.diff
+train_vdw_mixed:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/134-train_vdw_mixed_stdout.diff
+[train_charge_vdw_mixed] charge-vdW training on the two-batch PbTe TTT + water FFF dataset
+  run baseline
+  run candidate
+  FAIL: train_charge_vdw_mixed:loss.out: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/135-train_charge_vdw_mixed_loss.out.diff
+train_charge_vdw_mixed:nep.restart: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/136-train_charge_vdw_mixed_nep.restart.diff
+train_charge_vdw_mixed:nep.txt: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/137-train_charge_vdw_mixed_nep.txt.diff
+train_charge_vdw_mixed:stdout: text differs; unified diff: .work/20261104T091449499309Z-p1635320/diffs/138-train_charge_vdw_mixed_stdout.diff
+[pppm_default] pppm default
+  run baseline
+  run candidate
+  PASS
+[pppm_explicit] pppm explicit
+  run baseline
+  run candidate
+  PASS
+[pppm_spacing_one] pppm spacing one
+  run baseline
+  run candidate
+  PASS
+[pppm_spacing_late] pppm spacing late
+  run baseline
+  run candidate
+  PASS
+[pppm_spacing_fine] pppm spacing fine
+  run baseline
+  run candidate
+  PASS
+[pppm_spacing_coarse] pppm spacing coarse
+  run baseline
+  run candidate
+  PASS
+[pppm_round_exact] pppm round exact
+  run baseline
+  run candidate
+  PASS
+[pppm_round_above] pppm round above
+  run baseline
+  run candidate
+  PASS
+[pppm_round_power2] pppm round power2
+  run baseline
+  run candidate
+  PASS
+[pppm_round_5_7] pppm round 5 7
+  run baseline
+  run candidate
+  PASS
+[pppm_mode2] pppm mode2
+  run baseline
+  run candidate
+  PASS
+[pppm_peratom] pppm peratom
+  run baseline
+  run candidate
+  PASS
+[pppm_mode2_peratom] pppm mode2 peratom
+  run baseline
+  run candidate
+  PASS
+[pppm_grow_shrink] pppm grow shrink
+  run baseline
+  run candidate
+  PASS
+[pppm_grow_shrink_peratom] pppm grow shrink peratom
+  run baseline
+  run candidate
+  PASS
+[pppm_deform_same_mesh] pppm deform same mesh
+  run baseline
+  run candidate
+  PASS
+[pppm_shear_same_mesh] pppm shear same mesh
+  run baseline
+  run candidate
+  PASS
+[pppm_npt] pppm npt
+  run baseline
+  run candidate
+  PASS
+[pppm_two_runs] pppm two runs
+  run baseline
+  run candidate
+  PASS
+[pppm_no_force] Destroy pppm potential before any force evaluation
+  run baseline
+  run candidate
+  PASS
+[ewald_no_force] Destroy ewald potential before any force evaluation
+  run baseline
+  run candidate
+  PASS
+[pppm_invalid_zero] Reject kspace pppm 0
+  run baseline
+  run candidate
+  PASS
+[pppm_invalid_negative] Reject kspace pppm -1
+  run baseline
+  run candidate
+  PASS
+[pppm_invalid_nan] Reject kspace pppm nan
+  run baseline
+  run candidate
+  PASS
+[pppm_invalid_inf] Reject kspace pppm inf
+  run baseline
+  run candidate
+  PASS
+[pppm_invalid_tail] Reject kspace pppm 1.0oops
+  run baseline
+  run candidate
+  PASS
+[pppm_invalid_overflow] Reject kspace pppm 1e309
+  run baseline
+  run candidate
+  PASS
+[pppm_invalid_extra] Reject kspace pppm 1.0 2.0
+  run baseline
+  run candidate
+  PASS
+[pppm_invalid_bare] Reject kspace
+  run baseline
+  run candidate
+  PASS
+[pppm_invalid_ewald_spacing] Reject kspace ewald 1.0
+  run baseline
+  run candidate
+  PASS
+[pppm_mesh_overflow] Reject a PPPM mesh above 512 cubed points before allocation
+  run baseline
+  run candidate
+  PASS
+[pppm_triclinic_mesh] Triclinic plane thickness gives 18 along x instead of the vector-length choice 24
+  run baseline
+  run candidate
+  PASS
+[relation:neighbor_alias_translation_invariance] PASS
+[relation:compute_chunk_output_concatenation] PASS
+[relation:compute_chunk_restart_equality] PASS
+[relation:dos_output_equality] PASS
+[relation:mvac_output_equality] PASS
+[relation:sdc_output_equality] PASS
+[relation:dos_sdc_thermo_equality] PASS
+[relation:dos_sdc_restart_equality] PASS
+[relation:phonon_d_output_equality] PASS
+[relation:phonon_omega2_output_equality] PASS
+[relation:hnemdec_onsager_placement_equality] PASS
+[relation:hnemdec_thermo_placement_equality] PASS
+[relation:hnemdec_restart_placement_equality] PASS
+[relation:observer_first_run_output_equality] PASS
+[relation:observer_first_run_xyz_equality] PASS
+[relation:observer_reset_second_run_equality] PASS
+[relation:observer_reset_restart_equality] PASS
+[relation:msd_option_order_equality] PASS
+[relation:active_observer_independence_out] PASS
+[relation:active_observer_independence_xyz] PASS
+[relation:dump_dipole_thermo_side_effect] PASS
+[relation:dump_dipole_xyz_side_effect] PASS
+[relation:dump_polarizability_thermo_side_effect] PASS
+[relation:pppm_default_equivalence_thermo] PASS
+[relation:pppm_default_equivalence_state] PASS
+Summary: 216 passed, 41 failed; relations: 25 passed, 0 failed, 0 skipped; report: reports/report-20261104T091449499309Z-p1635320.json
