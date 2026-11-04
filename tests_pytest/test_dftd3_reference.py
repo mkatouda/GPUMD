@@ -223,3 +223,93 @@ def test_dftd3_large_box_neighbor_list_capacities_agree(name, tmp_path, monkeypa
         assert abs(e - e_ref) <= REL_CAP * abs(ref['energy']), capacity
         assert np.abs(f - f_ref).max() <= FORCE_CAP, capacity
         assert np.abs(v - v_ref).max() <= REL_CAP * np.abs(np.array(ref['virial'])).max(), capacity
+
+
+# Block size not dividing N, several blocks, many threads per atom: 130 atoms (a truncated 2 x 1 x 1
+# tiling of water27, 18.6 x 9.3 x 9.3 A, small-box path) with 1, 64 and 128 threads per atom must
+# agree with one thread per atom within the AC-1 caps and be bit-reproducible. No independent
+# reference exists for this structure (the stored references cover the fixtures only).
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd3_small_box_130_atoms_many_threads_per_atom(tmp_path, monkeypatch):
+    atoms = read(FIXTURE_DIR / 'water27.xyz')
+    atoms = atoms.repeat((2, 1, 1))[:130]
+    structure = tmp_path / 'water130.xyz'
+    write(structure, atoms, format='extxyz')
+    assert len(atoms) == 130
+    monkeypatch.delenv('GPUMD_DFTD3_SMALL_BOX_NUM_SUB', raising=False)
+    e0, f0, v0 = _run(tmp_path / 'noD3', structure, None)
+    results = {}
+    for num_sub in (1, 64, 128):
+        monkeypatch.setenv('GPUMD_DFTD3_SMALL_BOX_NUM_SUB', str(num_sub))
+        runs = [_run(tmp_path / f's{num_sub}_{k}', structure, (12.0, 6.0)) for k in range(2)]
+        assert f'threads per atom = {num_sub}' in _run.last_stdout
+        (e1, f1, v1), (e2, f2, v2) = runs
+        assert e1 == e2 and np.array_equal(f1, f2) and np.array_equal(v1, v2), num_sub
+        results[num_sub] = (e1 - e0, f1 - f0, v1 - v0)
+    e_ref, f_ref, v_ref = results[1]
+    for num_sub, (e, f, v) in results.items():
+        assert abs(e - e_ref) <= REL_CAP * abs(e_ref), (num_sub, abs(e - e_ref))
+        assert np.abs(f - f_ref).max() <= FORCE_CAP, (num_sub, np.abs(f - f_ref).max())
+        assert np.abs(v - v_ref).max() <= REL_CAP * np.abs(v_ref).max(), num_sub
+
+
+# Constant-pressure style run of the large-box path: `deform` with npt_ber (npt_scr has a stochastic
+# cell rescaling, so two runs differ at 1e-3 eV after a few steps; without `velocity` the initial
+# velocities are not reproducible either) changes the box strongly
+# (compression raises the expected number of partners, so the CN list buffer must grow: water_large
+# at -0.069 A/step grows it twice, 25% headroom included; expansion changes the number of cells). Energies must stay finite, and the per-step potential energy with
+# the neighbor list (default rule) must agree with the run without the list (capacity 0) within the
+# AC-1 energy cap (relative to the D3 energy) over the first steps; the whole run must complete.
+def _run_deform(workdir, structure, rate, cutoffs, steps):
+    workdir.mkdir(parents=True, exist_ok=True)
+    read(structure).write(workdir / 'model.xyz', format='extxyz')
+    lines = [f'potential {NEP_MODEL}', f'dftd3 pbe {cutoffs[0]} {cutoffs[1]}' if cutoffs else '',
+             'velocity 300 seed 12345', 'time_step 0.1',
+             'ensemble npt_ber 300 300 100 0 0 0 100 100 100 1000',
+             f'deform xx {rate} yy {rate} zz {rate}', 'dump_thermo 1', f'run {steps}']
+    (workdir / 'run.in').write_text('\n'.join(line for line in lines if line) + '\n')
+    result = subprocess.run([str(GPUMD_EXECUTABLE)], cwd=workdir, capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout[-2000:]
+    return np.loadtxt(workdir / 'thermo.out')
+
+
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+@pytest.mark.parametrize('name, rate', [('water_large', -0.069), ('water_large', 0.2),
+                                        ('cu_large', -0.0427), ('cu_large', 0.2)])
+def test_dftd3_large_box_changing_box_list_matches_no_list(name, rate, tmp_path, monkeypatch):
+    ref = REFERENCE[name]
+    cutoffs = (ref['potential_cutoff'], ref['cn_cutoff'])
+    structure = FIXTURE_DIR / f'{name}.xyz'
+    steps = 100
+    _large_box_env(monkeypatch, None, None)
+    base = _run_deform(tmp_path / 'noD3', structure, rate, None, 5)
+    with_list = _run_deform(tmp_path / 'list', structure, rate, cutoffs, steps)
+    _large_box_env(monkeypatch, None, 0)
+    no_list = _run_deform(tmp_path / 'nolist', structure, rate, cutoffs, steps)
+    assert with_list.shape[0] == steps and np.isfinite(with_list).all()
+    assert np.isfinite(no_list).all()
+    u_list, u_none = with_list[:, 2], no_list[:, 2]       # thermo.out: T, K, U, ...
+    e_d3 = abs(u_list[0] - base[0, 2])
+    assert e_d3 > 0
+    assert np.abs(u_list[:5] - u_none[:5]).max() <= REL_CAP * e_d3
+    # the box really changed a lot (column 10 of thermo.out: ax)
+    assert abs(with_list[-1, 9] / with_list[0, 9] - 1.0) > 0.1
+
+
+# The expected number of partners per thread (list capacity rule) is huge for a degenerate cell of a
+# non-periodic system (volume 1e-6 A^3); the capacity must be clamped, not converted from an
+# out-of-range double. The result must still meet the reference of the same molecule.
+@pytest.mark.skipif(not NEP_MODEL.exists(), reason='NEP89 model file not found')
+def test_dftd3_non_periodic_degenerate_cell_matches_reference(tmp_path, monkeypatch):
+    name = 'benzene_dimer'
+    ref = REFERENCE[name]
+    atoms = read(FIXTURE_DIR / f'{name}.xyz')
+    atoms.set_cell([0.01, 0.01, 0.01])
+    atoms.set_pbc(False)
+    structure = tmp_path / 'dimer_tiny_cell.xyz'
+    write(structure, atoms, format='extxyz')
+    _large_box_env(monkeypatch, None, None)
+    e0, f0, v0 = _run(tmp_path / 'noD3', structure, None)
+    e1, f1, v1 = _run(tmp_path / 'D3', structure, (ref['potential_cutoff'], ref['cn_cutoff']))
+    assert abs((e1 - e0) - ref['energy']) <= tolerance(name, 'energy')
+    assert np.abs((f1 - f0) - np.array(ref['forces'])).max() <= tolerance(name, 'force')

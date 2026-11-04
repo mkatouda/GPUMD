@@ -1,0 +1,74 @@
+[
+ {
+  "system": "w5184",
+  "base_ms": 0.7260803316831683,
+  "new_ms": 0.729692698019802,
+  "base_runs": [
+   0.7260803316831683,
+   0.7189500495049505,
+   0.7532495841584158
+  ],
+  "new_runs": [
+   0.7565347178217822,
+   0.7263657425742575,
+   0.729692698019802
+  ],
+  "kernels": {
+   "base": {
+    "find_cell_counts": 0.0033924999999999997,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001056,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.0020959999999999998,
+    "find_cell_contents": 0.0036490000000000003,
+    "find_dftd3_coordination_number_large_box": 0.0671855,
+    "find_dftd3_force_large_box": 0.6083185,
+    "find_dftd3_force_extra_large_box": 0.029281
+   },
+   "new": {
+    "find_cell_counts": 0.0034075,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001056,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.00208,
+    "find_cell_contents": 0.0036645000000000002,
+    "find_dftd3_coordination_number_large_box": 0.0671055,
+    "find_dftd3_force_large_box": 0.61195,
+    "find_dftd3_force_extra_large_box": 0.029360499999999998
+   }
+  },
+  "speedup": 0.9950494689799738
+ },
+ {
+  "system": "w41472",
+  "base_ms": 5.829956742574257,
+  "new_ms": 5.845333361386138,
+  "base_runs": [
+   5.808643816831683,
+   5.829956742574257,
+   5.833989905940594
+  ],
+  "new_runs": [
+   5.8017949356435645,
+   5.845333361386138,
+   5.8478031386138625
+  ],
+  "kernels": {
+   "base": {
+    "find_cell_counts": 0.0051525,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001056,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.002624,
+    "find_cell_contents": 0.005536,
+    "find_dftd3_coordination_number_large_box": 0.7167680000000001,
+    "find_dftd3_force_large_box": 4.886463,
+    "find_dftd3_force_extra_large_box": 0.1986765
+   },
+   "new": {
+    "find_cell_counts": 0.0051525,
+    "cub::CUB_200200_860_NS::DeviceScanInitKernel": 0.001056,
+    "cub::CUB_200200_860_NS::DeviceScanKernel": 0.002624,
+    "find_cell_contents": 0.005536,
+    "find_dftd3_coordination_number_large_box": 0.7150245,
+    "find_dftd3_force_large_box": 4.899455,
+    "find_dftd3_force_extra_large_box": 0.1993165
+   }
+  },
+  "speedup": 0.997369419695811
+ }
+]

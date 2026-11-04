@@ -254,6 +254,11 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
   fallback made the CN kernel slower (water 41,472 0.93x, water 5,184 0.86-0.92x): about 22% of candidates are accepted, so
   almost every warp (1-0.78^32 > 99.9%) still executes the double path. The timing-only upper bound (CN 0.71 -> 0.37 ms)
   needs warp-level compaction of accepted candidates or a float-only decision (changes results); not pursued.
+- Stage 3 outcome so far (2026-11-04): independent numerical review: no BLOCKER/MAJOR (MINOR fixed in VER-0019: capacity clamp, 25% list
+  headroom, tests for N~130 with num_sub 64/128 and NPT list growth). S1 extreme CN (VER-0017): pre-existing upstream float weight
+  underflow found, out of scope (UPSTREAM-0001). S2-S4 (VER-0018): AC-4 by slope method met at N=81/648/5,184/Cu 4,000, not met at
+  N=41,472 (6.19 ms, target dropped); `--suite full` only known non-deterministic cases plus strict-tolerance dftd3_* (AC-2 met) and
+  dftd2_* cases that master cannot run; pytest -m "not slow" 859 passed, 0 failed. NVE repeat (VER-0011 protocol) still pending.
 - Stage 3: re-measure VER-0004 section 3 and the VER-0001 slope method, `--suite full` against the `master`
   baseline, independent numerical review of the changed kernels, NVE with the VER-0011 protocol (single
   trajectory is not enough; see VER-0011), then record AC-4 per target point (met/unmet) and let the human

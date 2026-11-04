@@ -885,9 +885,12 @@ get_cn_list_capacity(const int N, const int num_sub, const double rc_angular, co
   } else {
     const double expected_pairs = N / box.get_volume() * (4.0 / 3.0) * 3.14159265358979323846 *
                                   rc_angular * rc_angular * rc_angular;
-    capacity = static_cast<int>(1.5 * expected_pairs / num_sub) + 8;
+    // clamp in double: the estimate is huge (and the cast undefined) for a tiny volume
+    capacity = static_cast<int>(std::min(1.5 * expected_pairs / num_sub, 4096.0)) + 8;
   }
-  if (static_cast<size_t>(N) * num_sub * capacity * sizeof(int) > MAX_CN_LIST_BYTES) {
+  const size_t list_bytes =
+    static_cast<size_t>(N) * num_sub * static_cast<size_t>(capacity) * sizeof(int);
+  if (list_bytes > MAX_CN_LIST_BYTES) {
     capacity = 0;
   }
   return capacity;
@@ -1602,10 +1605,13 @@ void DFTD3::compute_large_box(
   }
   const int list_capacity = get_cn_list_capacity(N, num_sub, rc_angular, box);
   if (list_capacity > 0) {
-    // grow only: the capacity follows the box volume, which changes in a constant-pressure run
+    // grow only, with 25% headroom (but within MAX_CN_LIST_BYTES): the capacity follows the box
+    // volume, which changes in a constant-pressure run, and resize() frees and allocates
     const size_t num_slots = static_cast<size_t>(N) * num_sub;
-    if (cn_list.size() < num_slots * list_capacity) {
-      cn_list.resize(num_slots * list_capacity);
+    const size_t list_needed = num_slots * list_capacity;
+    if (cn_list.size() < list_needed) {
+      cn_list.resize(std::max(
+        list_needed, std::min(list_needed + list_needed / 4, MAX_CN_LIST_BYTES / sizeof(int))));
     }
     if (cn_list_count.size() < num_slots) {
       cn_list_count.resize(num_slots);
