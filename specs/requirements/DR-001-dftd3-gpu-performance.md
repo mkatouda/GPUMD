@@ -1,6 +1,12 @@
 # DR-001: Faster GPU DFT-D3 with unchanged results
 
 - Status: Approved by the human on 2026-11-03
+- Implementation status (2026-11-04, human decision): implemented, with these items NOT met or not verified (recorded, not hidden):
+  AC-4 at N = 41,472 (slope method 6.19 ms vs 6.0 ms; the target was dropped by the human on 2026-11-04; VER-0018);
+  AC-5 HIP and sm < 60 builds not verified (the sm < 60 atomicAdd fallback was removed as unused);
+  AC-3 shown only at the noise level (no significant difference from master in 20+10+5 runs, VER-0011/VER-0020; for water 5,184 a degradation up to
+  about 2x in std and 4x in drift is not excluded by 10 runs);
+  pre-existing upstream behaviour outside AC-1: float weight underflow at extreme coordination numbers (UPSTREAM-0001).
 - Design: `specs/design/DES-0001-dftd3-gpu-optimization-plan.md`
 - Decision: `specs/decisions/ADR-0002-dftd3-optimization-numerics.md`
 - Baseline: `specs/verification/VER-0001-dftd3-vs-simple-dftd3/`

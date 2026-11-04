@@ -258,7 +258,9 @@ Targets are goals, not promises; a phase is dropped if its gate fails (Section 5
   headroom, tests for N~130 with num_sub 64/128 and NPT list growth). S1 extreme CN (VER-0017): pre-existing upstream float weight
   underflow found, out of scope (UPSTREAM-0001). S2-S4 (VER-0018): AC-4 by slope method met at N=81/648/5,184/Cu 4,000, not met at
   N=41,472 (6.19 ms, target dropped); `--suite full` only known non-deterministic cases plus strict-tolerance dftd3_* (AC-2 met) and
-  dftd2_* cases that master cannot run; pytest -m "not slow" 859 passed, 0 failed. NVE repeat (VER-0011 protocol) still pending.
+  dftd2_* cases that master cannot run; pytest -m "not slow" 859 passed, 0 failed. NVE repeat (VER-0020, final code 0c353281, VER-0011 protocol B, 70 runs, no NaN/crash): water 648 (20 seeds, 10 ps), water 5,184 (10 seeds, 5 ps),
+  Cu 4,000 (5 seeds, 10 ps): std, |drift| and max-min indistinguishable from master (all p >= 0.125, worst ratio 0.81-1.00); water 5,184 median
+  ratios 1.27 (std) and 1.45 (|drift|) with CIs up to 2.07 and 4.27, so degradation of that size is not excluded. Phase 7 and Stage 3 are complete.
 - Stage 3: re-measure VER-0004 section 3 and the VER-0001 slope method, `--suite full` against the `master`
   baseline, independent numerical review of the changed kernels, NVE with the VER-0011 protocol (single
   trajectory is not enough; see VER-0011), then record AC-4 per target point (met/unmet) and let the human
