@@ -6,7 +6,7 @@
 
 | 項目 | 内容 |
 |---|---|
-| 対象ブランチ | フォークの `develop` ブランチ（本文書作成時の HEAD は `8fe8ab99`。D3 コードの最終コミットは `0c353281`） |
+| 対象ブランチ | フォークの `develop` ブランチ（本文書作成時の HEAD は `8fe8ab99`。D3 コードの最終コミットは `0c353281`。その後 upstream/master `ddc6e2d2` をマージ済み（検証は VER-0022）） |
 | 動作確認環境 | NVIDIA RTX A6000（sm_86）、CUDA 12.3（`/usr/local/cuda`）[VER-0018, VER-0020 ヘッダ] |
 | ビルド | `cd src && make CUDA_ARCH="-arch=sm_86" -j4` |
 | 未検証の環境 | HIP（AMD/ROCm）ビルド、sm_60 未満、RTX A6000 以外の GPU、CUDA 12.3 以外 [DR-001 AC-5 注記, VER-0019] |
