@@ -1,0 +1,29 @@
+H_fcc_compressed             master-base_src: FAILED
+H_fcc_compressed             d3-stage3_src: FAILED
+Cu_fcc_compressed            master-base_src          OK  finite=True dE 8.56e-03/1.96e-02 dF 1.09e-06/1e-05 dV 5.91e-03/1.81e-02 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -9807 max|F| 0.00599
+Cu_fcc_compressed            d3-stage3_src            OK  finite=True dE 8.53e-03/1.96e-02 dF 1.64e-07/1e-05 dV 7.54e-03/1.81e-02 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -9807 max|F| 0.00599
+                             d3-stage3_src - master-base_src: dE 3.24e-05 dF 1.15e-06 dV 1.72e-03
+H_fcc_compressed_smallbox    master-base_src          OK  finite=True dE 6.61e-05/1.67e-04 dF 4.56e-08/1e-05 dV 5.42e-05/1.61e-04 | NEP noise E 0.0e+00 F 2.2e-16 V 0.0e+00 | E_D3 -83.31 max|F| 0.0098
+H_fcc_compressed_smallbox    d3-stage3_src            OK  finite=True dE 5.28e-05/1.67e-04 dF 6.31e-08/1e-05 dV 5.28e-05/1.61e-04 | NEP noise E 0.0e+00 F 2.2e-16 V 5.7e-14 | E_D3 -83.31 max|F| 0.0098
+                             d3-stage3_src - master-base_src: dE 1.33e-05 dF 4.61e-08 dV 1.72e-06
+Cu_dilated_a5.2              master-base_src          OK  finite=True dE 3.15e-04/9.01e-04 dF 3.22e-07/1e-05 dV 2.62e-04/6.15e-04 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -450.5 max|F| 0.0149
+Cu_dilated_a5.2              d3-stage3_src            OK  finite=True dE 3.17e-04/9.01e-04 dF 3.13e-07/1e-05 dV 2.68e-04/6.15e-04 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -450.5 max|F| 0.0149
+                             d3-stage3_src - master-base_src: dE 2.53e-06 dF 3.73e-08 dV 6.01e-06
+Cu_dilated_a7.5              master-base_src          OK  finite=True dE 5.70e-05/1.26e-04 dF 4.23e-08/1e-05 dV 9.89e-05/2.26e-04 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -62.78 max|F| 0.0025
+Cu_dilated_a7.5              d3-stage3_src            OK  finite=True dE 5.72e-05/1.26e-04 dF 4.25e-08/1e-05 dV 9.96e-05/2.26e-04 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -62.78 max|F| 0.0025
+                             d3-stage3_src - master-base_src: dE 2.24e-07 dF 1.36e-08 dV 7.00e-07
+Au_dilated_a9                master-base_src          OK  finite=True dE 1.15e-05/2.53e-05 dF 1.80e-08/1e-05 dV 2.28e-05/5.10e-05 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -12.65 max|F| 0.000921
+Au_dilated_a9                d3-stage3_src            OK  finite=True dE 1.15e-05/2.53e-05 dF 1.85e-08/1e-05 dV 2.28e-05/5.10e-05 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -12.65 max|F| 0.000921
+                             d3-stage3_src - master-base_src: dE 3.73e-09 dF 2.79e-09 dV 1.01e-07
+C_dilated_diamond_a9         master-base_src          OK  finite=True dE 1.55e-05/3.86e-05 dF 1.14e-08/1e-05 dV 2.05e-05/5.98e-05 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -19.29 max|F| 0.000655
+C_dilated_diamond_a9         d3-stage3_src            OK  finite=True dE 1.53e-05/3.86e-05 dF 1.14e-08/1e-05 dV 2.04e-05/5.98e-05 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -19.29 max|F| 0.000655
+                             d3-stage3_src - master-base_src: dE 1.99e-07 dF 4.58e-09 dV 2.61e-07
+short_pairs_periodic         master-base_src          OK  finite=True dE 1.98e-08/6.11e-08 dF 1.85e-11/1e-05 dV 3.61e-10/7.00e-10 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -0.03054 max|F| 1.75e-05
+short_pairs_periodic         d3-stage3_src            OK  finite=True dE 2.35e-08/6.11e-08 dF 2.04e-11/1e-05 dV 3.76e-10/7.00e-10 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -0.03054 max|F| 1.75e-05
+                             d3-stage3_src - master-base_src: dE 3.73e-09 dF 3.64e-12 dV 1.46e-11
+H70_dense_cluster            master-base_src          OVER finite=True dE 8.11e+00/1.08e-05 dF 4.35e-02/1e-05 dV 1.14e+00/1.52e-06 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -5.421 max|F| 0.0292
+H70_dense_cluster            d3-stage3_src            OVER finite=True dE 8.11e+00/1.08e-05 dF 4.35e-02/1e-05 dV 1.14e+00/1.52e-06 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -5.421 max|F| 0.0292
+                             d3-stage3_src - master-base_src: dE 5.96e-08 dF 7.83e-08 dV 9.46e-08
+CuH70_dense_cluster          master-base_src          OVER finite=True dE 7.25e+00/5.18e-05 dF 7.23e-02/1e-05 dV 2.20e+00/8.72e-06 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -25.92 max|F| 0.152
+CuH70_dense_cluster          d3-stage3_src            OVER finite=True dE 7.25e+00/5.18e-05 dF 7.23e-02/1e-05 dV 2.20e+00/8.72e-06 | NEP noise E 0.0e+00 F 0.0e+00 V 0.0e+00 | E_D3 -25.92 max|F| 0.152
+                             d3-stage3_src - master-base_src: dE 4.17e-07 dF 2.98e-08 dV 5.59e-08

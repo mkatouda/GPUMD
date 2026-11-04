@@ -27,6 +27,10 @@ their float error is proportional to their magnitude (about 5-8e-7 of the D3 ene
 unmodified code, reproducible run to run); fixed absolute limits cannot hold for large
 systems (revised 2026-11-03 after the Phase 1 measurement; the original absolute caps of
 1e-5 eV and 1e-4 eV are withdrawn).
+Note (2026-11-04, human decision, VER-0017): the AC-1 reference cases do not include extreme coordination numbers. The unmodified code (upstream
+master) deviates from simple-dftd3 there (float weight underflow selects the C6 of the last reference index; e.g. dense H70 cluster dE 8.1 eV). This
+pre-existing behaviour is out of scope of DR-001 (the optimized code reproduces it, so AC-1 'no worse than the unmodified code' holds) and is recorded
+for a later upstream bug report or fix PR: `specs/upstream-issues/UPSTREAM-0001-dftd3-weight-underflow.md`.
 
 AC-2 (no regression). `pytest -m "not slow"` in `tests_pytest/` shows no new failure
 (baseline: 738 passed, 480 skipped); `run_regression.py --suite full` shows no failure other

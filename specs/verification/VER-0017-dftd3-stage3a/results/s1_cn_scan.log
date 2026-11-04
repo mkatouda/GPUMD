@@ -1,0 +1,12 @@
+H70_R6.0     approx CN   0.00..  1.07 | master-base: dE 9.0e-07 dF 3.6e-07 dV 7.0e-07 | d3-stage3: dE 9.0e-07 dF 3.7e-07 dV 7.1e-07
+H70_R4.0     approx CN   0.00..  1.93 | master-base: dE 1.7e-06 dF 3.0e-07 dV 1.1e-06 | d3-stage3: dE 1.7e-06 dF 2.9e-07 dV 1.1e-06
+H70_R3.0     approx CN   0.01..  2.67 | master-base: dE 2.2e-06 dF 1.1e-06 dV 1.1e-06 | d3-stage3: dE 2.1e-06 dF 1.1e-06 dV 1.2e-06
+H70_R2.4     approx CN   0.09..  5.47 | master-base: dE 2.1e-01 dF 3.5e-02 dV 1.0e-01 | d3-stage3: dE 2.1e-01 dF 3.5e-02 dV 1.0e-01
+H70_R2.0     approx CN   0.43..  5.66 | master-base: dE 1.8e+00 dF 3.9e-02 dV 4.6e-01 | d3-stage3: dE 1.8e+00 dF 3.9e-02 dV 4.6e-01
+H70_R1.7     approx CN   1.88..  8.57 | master-base: dE 6.7e+00 dF 5.3e-02 dV 1.2e+00 | d3-stage3: dE 6.7e+00 dF 5.3e-02 dV 1.2e+00
+Cu70_R6.0    approx CN   2.71.. 18.71 | master-base: dE 9.4e-04 dF 5.2e-03 dV 1.7e-02 | d3-stage3: dE 9.4e-04 dF 5.2e-03 dV 1.7e-02
+Cu70_R4.0    approx CN  13.43.. 45.25 | master-base: dE 3.1e-05 dF 2.7e-07 dV 1.6e-05 | d3-stage3: dE 3.1e-05 dF 2.7e-07 dV 1.6e-05
+Cu70_R3.0    approx CN  27.97.. 67.58 | master-base: dE 4.2e-05 dF 3.5e-07 dV 1.1e-05 | d3-stage3: dE 4.2e-05 dF 3.2e-07 dV 1.1e-05
+Cu70_R2.4    approx CN  46.58.. 68.98 | master-base: dE 4.6e-05 dF 2.0e-07 dV 5.9e-06 | d3-stage3: dE 4.6e-05 dF 2.0e-07 dV 5.9e-06
+Cu70_R2.0    approx CN  60.71.. 69.00 | master-base: dE 4.8e-05 dF 1.2e-07 dV 2.0e-06 | d3-stage3: dE 4.8e-05 dF 1.2e-07 dV 2.0e-06
+Cu70_R1.7    approx CN  67.44.. 69.00 | master-base: dE 5.0e-05 dF 4.8e-08 dV 8.6e-07 | d3-stage3: dE 4.9e-05 dF 4.8e-08 dV 8.6e-07
