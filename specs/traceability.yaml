@@ -18,6 +18,14 @@ requirements:
     verification: [specs/verification/VER-0003-dftd2-parameters-and-oracle, specs/verification/VER-0005-dftd2-cutoff-study, specs/verification/VER-0006-dftd2-consistency-and-performance, specs/verification/VER-0007-dftd2-review-fixes, specs/verification/VER-0008-dftd2-optimization, specs/verification/VER-0009-dftd2-float-candidates, specs/verification/VER-0010-dftd2-final-verification, specs/verification/VER-0021-dftd2-vs-dftd3-timing, specs/verification/VER-0022-upstream-merge-ddc6e2d2]
     tests: [tests_pytest/test_dftd2_reference.py, tests_pytest/test_dftd2_src_table.py, tests_pytest/test_dftd2_consistency.py]   # AC-1..6 and 8 met; AC-4 FD at rc=12 and 30 A (VER-0010). AC-7 NOT met (measured, informative, not a gate; re-measured 2026-11-04 against the optimized D3 in VER-0021: met only at water 648 rc=12 A (D2 at noise level), not met elsewhere, never at rc=30 A): D2/D3 extra time <= 0.5 only at rc=12 A for N=81/648; at the default rc=30 A it is 0.66-9.3 (VER-0010). Independent reviews: no open BLOCKER/MAJOR (VER-0007, stage 3b)
     status: implemented
+  - id: DR-003
+    title: DFT-D3 with zero damping, D3(0)
+    source: specs/requirements/DR-003-dftd3-zero-damping.md
+    design: specs/design/DES-0003-dftd3-zero-damping-plan.md
+    adrs: [specs/decisions/ADR-0003-dftd3-damping-keyword.md]
+    verification: []
+    tests: []   # Phase 1 (parameter provenance) started 2026-11-06
+    status: planned
 # Example entry:
 # - id: DR-001
 #   title: Short requirement title

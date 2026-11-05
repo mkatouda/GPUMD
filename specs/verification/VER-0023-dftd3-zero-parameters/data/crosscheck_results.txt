@@ -1,0 +1,16 @@
+A  r0ab generated vs dftd3-lib runtime: entries 8836, mismatches (float32-literal emulation, exact) = 0; max rel diff vs decimal value = 5.87e-08 (float32 literal rounding, <= 6e-8)
+   units: table is Angstrom; lib bohr = table/0.52917726. Sanity: r0ab(H,H)=2.1823 A = 4.1239 bohr, r0ab(C,C)=2.9103 A, r0ab(Pu,Pu)=4.4341 A
+B  parameters generated vs dftd3-lib runtime setfuncpar(version=3): 295 entries (59 functional/variant), mismatches = 0
+C  simple-dftd3 method=name vs explicit generated parameters: 48 functionals covered, 0 disagree (>1e-10 rel), worst rel diff 0.0e+00 over 8 dimers x 5 r
+   not known to simple-dftd3 by that name (NOT independently cross-checked, lib only): none
+   Stage A covered by simple-dftd3 and agreeing: b-lyp(b-lyp), revpbe(revpbe), pbe(pbe), tpss(tpss), b3-lyp(b3-lyp)
+D1 R0 recovered from simple-dftd3 dimers vs table/0.529177210903, Z<=86: 7396 pairs (full matrix entries), max rel 2.82e-12, unusable 0
+D1b same but table/0.52917726 (dftd3-lib constant): max rel 9.28e-08  (=> simple-dftd3 uses the CODATA2018 Angstrom/bohr; ratio 9.278e-08)
+D2 Z>=87 (any partner), simple-dftd3 vs generated: 1440 matrix entries, 1440 differ by >1e-6, max rel 2.87e-01  ==> SOURCES DISAGREE
+D3 R0 recovered from dftd3-lib itself (energies with explicit parameters, all Z<=94) vs float32 table/0.52917726: max rel 2.64e-16 over 8836 entries
+E1 DR-003 formula (decimal tables, oracle bohr constant, C6/C8 from simple-dftd3) vs simple-dftd3, Z<=86 dimers: worst rel 4.51e-11
+E2 same formula with float32-literal tables (what dftd3-lib really uses) vs dftd3-lib energy, Z<=86: worst rel 2.07e-07
+E3 informative: decimal tables vs dftd3-lib energy: worst rel 2.18e-06 (float32 literals x alpha=14 amplification); decimal tables with 0.52917726 instead of CODATA18 vs simple-dftd3: worst rel 1.48e-06
+E4 Pu-Pu (Z=94) dimer, formula vs simple-dftd3 (same C6/C8, differing r0ab): worst rel 1.96e-02
+GATE Z<=86 (A,B exact; C<=1e-10; D1,E1 <1e-9; E2 <1e-6): PASS
+GATE Z=87..94 vs simple-dftd3: FAIL (1440 entries differ >1e-6)
