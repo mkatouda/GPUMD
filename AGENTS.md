@@ -75,6 +75,12 @@ report. This does not relax any other rule in this file.
 - **Prompts are scope contracts.** State files/specs in scope, files out of scope,
   that commits and destructive git operations are forbidden unless the human asked,
   and that ambiguity means stop with `SPEC_CONFLICT`.
+- **Short agent reports, no progress chatter.** Tell every subagent in its prompt to
+  return one concise final report (outcome, files changed, exact commands and key
+  numbers, open issues; aim for ~30 lines or fewer, no narrated steps, no pasted
+  logs) and to send no intermediate progress messages. The parent likewise
+  does not relay routine progress; it speaks up only for results, blockers,
+  `SPEC_CONFLICT`, or decisions needed from the human.
 - **No overlapping concurrent delegation.** Confirm parallel subagents touch
   disjoint files.
 - **GPU contention.** Only one subagent at a time runs GPU-heavy builds/tests unless
