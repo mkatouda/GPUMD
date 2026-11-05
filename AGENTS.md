@@ -44,7 +44,7 @@ and document the source, settings, and uncertainty of every reference value.
    `tests_regression/manifest.json` for run-level behavior).
 4. Make the smallest conforming change; keep CUDA and HIP paths in sync via
    `gpu_macro.cuh`, and mirror changes into `main_replica/` copies where applicable.
-5. Build warning-clean (`make CUDA_ARCH="-arch=sm_86" -j4`), run clang-format, focused
+5. Build warning-clean (`make CUDA_ARCH="-arch=sm_86" -j4`), run clang-format (changed code only, see Build), focused
    pytest, and `run_regression.py --suite full` against the `master` baseline binary.
 6. Check, as applicable: units, energy/force/virial consistency (finite difference),
    energy conservation in NVE, translational/rotational invariance, atom-order and
@@ -174,6 +174,13 @@ make gnep                          # optional target, not part of `all`
 ```
 
 `make` (target `all`) builds `gpumd nep gpumd_replica tb`, outputs in `src/`. A CMake build (`CMakeLists.txt`, `-DPKG_NNAP=yes` for NNAP) is also available. Both build systems glob sources by directory (`src/force/*.cu` and `src/force/*/*.cu` for gpumd; `src/main_nep/**` for nep), so new files in existing dirs need no build edits, but nested deeper dirs do. The Linux makefile enables many `-W` flags; keep code warning-clean. Formatting uses clang-format (`src/apply_clang_format.sh`).
+
+**clang-format scope.** Run clang-format only on source code that the human or an agent
+changed in the current task, and never on unrelated files or on whole directories (do not run
+`src/apply_clang_format.sh` over the tree). Even in a changed file, do not accept reformatting
+of lines you did not edit: if the tool rewrites unrelated parts (a large diff in a file that
+needed a small edit), revert the formatting and keep only the intended edit. This keeps
+diffs reviewable and upstream merges clean. Tell subagents this in their prompts.
 
 ## Tests
 
