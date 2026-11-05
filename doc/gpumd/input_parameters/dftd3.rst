@@ -12,13 +12,24 @@ For theoretical background on DFT-D3, see [Grimme2010]_ and [Grimme2011]_.
 Syntax
 ------
 
-  dftd3 <functional> <potential_cutoff> <coordination_number_cutoff>
+  dftd3 <functional> <potential_cutoff> <coordination_number_cutoff> [<damping>]
 
-where :attr:`functional` is the exchange-correlation functional used in generating the reference data for training the NEP model, :attr:`potential_cutoff` is the cutoff radius (in units of Angstrom) for the D3 potential, and :attr:`coordination_number_cutoff` is the cutoff radius (in units of Angstrom) for calculating the coordination numbers. 
+where :attr:`functional` is the exchange-correlation functional used in generating the reference data for training the NEP model, :attr:`potential_cutoff` is the cutoff radius (in units of Angstrom) for the D3 potential, and :attr:`coordination_number_cutoff` is the cutoff radius (in units of Angstrom) for calculating the coordination numbers.
+The optional :attr:`damping` is ``bj`` (Becke-Johnson damping, the default when it is omitted) or ``zero`` (zero damping, D3(0)); it is case sensitive, and any other value, or more than five tokens, is an input error.
+The startup output prints the damping used.
 
 This keyword can be put anywhere in the ``run.in`` input file.
 
-We have only implemented the Becke-Johnson (BJ) damping, and a full list of supported functionals can be found from the following link: https://www.chemiebn.uni-bonn.de/pctc/mulliken-center/software/dft-d3/functionalsbj
+Two dampings are implemented.
+With ``bj`` (default), the full list of supported functionals can be found from the following link: https://www.chemiebn.uni-bonn.de/pctc/mulliken-center/software/dft-d3/functionalsbj
+A functional that is not tabulated for the chosen damping is an input error that names the damping and the functional; there is no fallback to the other damping.
+Existing inputs without the damping token give the same results as before.
+
+With ``zero`` the energy of a pair is :math:`-\left[ s_6 C_6 f_6(r)/r^6 + s_8 C_8 f_8(r)/r^8 \right]` with :math:`f_n(r) = 1/(1 + 6 (r/(s_{r,n} R_0))^{-\alpha_n})`, :math:`\alpha_6 = 14`, :math:`\alpha_8 = 16` and :math:`s_{r,8} = 1` [Grimme2010]_ (:math:`R_0` are the pair cutoff radii of D3, tabulated in Angstrom). The parameters (def2-QZVP set of [Grimme2010]_, as in dftd3-lib) cannot be changed by the user. The supported functionals are (the same spelling as for ``bj``, lower case, without hyphens):
+``b1b95``, ``b2gpplyp``, ``b2plyp``, ``b3lyp``, ``b3pw91``, ``b97d``, ``bhlyp``, ``blyp``, ``bmk``, ``bop``, ``bp86``, ``bpbe``, ``camb3lyp``, ``hcth120``, ``hf``, ``hse06``, ``lcwpbe``, ``m05``, ``m052x``, ``m06``, ``m062x``, ``m06hf``, ``m06l``, ``mpw1b95``, ``mpwb1k``, ``mpwlyp``, ``olyp``, ``opbe``, ``otpss``, ``pbe``, ``pbe0``, ``pbe38``, ``pbesol``, ``ptpss``, ``pw6b95``, ``pwb6k``, ``pwpb95``, ``revpbe``, ``revpbe0``, ``revpbe38``, ``revssb``, ``rpbe``, ``rpw86pbe``, ``ssb``, ``tpss``, ``tpss0``, ``tpssh`` (and ``slaterdiracexchange``, the Slater-Dirac exchange alone).
+Zero damping is limited to the elements H-Rn (:math:`Z \le 86`): if the structure contains an atom type with :math:`Z \ge 87` (Fr-Pu), the run stops with an error naming the element(s). Only the elements present in the structure count, not those listed in the model file. The limit does not apply to ``bj``.
+
+Both dampings are two-body only: the three-body (Axilrod-Teller-Muto) term is not implemented. In particular, D3(0) here differs from the default of Quantum ESPRESSO (``dftd3_version = 3`` with ``dftd3_threebody = .true.``) by the three-body term. The lengths used are in Angstrom (the :math:`R_0` table is converted from bohr with the constant of the source code, 0.5291772575 Å/bohr), so the results differ from codes using the CODATA bohr radius by up to about 1.5 parts per million in the damping region.
 
 Example
 -------
@@ -27,7 +38,13 @@ Example
 
   dftd3 pbe 12 6
   
-This will add the DFT-D3 dispersion correction to NEP with the PBE functional and a cutoff radius of 12 Angstrom for the D3 potential and a cutoff radius of 6 Angstrom for the coordination number.
+This will add the DFT-D3 dispersion correction to NEP with the PBE functional and BJ damping and a cutoff radius of 12 Angstrom for the D3 potential and a cutoff radius of 6 Angstrom for the coordination number.
+
+.. code::
+
+  dftd3 pbe 12 6 zero
+
+This does the same with zero damping (D3(0)).
 
 .. _dftd3_cost:
 

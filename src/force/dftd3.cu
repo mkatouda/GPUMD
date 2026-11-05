@@ -29,6 +29,7 @@ J. Comput. Chem., 32, 1456 (2011).
 
 #include "dftd3.cuh"
 #include "dftd3para.cuh"
+#include "dftd3zero_table.cuh"
 #include "model/box.cuh"
 #include "neighbor.cuh"
 #include "utilities/common.cuh"
@@ -159,6 +160,93 @@ static __device__ __forceinline__ void get_c6_factorized(
     W = 1.0f / W;
     c6 = Z * W;
     dc6 = dZ * W - c6 * dW * W;
+  }
+}
+
+// Zero-damped term of one pair for the power n (6 or 8) and the exponent alpha = n + 8:
+//   g = f(r) / r^n,  f = 1 / (1 + 6 t^-alpha),  t = r / (sr_n R0),  inv_a = 1 / (sr_n R0),
+//   h = n - alpha (1 - f),   so that  dg/dr = -g h / r.
+// For t < 1 the form g = t^8 inv_a^n / (t^alpha + 6) is used, and for t >= 1 the form
+// g = r^-n / (1 + 6 t^-alpha); neither overflows for any r (and g -> 0 for r -> 0).
+template <int n>
+static __device__ __forceinline__ void
+d3_zero_term(const float r, const float inv_a, float& g, float& h)
+{
+  constexpr float alpha = n + 8;
+  const float t = r * inv_a;
+  if (t < 1.0f) {
+    const float t2 = t * t;
+    const float t4 = t2 * t2;
+    const float t8 = t4 * t4;
+    const float p = (n == 6) ? t8 * t4 * t2 : t8 * t8; // t^alpha <= 1
+    const float inv = 1.0f / (p + 6.0f);
+    float inv_a_n = 1.0f;
+#pragma unroll
+    for (int k = 0; k < n; ++k) {
+      inv_a_n *= inv_a;
+    }
+    g = t8 * inv_a_n * inv;
+    h = n - alpha * 6.0f * inv;
+  } else {
+    const float u = 1.0f / t;
+    const float u2 = u * u;
+    const float u4 = u2 * u2;
+    const float u8 = u4 * u4;
+    const float q = (n == 6) ? u8 * u4 * u2 : u8 * u8; // t^-alpha <= 1
+    const float finv = 1.0f / (1.0f + 6.0f * q);
+    const float ir = 1.0f / r;
+    const float ir2 = ir * ir;
+    const float ir4 = ir2 * ir2;
+    const float ir_n = (n == 6) ? ir4 * ir2 : ir4 * ir4;
+    g = ir_n * finv;
+    h = n - alpha * 6.0f * q * finv;
+  }
+}
+
+// Damped two-body pair terms shared by the small-box and large-box kernels (BJ and zero damping).
+// Inputs: atomic number indices z1, z2, c6 of the pair (eV A^6), c8/c6, squared distance d12_2.
+// Outputs: pe = half of the pair energy magnitude (full neighbor list), f2 with force factor
+// (force on atom 1 = 2 f2 r12), and the damped functions g6, g8 (the C6 and C8 coefficients
+// multiply s6 g6 and s8 g8 in the energy; used for the coordination-number derivative).
+static __device__ __forceinline__ void d3_damped_pair(
+  const DFTD3::DFTD3_Para& p,
+  const int z1,
+  const int z2,
+  const float c6,
+  const float c8_over_c6,
+  const float d12_2,
+  float& pe,
+  float& f2,
+  float& g6,
+  float& g8)
+{
+  const float c8 = c6 * c8_over_c6;
+  if (p.damping == 0) {
+    // BJ damping; operation order unchanged (DR-003 AC-3)
+    const float d12_4 = d12_2 * d12_2;
+    const float d12_6 = d12_4 * d12_2;
+    const float d12_8 = d12_6 * d12_2;
+    float damp = p.a1 * sqrt(c8_over_c6) + p.a2;
+    float damp_2 = damp * damp;
+    float damp_4 = damp_2 * damp_2;
+    float damp_6 = 1.0f / (d12_6 + damp_4 * damp_2);
+    float damp_8 = 1.0f / (d12_8 + damp_4 * damp_4);
+    pe = (p.s6 * c6 * damp_6 + p.s8 * c8 * damp_8) * 0.5f;
+    f2 =
+      p.s6 * c6 * 3.0f * d12_4 * (damp_6 * damp_6) + p.s8 * c8 * 4.0f * d12_6 * (damp_8 * damp_8);
+    g6 = damp_6;
+    g8 = damp_8;
+  } else {
+    // zero damping, D3(0); R0 in Angstrom (packed lower triangle of the symmetric table)
+    const int zl = z1 > z2 ? z1 : z2;
+    const int zs = z1 > z2 ? z2 : z1;
+    const float r0 = d3zero_r0ab[zl * (zl + 1) / 2 + zs];
+    const float r = sqrt(d12_2);
+    float h6, h8;
+    d3_zero_term<6>(r, 1.0f / (p.sr6 * r0), g6, h6);
+    d3_zero_term<8>(r, 1.0f / (p.sr8 * r0), g8, h8);
+    pe = (p.s6 * c6 * g6 + p.s8 * c8 * g8) * 0.5f;
+    f2 = 0.5f * (p.s6 * c6 * g6 * h6 + p.s8 * c8 * g8 * h8) / d12_2;
   }
 }
 
@@ -579,25 +667,16 @@ __global__ void add_dftd3_force_small_box(
     const int z12 = z_small * max_elem - (z_small * (z_small - 1)) / 2 + (z_large - z_small);
     const float r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
     const float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
-    const float d12_4 = d12_2 * d12_2;
-    const float d12_6 = d12_4 * d12_2;
-    const float d12_8 = d12_6 * d12_2;
     float c6;
     float dc6;
     get_c6_factorized(z1, z2, z12, num_cn_1, cw, g_cn_weight + n2 * max_cn, g_c6_ref, c6, dc6);
     c6 *= HartreeBohr6;
     dc6 *= HartreeBohr6;
 
-    float c8_over_c6 = 3.0f * r2r4[z1] * r2r4[z2] * Bohr2;
-    float c8 = c6 * c8_over_c6;
-    float damp = dftd3_para.a1 * sqrt(c8_over_c6) + dftd3_para.a2;
-    float damp_2 = damp * damp;
-    float damp_4 = damp_2 * damp_2;
-    float damp_6 = 1.0f / (d12_6 + damp_4 * damp_2);
-    float damp_8 = 1.0f / (d12_8 + damp_4 * damp_4);
-    s_pe -= (dftd3_para.s6 * c6 * damp_6 + dftd3_para.s8 * c8 * damp_8) * 0.5f;
-    float f2 = dftd3_para.s6 * c6 * 3.0f * d12_4 * (damp_6 * damp_6) +
-               dftd3_para.s8 * c8 * 4.0f * d12_6 * (damp_8 * damp_8);
+    const float c8_over_c6 = 3.0f * r2r4[z1] * r2r4[z2] * Bohr2;
+    float pe_pair, f2, g6, g8;
+    d3_damped_pair(dftd3_para, z1, z2, c6, c8_over_c6, d12_2, pe_pair, f2, g6, g8);
+    s_pe -= pe_pair;
     float f12[3] = {r12[0] * f2, r12[1] * f2, r12[2] * f2};
     s_fx += 2.0f * f12[0];
     s_fy += 2.0f * f12[1];
@@ -611,8 +690,8 @@ __global__ void add_dftd3_force_small_box(
     s_szx -= r12[2] * f12[0];
     s_szy -= r12[2] * f12[1];
     s_szz -= r12[2] * f12[2];
-    dc6_sum += dc6 * dftd3_para.s6 * damp_6;
-    dc8_sum += dc6 * c8_over_c6 * dftd3_para.s8 * damp_8;
+    dc6_sum += dc6 * dftd3_para.s6 * g6;
+    dc8_sum += dc6 * c8_over_c6 * dftd3_para.s8 * g8;
   }
   if (num_sub > 1) {
     s_red[0][tid] = s_fx;
@@ -1106,9 +1185,6 @@ __global__ void find_dftd3_force_large_box(
               z_large = atomic_number_1;
             }
             int z12 = z_small * max_elem - (z_small * (z_small - 1)) / 2 + (z_large - z_small);
-            float d12_4 = d12_2 * d12_2;
-            float d12_6 = d12_4 * d12_2;
-            float d12_8 = d12_6 * d12_2;
             float c6;
             float dc6;
             get_c6_factorized(
@@ -1124,16 +1200,20 @@ __global__ void find_dftd3_force_large_box(
             c6 *= HartreeBohr6;
             dc6 *= HartreeBohr6;
 
-            float c8_over_c6 = 3.0f * r2r4[atomic_number_1] * r2r4[atomic_number_2] * Bohr2;
-            float c8 = c6 * c8_over_c6;
-            float damp = dftd3_para.a1 * sqrt(c8_over_c6) + dftd3_para.a2;
-            float damp_2 = damp * damp;
-            float damp_4 = damp_2 * damp_2;
-            float damp_6 = 1.0f / (d12_6 + damp_4 * damp_2);
-            float damp_8 = 1.0f / (d12_8 + damp_4 * damp_4);
-            s_pe -= (dftd3_para.s6 * c6 * damp_6 + dftd3_para.s8 * c8 * damp_8) * 0.5f;
-            float f2 = dftd3_para.s6 * c6 * 3.0f * d12_4 * (damp_6 * damp_6) +
-                       dftd3_para.s8 * c8 * 4.0f * d12_6 * (damp_8 * damp_8);
+            const float c8_over_c6 = 3.0f * r2r4[atomic_number_1] * r2r4[atomic_number_2] * Bohr2;
+            float pe_pair, f2, g6, g8;
+            d3_damped_pair(
+              dftd3_para,
+              atomic_number_1,
+              atomic_number_2,
+              c6,
+              c8_over_c6,
+              d12_2,
+              pe_pair,
+              f2,
+              g6,
+              g8);
+            s_pe -= pe_pair;
             float f12[3] = {r12[0] * f2, r12[1] * f2, r12[2] * f2};
             s_fx += 2.0f * f12[0];
             s_fy += 2.0f * f12[1];
@@ -1147,8 +1227,8 @@ __global__ void find_dftd3_force_large_box(
             s_szx -= r12[2] * f12[0];
             s_szy -= r12[2] * f12[1];
             s_szz -= r12[2] * f12[2];
-            dc6_sum += dc6 * dftd3_para.s6 * damp_6;
-            dc8_sum += dc6 * c8_over_c6 * dftd3_para.s8 * damp_8;
+            dc6_sum += dc6 * dftd3_para.s6 * g6;
+            dc8_sum += dc6 * c8_over_c6 * dftd3_para.s8 * g8;
           }
         }
       }
@@ -1790,6 +1870,9 @@ void DFTD3::compute(
   GPU_Vector<double>& force_per_atom,
   GPU_Vector<double>& virial_per_atom)
 {
+  if (dftd3_para.damping == 1 && !elements_checked) {
+    check_elements(type);
+  }
   const bool is_small_box = get_expanded_box(rc_radial, box, ebox);
 
   if (is_small_box) {
@@ -1805,7 +1888,8 @@ void DFTD3::initialize(
   std::string& functional,
   const float rc_potential,
   const float rc_coordination_number,
-  const std::string& potential_file_name)
+  const std::string& potential_file_name,
+  const std::string& damping)
 {
   rc_radial = rc_potential;
   rc_angular = rc_coordination_number;
@@ -1814,65 +1898,81 @@ void DFTD3::initialize(
     return std::tolower(c);
   });
 
+  const bool zero_damping = (damping == "zero");
+  dftd3_para.damping = zero_damping ? 1 : 0;
   bool valid = false;
-  valid = valid || set_para(functional, "b1b95", 1.000, 0.2092, 1.4507, 5.5545, dftd3_para);
-  valid = valid || set_para(functional, "b2gpplyp", 0.560, 0.0000, 0.2597, 6.3332, dftd3_para);
-  valid = valid || set_para(functional, "b2plyp", 0.640, 0.3065, 0.9147, 5.0570, dftd3_para);
-  valid = valid || set_para(functional, "b3lyp", 1.000, 0.3981, 1.9889, 4.4211, dftd3_para);
-  valid = valid || set_para(functional, "b3pw91", 1.000, 0.4312, 2.8524, 4.4693, dftd3_para);
-  valid = valid || set_para(functional, "b97d", 1.000, 0.5545, 2.2609, 3.2297, dftd3_para);
-  valid = valid || set_para(functional, "bhlyp", 1.000, 0.2793, 1.0354, 4.9615, dftd3_para);
-  valid = valid || set_para(functional, "blyp", 1.000, 0.4298, 2.6996, 4.2359, dftd3_para);
-  valid = valid || set_para(functional, "bmk", 1.000, 0.1940, 2.0860, 5.9197, dftd3_para);
-  valid = valid || set_para(functional, "bop", 1.000, 0.4870, 3.295, 3.5043, dftd3_para);
-  valid = valid || set_para(functional, "bp86", 1.000, 0.3946, 3.2822, 4.8516, dftd3_para);
-  valid = valid || set_para(functional, "bpbe", 1.000, 0.4567, 4.0728, 4.3908, dftd3_para);
-  valid = valid || set_para(functional, "camb3lyp", 1.000, 0.3708, 2.0674, 5.4743, dftd3_para);
-  valid = valid || set_para(functional, "dsdblyp", 0.500, 0.0000, 0.2130, 6.0519, dftd3_para);
-  valid = valid || set_para(functional, "hcth120", 1.000, 0.3563, 1.0821, 4.3359, dftd3_para);
-  valid = valid || set_para(functional, "hf", 1.000, 0.3385, 0.9171, 2.883, dftd3_para);
-  valid = valid || set_para(functional, "hse-hjs", 1.000, 0.3830, 2.3100, 5.685, dftd3_para);
-  valid = valid || set_para(functional, "lc-wpbe08", 1.000, 0.3919, 1.8541, 5.0897, dftd3_para);
-  valid = valid || set_para(functional, "lcwpbe", 1.000, 0.3919, 1.8541, 5.0897, dftd3_para);
-  valid = valid || set_para(functional, "m11", 1.000, 0.0000, 2.8112, 10.1389, dftd3_para);
-  valid = valid || set_para(functional, "mn12l", 1.000, 0.0000, 2.2674, 9.1494, dftd3_para);
-  valid = valid || set_para(functional, "mn12sx", 1.000, 0.0983, 1.1674, 8.0259, dftd3_para);
-  valid = valid || set_para(functional, "mpw1b95", 1.000, 0.1955, 1.0508, 6.4177, dftd3_para);
-  valid = valid || set_para(functional, "mpwb1k", 1.000, 0.1474, 0.9499, 6.6223, dftd3_para);
-  valid = valid || set_para(functional, "mpwlyp", 1.000, 0.4831, 2.0077, 4.5323, dftd3_para);
-  valid = valid || set_para(functional, "n12sx", 1.000, 0.3283, 2.4900, 5.7898, dftd3_para);
-  valid = valid || set_para(functional, "olyp", 1.000, 0.5299, 2.6205, 2.8065, dftd3_para);
-  valid = valid || set_para(functional, "opbe", 1.000, 0.5512, 3.3816, 2.9444, dftd3_para);
-  valid = valid || set_para(functional, "otpss", 1.000, 0.4634, 2.7495, 4.3153, dftd3_para);
-  valid = valid || set_para(functional, "pbe", 1.000, 0.4289, 0.7875, 4.4407, dftd3_para);
-  valid = valid || set_para(functional, "pbe0", 1.000, 0.4145, 1.2177, 4.8593, dftd3_para);
-  valid = valid || set_para(functional, "pbe38", 1.000, 0.3995, 1.4623, 5.1405, dftd3_para);
-  valid = valid || set_para(functional, "pbesol", 1.000, 0.4466, 2.9491, 6.1742, dftd3_para);
-  valid = valid || set_para(functional, "ptpss", 0.750, 0.000, 0.2804, 6.5745, dftd3_para);
-  valid = valid || set_para(functional, "pw6b95", 1.000, 0.2076, 0.7257, 6.375, dftd3_para);
-  valid = valid || set_para(functional, "pwb6k", 1.000, 0.1805, 0.9383, 7.7627, dftd3_para);
-  valid = valid || set_para(functional, "pwpb95", 0.820, 0.0000, 0.2904, 7.3141, dftd3_para);
-  valid = valid || set_para(functional, "revpbe", 1.000, 0.5238, 2.3550, 3.5016, dftd3_para);
-  valid = valid || set_para(functional, "revpbe0", 1.000, 0.4679, 1.7588, 3.7619, dftd3_para);
-  valid = valid || set_para(functional, "revpbe38", 1.000, 0.4309, 1.4760, 3.9446, dftd3_para);
-  valid = valid || set_para(functional, "revssb", 1.000, 0.4720, 0.4389, 4.0986, dftd3_para);
-  valid = valid || set_para(functional, "rpbe", 1.000, 0.1820, 0.8318, 4.0094, dftd3_para);
-  valid = valid || set_para(functional, "rpw86pbe", 1.000, 0.4613, 1.3845, 4.5062, dftd3_para);
-  valid = valid || set_para(functional, "scan", 1.000, 0.5380, 0.0000, 5.42, dftd3_para);
-  valid = valid || set_para(functional, "sogga11x", 1.000, 0.1330, 1.1426, 5.7381, dftd3_para);
-  valid = valid || set_para(functional, "ssb", 1.000, -0.0952, -0.1744, 5.2170, dftd3_para);
-  valid = valid || set_para(functional, "tpss", 1.000, 0.4535, 1.9435, 4.4752, dftd3_para);
-  valid = valid || set_para(functional, "tpss0", 1.000, 0.3768, 1.2576, 4.5865, dftd3_para);
-  valid = valid || set_para(functional, "tpssh", 1.000, 0.4529, 2.2382, 4.6550, dftd3_para);
-  valid = valid || set_para(functional, "b2kplyp", 0.64, 0.0000, 0.1521, 7.1916, dftd3_para);
-  valid = valid || set_para(functional, "dsd-pbep86", 0.418, 0.0000, 0.0000, 5.6500, dftd3_para);
-  valid = valid || set_para(functional, "b97m", 1.0000, -0.0780, 0.1384, 5.5946, dftd3_para);
-  valid = valid || set_para(functional, "wb97x", 1.0000, 0.0000, 0.2641, 5.4959, dftd3_para);
-  valid = valid || set_para(functional, "wb97m", 1.0000, 0.5660, 0.3908, 3.1280, dftd3_para);
+
+  if (zero_damping) {
+    for (int k = 0; k < D3ZERO_NUM_PARAMS; ++k) {
+      if (functional == D3ZERO_PARAMS[k].name) {
+        dftd3_para.s6 = D3ZERO_PARAMS[k].s6;
+        dftd3_para.sr6 = D3ZERO_PARAMS[k].sr6;
+        dftd3_para.s8 = D3ZERO_PARAMS[k].s8;
+        dftd3_para.sr8 = D3ZERO_PARAMS[k].sr8;
+        valid = true;
+        break;
+      }
+    }
+  } else {
+    valid = valid || set_para(functional, "b1b95", 1.000, 0.2092, 1.4507, 5.5545, dftd3_para);
+    valid = valid || set_para(functional, "b2gpplyp", 0.560, 0.0000, 0.2597, 6.3332, dftd3_para);
+    valid = valid || set_para(functional, "b2plyp", 0.640, 0.3065, 0.9147, 5.0570, dftd3_para);
+    valid = valid || set_para(functional, "b3lyp", 1.000, 0.3981, 1.9889, 4.4211, dftd3_para);
+    valid = valid || set_para(functional, "b3pw91", 1.000, 0.4312, 2.8524, 4.4693, dftd3_para);
+    valid = valid || set_para(functional, "b97d", 1.000, 0.5545, 2.2609, 3.2297, dftd3_para);
+    valid = valid || set_para(functional, "bhlyp", 1.000, 0.2793, 1.0354, 4.9615, dftd3_para);
+    valid = valid || set_para(functional, "blyp", 1.000, 0.4298, 2.6996, 4.2359, dftd3_para);
+    valid = valid || set_para(functional, "bmk", 1.000, 0.1940, 2.0860, 5.9197, dftd3_para);
+    valid = valid || set_para(functional, "bop", 1.000, 0.4870, 3.295, 3.5043, dftd3_para);
+    valid = valid || set_para(functional, "bp86", 1.000, 0.3946, 3.2822, 4.8516, dftd3_para);
+    valid = valid || set_para(functional, "bpbe", 1.000, 0.4567, 4.0728, 4.3908, dftd3_para);
+    valid = valid || set_para(functional, "camb3lyp", 1.000, 0.3708, 2.0674, 5.4743, dftd3_para);
+    valid = valid || set_para(functional, "dsdblyp", 0.500, 0.0000, 0.2130, 6.0519, dftd3_para);
+    valid = valid || set_para(functional, "hcth120", 1.000, 0.3563, 1.0821, 4.3359, dftd3_para);
+    valid = valid || set_para(functional, "hf", 1.000, 0.3385, 0.9171, 2.883, dftd3_para);
+    valid = valid || set_para(functional, "hse-hjs", 1.000, 0.3830, 2.3100, 5.685, dftd3_para);
+    valid = valid || set_para(functional, "lc-wpbe08", 1.000, 0.3919, 1.8541, 5.0897, dftd3_para);
+    valid = valid || set_para(functional, "lcwpbe", 1.000, 0.3919, 1.8541, 5.0897, dftd3_para);
+    valid = valid || set_para(functional, "m11", 1.000, 0.0000, 2.8112, 10.1389, dftd3_para);
+    valid = valid || set_para(functional, "mn12l", 1.000, 0.0000, 2.2674, 9.1494, dftd3_para);
+    valid = valid || set_para(functional, "mn12sx", 1.000, 0.0983, 1.1674, 8.0259, dftd3_para);
+    valid = valid || set_para(functional, "mpw1b95", 1.000, 0.1955, 1.0508, 6.4177, dftd3_para);
+    valid = valid || set_para(functional, "mpwb1k", 1.000, 0.1474, 0.9499, 6.6223, dftd3_para);
+    valid = valid || set_para(functional, "mpwlyp", 1.000, 0.4831, 2.0077, 4.5323, dftd3_para);
+    valid = valid || set_para(functional, "n12sx", 1.000, 0.3283, 2.4900, 5.7898, dftd3_para);
+    valid = valid || set_para(functional, "olyp", 1.000, 0.5299, 2.6205, 2.8065, dftd3_para);
+    valid = valid || set_para(functional, "opbe", 1.000, 0.5512, 3.3816, 2.9444, dftd3_para);
+    valid = valid || set_para(functional, "otpss", 1.000, 0.4634, 2.7495, 4.3153, dftd3_para);
+    valid = valid || set_para(functional, "pbe", 1.000, 0.4289, 0.7875, 4.4407, dftd3_para);
+    valid = valid || set_para(functional, "pbe0", 1.000, 0.4145, 1.2177, 4.8593, dftd3_para);
+    valid = valid || set_para(functional, "pbe38", 1.000, 0.3995, 1.4623, 5.1405, dftd3_para);
+    valid = valid || set_para(functional, "pbesol", 1.000, 0.4466, 2.9491, 6.1742, dftd3_para);
+    valid = valid || set_para(functional, "ptpss", 0.750, 0.000, 0.2804, 6.5745, dftd3_para);
+    valid = valid || set_para(functional, "pw6b95", 1.000, 0.2076, 0.7257, 6.375, dftd3_para);
+    valid = valid || set_para(functional, "pwb6k", 1.000, 0.1805, 0.9383, 7.7627, dftd3_para);
+    valid = valid || set_para(functional, "pwpb95", 0.820, 0.0000, 0.2904, 7.3141, dftd3_para);
+    valid = valid || set_para(functional, "revpbe", 1.000, 0.5238, 2.3550, 3.5016, dftd3_para);
+    valid = valid || set_para(functional, "revpbe0", 1.000, 0.4679, 1.7588, 3.7619, dftd3_para);
+    valid = valid || set_para(functional, "revpbe38", 1.000, 0.4309, 1.4760, 3.9446, dftd3_para);
+    valid = valid || set_para(functional, "revssb", 1.000, 0.4720, 0.4389, 4.0986, dftd3_para);
+    valid = valid || set_para(functional, "rpbe", 1.000, 0.1820, 0.8318, 4.0094, dftd3_para);
+    valid = valid || set_para(functional, "rpw86pbe", 1.000, 0.4613, 1.3845, 4.5062, dftd3_para);
+    valid = valid || set_para(functional, "scan", 1.000, 0.5380, 0.0000, 5.42, dftd3_para);
+    valid = valid || set_para(functional, "sogga11x", 1.000, 0.1330, 1.1426, 5.7381, dftd3_para);
+    valid = valid || set_para(functional, "ssb", 1.000, -0.0952, -0.1744, 5.2170, dftd3_para);
+    valid = valid || set_para(functional, "tpss", 1.000, 0.4535, 1.9435, 4.4752, dftd3_para);
+    valid = valid || set_para(functional, "tpss0", 1.000, 0.3768, 1.2576, 4.5865, dftd3_para);
+    valid = valid || set_para(functional, "tpssh", 1.000, 0.4529, 2.2382, 4.6550, dftd3_para);
+    valid = valid || set_para(functional, "b2kplyp", 0.64, 0.0000, 0.1521, 7.1916, dftd3_para);
+    valid = valid || set_para(functional, "dsd-pbep86", 0.418, 0.0000, 0.0000, 5.6500, dftd3_para);
+    valid = valid || set_para(functional, "b97m", 1.0000, -0.0780, 0.1384, 5.5946, dftd3_para);
+    valid = valid || set_para(functional, "wb97x", 1.0000, 0.0000, 0.2641, 5.4959, dftd3_para);
+    valid = valid || set_para(functional, "wb97m", 1.0000, 0.5660, 0.3908, 3.1280, dftd3_para);
+  }
 
   if (!valid) {
-    std::cout << "The " << functional
-              << " functional is not supported for DFT-D3 with BJ damping.\n"
+    std::cout << "The " << functional << " functional is not supported for DFT-D3 with "
+              << (zero_damping ? "zero" : "BJ") << " damping.\n"
               << std::endl;
     exit(1);
   }
@@ -1882,13 +1982,71 @@ void DFTD3::initialize(
   std::cout << "        coordination number cutoff = " << rc_coordination_number << " Angstrom"
             << std::endl;
   std::cout << "        functional = " << functional << std::endl;
+  std::cout << "        damping = " << (zero_damping ? "zero (D3(0))" : "bj") << std::endl;
   std::cout << "            s6 = " << dftd3_para.s6 << std::endl;
   std::cout << "            s8 = " << dftd3_para.s8 << std::endl;
-  std::cout << "            a1 = " << dftd3_para.a1 << std::endl;
-  std::cout << "            a2 = " << dftd3_para.a2 << " Angstrom" << std::endl;
+  if (zero_damping) {
+    std::cout << "            sr6 = " << dftd3_para.sr6 << std::endl;
+    std::cout << "            sr8 = " << dftd3_para.sr8 << std::endl;
+    std::cout << "            alpha6 = 14, alpha8 = 16" << std::endl;
+  } else {
+    std::cout << "            a1 = " << dftd3_para.a1 << std::endl;
+    std::cout << "            a2 = " << dftd3_para.a2 << " Angstrom" << std::endl;
+  }
 
   c6_ref.resize(111625);
   c6_ref.copy_from_host(c6_ref_cpu);
 
   find_atomic_number(potential_file_name, dftd3_para.atomic_number);
+  elements_checked = false;
+}
+
+std::string DFTD3::parse_damping(const std::vector<std::string>& tokens)
+{
+  if (tokens.size() < 4) {
+    std::cout << "dftd3 must have 3 parameters (functional, potential cutoff, coordination number "
+                 "cutoff) and an optional damping (zero or bj)\n";
+    exit(1);
+  }
+  if (tokens.size() > 5) {
+    std::cout << "dftd3 has too many parameters; the syntax is dftd3 <functional> <rc_potential> "
+                 "<rc_cn> [zero|bj]\n";
+    exit(1);
+  }
+  if (tokens.size() == 4) {
+    return "bj";
+  }
+  if (tokens[4] != "zero" && tokens[4] != "bj") {
+    std::cout << "dftd3 damping must be zero or bj (lower case), not " << tokens[4] << "\n";
+    exit(1);
+  }
+  return tokens[4];
+}
+
+// D3(0) is tabulated for Z <= 86 only (DR-003 D5); the atom types actually present are checked.
+void DFTD3::check_elements(const GPU_Vector<int>& type)
+{
+  const int N = type.size();
+  std::vector<int> h_type(N);
+  CHECK(gpuMemcpy(h_type.data(), type.data(), sizeof(int) * N, gpuMemcpyDeviceToHost));
+  std::vector<bool> bad(NUM_ELEMENTS, false);
+  bool any_bad = false;
+  for (int i = 0; i < N; ++i) {
+    const int z_index = dftd3_para.atomic_number[h_type[i]];
+    if (z_index >= 86) {
+      bad[z_index] = true;
+      any_bad = true;
+    }
+  }
+  if (any_bad) {
+    std::string msg = "dftd3 with zero damping has no parameters for element(s):";
+    for (int z = 86; z < NUM_ELEMENTS; ++z) {
+      if (bad[z]) {
+        msg += " " + ELEMENTS[z] + " (Z=" + std::to_string(z + 1) + ")";
+      }
+    }
+    msg += ". D3(0) is limited to Z <= 86 (H-Rn); use bj damping or remove these elements.";
+    PRINT_INPUT_ERROR(msg.c_str());
+  }
+  elements_checked = true;
 }

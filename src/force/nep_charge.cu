@@ -150,10 +150,7 @@ void NEP_Charge::initialize_dftd3(const RunInput& run_input)
     const std::vector<std::string>& tokens = line.tokens;
     if (!tokens.empty() && tokens[0] == "dftd3") {
       has_dftd3 = true;
-      if (tokens.size() != 4) {
-        std::cout << "dftd3 must have 3 parameters\n";
-        exit(1);
-      }
+      const std::string damping = DFTD3::parse_damping(tokens);
       std::string xc_functional = tokens[1];
       float rc_potential = get_double_from_token(tokens[2], __FILE__, __LINE__);
       float rc_coordination_number = get_double_from_token(tokens[3], __FILE__, __LINE__);
@@ -161,7 +158,8 @@ void NEP_Charge::initialize_dftd3(const RunInput& run_input)
         xc_functional,
         rc_potential,
         rc_coordination_number,
-        get_first_potential_filename(run_input));
+        get_first_potential_filename(run_input),
+        damping);
       break;
     }
   }
