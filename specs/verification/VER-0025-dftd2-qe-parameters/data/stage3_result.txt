@@ -1,0 +1,5 @@
+rc = 50.202158 A, cell volume 719.8200 A^3
+printed DFT-D3 Dispersion -0.00257072 Ry = -0.03497643 eV (8 decimals in Ry only)
+E_D3 QE(7.6-dev, XML etot difference) -0.0349764035 eV   numpy -0.0349764051 eV   diff +1.608e-09 eV   rel 4.598e-08
+forces: max|F| numpy 3.184214e-02 eV/A, max|dF| 1.466e-09 eV/A  rel(max-norm) 4.604e-08
+stress (eV/A^3): max|S| numpy 9.566969e-05, max|dS| 2.612e-12 rel(max-norm) 2.730e-08; in kbar: max|dS| 0.00000 kbar, max|S| 0.153 kbar

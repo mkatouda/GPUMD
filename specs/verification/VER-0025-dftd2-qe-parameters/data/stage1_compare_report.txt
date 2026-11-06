@@ -1,0 +1,9 @@
+C6 first point, Z<=86: pairs 3741, decimal mismatches vs GPUMD c6_ref_cpu[z12*25]: 0; max rel (decimal) 0.000e+00; max rel (float32 table value vs QE double) 5.901e-08
+C6 first point, pairs with Z>=87 (information only): 724 pairs, decimal mismatches vs GPUMD: 0
+First reference CN != 0 (GPUMD cn_ref[5*Z]), Z<=86: [1, 58]; QE c6ab(Z,Z,1,1,2) != 0: [1, 58]
+First-point CN mismatch QE vs GPUMD cn_ref (all 94 elements, all pairs): 0
+C6 first point QE 7.2 vs QE HEAD (7.6-515), all Z<=94: max abs diff 0.000e+00
+r0ab Z<=86: 3741 pairs; decimal mismatches QE7.2 vs VER-0023 csv: 0; vs GPUMD d3zero_r0ab literals: 0 (as float32: 0)
+r0ab pairs with Z>=87 (information only): decimal differences QE7.2 vs VER-0023: 0
+r0ab QE 7.2 vs QE HEAD decimals (all 4465): differences 0
+r0ab bohr, QE 7.2 (float32 literal)/autoang vs HEAD (double literal)/autoang: max rel 5.875e-08; effect on exp(-20 (r/(1.1 R0) - 1)) argument at r=R0*1.1: up to 1.17e-06 absolute

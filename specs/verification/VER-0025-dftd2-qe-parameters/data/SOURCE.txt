@@ -1,0 +1,13 @@
+QE tag qe-7.2 (commit b4c5e8deeb7d1863e7553a87b45f8d22c21926a5; tag object deec76b2...) from /home/katouda/build/q-e, read with git show, repo untouched
+pars.f90 sha256 9ef52f3a9cf1903b06d5dc2167f499f109cdea19fe19f23e769541b4657041e2
+core.f90 sha256 bc7ae59463cd56b48e095674522b64f924df1159cf500373c5d239a4a8dce0c8
+common.f90 sha256 8916be3d65d0a89fad628bd1ef382af17893d0f8e67803c7e3629431dbc53230
+api.f90 sha256 33dc920b52e37218ddecb14b87ea72d466375ef1704d8e00cb7ae832b3a76c7d
+QE development HEAD c7587f9fedd7d3ac3e4b54a1ce7310ca555aba89 (7.6-515)
+HEAD pars.f90 sha256 9ef52f3a9cf1903b06d5dc2167f499f109cdea19fe19f23e769541b4657041e2
+HEAD core.f90 sha256 0343bb0e2af7d1ba56b4ba7e64ede71ebdb85c48ebf724c3a09bdd7d62cdb36e
+HEAD common.f90 sha256 3c86e0c25957f99c3feec79c9e6533415ba284c3263b55e2f17d16162f8a7abe
+HEAD api.f90 sha256 df726e8fe70d96272ab528af8bdb1424251c6421ad6798d69694a2f103d838b6
+d2_reference.py (request, unmodified copy in scripts/) sha256 2c0351f03180fcb1a1b23af5ab38d7991877aff7114fb4efd4d328c9024ca4e1
+pseudopotentials (stage 3): 1c674ec4fe19ee85db53e6b9ecf7cd40e70eda362cedd83f7c51c9c4081ea064  /home/katouda/bin/qe/ps/sg15_oncv/C_ONCV_PBE-1.2.upf
+                            c896fba787ae0302b67683e27bf2d174b29bc494686178599eeeceb6868138b5  /home/katouda/bin/qe/ps/sg15_oncv/F_ONCV_PBE-1.2.upf

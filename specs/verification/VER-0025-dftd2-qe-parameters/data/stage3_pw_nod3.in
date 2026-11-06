@@ -1,0 +1,23 @@
+&control
+  calculation='scf', prefix='cf4', outdir='./tmp_no', pseudo_dir='/home/katouda/bin/qe/ps/sg15_oncv', tprnfor=.true., tstress=.true.
+/
+&system
+  ibrav=0, nat=5, ntyp=2, ecutwfc=40.0, input_dft='pbe'
+/
+&electrons
+  conv_thr=1.0d-12, mixing_beta=0.5
+/
+ATOMIC_SPECIES
+C 12.011 C_ONCV_PBE-1.2.upf
+F 18.998 F_ONCV_PBE-1.2.upf
+CELL_PARAMETERS angstrom
+9.0000000000 0.0000000000 0.0000000000
+0.9000000000 8.6000000000 0.0000000000
+-0.7000000000 0.5000000000 9.3000000000
+ATOMIC_POSITIONS angstrom
+C 4.5000000000 4.3000000000 4.6500000000
+F 5.6000000000 5.1000000000 5.3000000000
+F 3.4500000000 5.2000000000 4.1000000000
+F 3.9000000000 3.1500000000 5.5500000000
+F 5.1500000000 3.6000000000 3.9000000000
+K_POINTS gamma

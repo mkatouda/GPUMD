@@ -1,0 +1,9 @@
+C-C: C6 49.113 Eh bohr^6 (request 49.113), r0ab 2.9103 A (request 2.9103), 1.1*r0ab 3.201330 A (request 3.2013) -> OK
+C-F: C6 20.2827 Eh bohr^6 (request 20.2827), r0ab 2.4770 A (request 2.477), 1.1*r0ab 2.724700 A (request 2.7247) -> OK
+F-F: C6 9.6916 Eh bohr^6 (request 9.6916), r0ab 2.2996 A (request 2.2996), 1.1*r0ab 2.529560 A (request 2.5296) -> OK
+STAGE 2 pair values gate: PASS
+QE 7.2 AUTOEV = HARTREE_SI/ELECTRONVOLT_SI = 27.211386245988 (d2_reference.py 27.211386245988); rel diff 1.33e-15
+Hartree*Bohr^6 [eV A^6 per Eh bohr^6]: CODATA2018 (d2_reference.py, QE 7.2 constants.f90) 0.597526904282; GPUMD HartreeBohr6 0.597527426644; rel diff (GPUMD/ref - 1) = +8.742e-07
+GPUMD Bohr 0.5291772575069165 vs CODATA2018 0.529177210903: rel +8.807e-08; (ratio)^6 - 1 = +5.284e-07
+  GPUMD HartreeBohr6 if recomputed from its own Bohr and CODATA Hartree: 0.597527220023 (rel to ref +5.284e-07); float32 rounding of the literal: +2.97e-08
+QE dft-d3 autoang 0.52917720859 vs BOHR_RADIUS_SI 0.529177210903: effective R0 (A) = r0ab * 1.000000004371 (rel +4.37e-09); effect on d2_reference.py (decimal r0ab, no such factor): argument of the exponential up to 20*4.37e-09 = 8.7e-08
