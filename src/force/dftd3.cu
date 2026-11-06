@@ -2010,7 +2010,9 @@ void DFTD3::initialize(
   std::cout << "        coordination number cutoff = " << rc_coordination_number << " Angstrom"
             << std::endl;
   std::cout << "        functional = " << functional << std::endl;
-  std::cout << "        damping = " << (zero_damping ? "zero (D3(0))" : "bj") << std::endl;
+  if (zero_damping) { // BJ output stays unchanged (ADR-0003 item 4)
+    std::cout << "        damping = zero (D3(0))" << std::endl;
+  }
   std::cout << "            s6 = " << dftd3_para.s6 << std::endl;
   std::cout << "            s8 = " << dftd3_para.s8 << std::endl;
   if (zero_damping) {

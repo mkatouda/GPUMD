@@ -163,11 +163,15 @@ def test_zero_syntax_accepted(tmp_path, water):
 @fast_model
 @pytest.mark.parametrize('damping', ['zero', 'bj'])
 def test_header_names_the_damping(damping, tmp_path, water):
-    """ADR-0003 item 4: the printed header gains a damping line (existing lines keep their text)."""
+    """ADR-0003 item 4 (revised 2026-11-06): zero damping adds a damping line to the printed header;
+    the BJ header (4 tokens or explicit `bj`) is unchanged, i.e. has no damping line."""
     result = run_input(tmp_path, water, f'dftd3 pbe 12 6 {damping}')
     assert result.returncode == 0, combined_output(result)[-1000:]
     block = result.stdout.split('Add DFT-D3:')[1].split('\n\n')[0].lower()
-    assert 'damping' in block and damping in block, block
+    if damping == 'zero':
+        assert 'damping = zero' in block, block
+    else:
+        assert 'damping' not in block, block
 
 
 @fast_model
