@@ -154,6 +154,17 @@ $$
 
 $C_6$ は eV Å$^6$、$R_0$ は Å です。元素ごとの $C_6^i$, $R_0^i$ は内蔵表（$Z \le 86$、H から Rn）から読みます [`dftd2para.cuh`、`initialize` D2:659-662]。**$s_6$ は表に含まれず、ユーザーが `dftd2` の第1引数で直接与えます**。$d = 20$ は定数 `D_DAMP` [D2:57] です。
 
+### `table qe` と `trunc plain`（DR-004、ADR-0004）
+
+`table qe`（Quantum ESPRESSO 7.2 の `dftd3_version = 2`）では、上の $C_6^{ij}$, $R_0^{ij}$ の代わりに
+$C_6^{ij} = C_6^{\mathrm{D3}}(Z_i, Z_j;\ \text{両原子の最初の参照点})$、$R_0^{ij} = 1.1\, r_0^{\mathrm{D3},ij}$
+を使います（$d = 20$、式の形は同じ）。QE の `pars.f90`（C6）と `core.f90`（`setr0ab`、`r0ab`）の
+タグ `qe-7.2`（コミット `b4c5e8de`）から `tools/dftd2_qe_table/generate_dftd2qe_table.py` で
+`src/force/dftd2qe_table.cuh`（倍精度、Z ≤ 86）を生成します。C6 は $E_h a_0^6$ の値に、QE 7.2 の CODATA 2018
+定数（$a_0$ = 0.529177210903 Å、$E_h$ = 27.211386245988 eV）をホストの倍精度で掛けて eV Å$^6$ にします
+（float の `dftd3para.cuh` の定数は使いません。相対で 8.7×10⁻⁷ ずれるためです。VER-0025）。
+`trunc plain` は $\phi(r_c) = \phi'(r_c) = 0$ とするだけで、カーネルは同じです。
+
 ### シフト付き力の打ち切り
 
 距離がカットオフ $r_c$ 未満のペアについて、エネルギーと力が $r_c$ で連続に 0 となるよう、

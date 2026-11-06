@@ -71,13 +71,14 @@ void NEP::initialize_dftd2(const RunInput& run_input)
 {
   has_dftd2 = false;
   double s6, rc;
-  if (DFTD2::find_in_run_input(run_input, s6, rc)) {
+  DFTD2::Options dftd2_options;
+  if (DFTD2::find_in_run_input(run_input, s6, rc, dftd2_options)) {
     has_dftd2 = true;
     std::vector<int> atomic_numbers(paramb.num_types);
     for (int n = 0; n < paramb.num_types; ++n) {
       atomic_numbers[n] = zbl.atomic_numbers[n];
     }
-    dftd2.initialize(s6, rc, atomic_numbers);
+    dftd2.initialize(s6, rc, dftd2_options, atomic_numbers);
   }
 }
 

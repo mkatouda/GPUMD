@@ -376,7 +376,8 @@ void Run::parse_one_keyword(
       PRINT_INPUT_ERROR("dftd2 and dftd3 cannot be used together; use only one of them.");
     }
     double dftd2_s6, dftd2_rc;
-    DFTD2::parse_tokens(tokens, dftd2_s6, dftd2_rc);
+    DFTD2::Options dftd2_options;
+    DFTD2::parse_tokens(tokens, dftd2_s6, dftd2_rc, dftd2_options);
     has_seen_dftd2_command = true;
     if (force.has_any_potential()) {
       check_dftd2_potential();

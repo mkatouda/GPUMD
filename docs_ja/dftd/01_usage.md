@@ -6,7 +6,7 @@
 
 ```
 dftd3 <functional> <potential_cutoff> <coordination_number_cutoff> [zero|bj]
-dftd2 <s6> [<cutoff>]
+dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 ```
 
 どちらのキーワードも `run.in` の**任意の位置**に書けます（`run` の後ろでも読まれます）。ポテンシャルの生成時に `run.in` の全行が走査されるためです [コード: `nep.cu` のコンストラクタ、`DFTD2::find_in_run_input`。回帰テスト `dftd3_single_late` が `run 1` の後ろに `dftd3 pbe 4 3` を置く場合を確認]。
@@ -31,7 +31,13 @@ dftd2 <s6> [<cutoff>]
 | `s6` | 大域的スケーリング係数 | なし | なし（必須） | 正の有限値でなければエラー |
 | `cutoff` | カットオフ半径 | Å | 30 Å（`DFTD2::DEFAULT_CUTOFF`）[`dftd2.cuh:30`] | 正の有限値でなければエラー。200 Å を超えると警告のみ |
 
-- トークン数は 2 または 3 です。
+- 第 2 引数が数値ならカットオフとして読みます（カットオフは `s6` の直後にだけ置けます）。
+- 続けて任意のオプション `table`（`grimme2006` または `qe`）と `trunc`（`sf` または `plain`）を、キーワードと値の組として任意の順序で、それぞれ高々 1 回書けます。値は小文字だけです（大文字はエラー）。
+- 既定は `table grimme2006`、`trunc sf` で、オプションなしの入力の結果と画面出力は従来と同一です（ビット一致をテストしています）。
+- `table qe` または `trunc plain` を使うときは、カットオフを**明示**しなければエラーです（ラベル生成時のカットオフと一致させるため。既定の 30 Å は Grimme 表とシフト付き力の収束調べのための値です）。
+- `table qe` は Quantum ESPRESSO 7.2（`dftd3_version = 2`）のパラメータです。これは Grimme 2006 の表ではなく、**D2 の式に D3 の表を使うもの**（C6 は両原子の最初の D3 参照点の C6、R0 = 1.1 × D3 の `r0ab`）です。Z ≤ 86 のみ対応し、構造に Z ≥ 87 の元素があると、その元素名を示してエラーになります（最初の力評価時）。
+- `trunc plain` はシフトなしの打ち切り（QE と同じ）で、カットオフを越えるペアごとにエネルギーが約 7×10⁻⁶ eV（C-C、12 Å、`table qe`、s6 = 0.75）だけ跳びます。NVE では全エネルギーが小さな段差を持ち、ゆっくりドリフトします。
+- ラベル生成（例えば QE の計算）と MD で、テーブルと打ち切りの設定を記録し、一致させることを推奨します。
 - 汎関数表はありません。`s6` はユーザーが直接指定します。PBE 用の Grimme の値は 0.75 ですが、他の値の選択はユーザーの責任です [dftd2.rst Limitations]。
 - 単位：エネルギーは eV、力は eV/Å、ビリアルは eV です [dftd2.rst Model]。
 
@@ -133,6 +139,8 @@ D2（`D2:674`）：
 Use the DFT-D2 correction (s6 = <値>, shifted-force cutoff = <値> A).
 ```
 
+`trunc plain` のときは `shifted-force cutoff` が `cutoff` になります。既定値でないオプションがあるときだけ、続けて `    table = qe (...)` と `    trunc = plain (...)` の行が出ます（既定値の入力の出力は従来と同一）。
+
 カットオフ値は float に丸めた後の値です。`dftd2` のカットオフが 200 Å を超えると、次の警告も出ます。
 
 ```
@@ -160,7 +168,11 @@ Warning: the dftd2 cutoff (<値> A) is larger than 200 A; the cost grows as the 
 | `dftd3 and dftd2 cannot be used together; use only one of them.` | 標準エラー | `dftd3` と `dftd2` を併用（`dftd3` が `dftd2` の後） | どちらか一つにする |
 | `dftd2 can only appear once.` | 標準エラー | `dftd2` が 2 回以上 | 1 行にする |
 | `dftd2 and dftd3 cannot be used together; use only one of them.` | 標準エラー | `dftd2` と `dftd3` を併用（`dftd2` が `dftd3` の後、またはどこかに `dftd3` がある） | どちらか一つにする |
-| `dftd2 requires 1 or 2 parameters: dftd2 <s6> [<cutoff in Angstrom>].` | 標準エラー | `dftd2` 行のトークン数が 2 または 3 でない | `dftd2 <s6> [<cutoff>]` にする |
+| `dftd2 requires at least 1 parameter: dftd2 <s6> [<cutoff in Angstrom>] [table grimme2006\|qe] [trunc sf\|plain].` | 標準エラー | `s6` が無い | `dftd2 <s6> ...` にする |
+| `dftd2: the option '<table/trunc>' can only be given once.` / `... needs a value (...)` | 標準エラー | オプションの重複、値の欠落 | 1 回だけ、値付きで書く |
+| `dftd2: unknown table '<値>'; ...` / `dftd2: unknown truncation '<値>'; ...` | 標準エラー | `table` は `grimme2006\|qe`、`trunc` は `sf\|plain`（小文字）以外 | 有効な値にする |
+| `dftd2: unexpected number '<値>'; the cutoff, if given, must come directly after s6 ...` / `dftd2: unknown token '<値>'; ...` | 標準エラー | オプションの後ろの数値、未知のトークン | 構文に従う |
+| `dftd2: the cutoff must be given explicitly with 'table qe' or 'trunc plain' ...` | 標準エラー | `table qe` / `trunc plain` でカットオフ無し | カットオフを明示する |
 | `dftd2: s6 must be a positive number.` | 標準エラー | `s6` ≤ 0、NaN、無限大 | 正の値を指定する |
 | `dftd2: cutoff must be a positive number (Angstrom).` | 標準エラー | カットオフ ≤ 0、NaN、無限大 | 正の値を Å で指定する |
 | `dftd2 is only supported for NEP potentials (nep4*, nep4_charge*, nep_vdw, qnep3_vdw); the potential used here is not supported.` | 標準エラー | NEP 系以外のポテンシャル、または `potential` が無い | NEP 系のポテンシャルを使う。`dftd2` 行を外す |
@@ -168,7 +180,7 @@ Warning: the dftd2 cutoff (<値> A) is larger than 200 A; the cost grows as the 
 | `dftd3 has not been implemented for multi-GPU version.` | 標準エラー | 複数 GPU 版の NEP と `dftd3` | 同上 |
 | `The dftd3 command is not supported for vdW NEP models.` | 標準エラー | `nep_vdw`/`qnep3_vdw` と `dftd3` | `dftd3` を外す（`dftd2` は使える。二重計上に注意） |
 | `dftd2: atom type out of range.` | 標準エラー | 原子型がモデルの型数の範囲外（最初の評価時） | `model.xyz` の型とポテンシャルの元素リストを確認する |
-| `dftd2 has no parameters for element(s): <元素名 (Z=n)> ... . The built-in DFT-D2 table covers Z <= 86 (H-Rn) only.`（元素が認識不能の場合は `(unrecognized element)` のみ） | 標準エラー | 構造に実在する原子の Z が 1 未満または 86 超（最初の力評価時に一度だけ検査） | その元素を含まない構造にするか、`dftd3` を使う |
+| `dftd2 has no parameters for element(s): <元素名 (Z=n)> ... . The built-in DFT-D2 table covers Z <= 86 (H-Rn) only.`（`table qe` のときは末尾が `The 'table qe' parameters cover Z <= 86 (H-Rn) only.`。元素が認識不能の場合は `(unrecognized element)` のみ） | 標準エラー | 構造に実在する原子の Z が 1 未満または 86 超（最初の力評価時に一度だけ検査） | その元素を含まない構造にするか、`dftd3` を使う |
 
 補足：
 
@@ -203,6 +215,12 @@ dftd2       0.75 15
 ```
 
 `s6` = 0.75、カットオフ 15 Å（既定値は 30 Å）です。値は説明用です [examples の README]。
+
+QE `dftd3_version = 2` と同じ D2（D3 の表、ハードカットオフ）の例は `examples/gpumd_dftd2/run_qe.in` です。
+
+```
+dftd2       0.75 12 table qe trunc plain
+```
 
 ### 作業用ディレクトリで実行する
 

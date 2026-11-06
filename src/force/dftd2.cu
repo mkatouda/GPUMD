@@ -38,6 +38,7 @@ double vector once (about 6e-8 * r); e.g. r = 3 A and width = 12 A: about 5 time
 
 #include "dftd2.cuh"
 #include "dftd2para.cuh"
+#include "dftd2qe_table.cuh"
 #include "model/box.cuh"
 #include "utilities/common.cuh"
 #include "utilities/error.cuh"
@@ -55,6 +56,17 @@ double vector once (about 6e-8 * r); e.g. r = 3 A and width = 12 A: about 5 time
 namespace
 {
 constexpr double D_DAMP = 20.0;
+// Constants of the `table qe` pair parameters (Quantum ESPRESSO 7.2, dft-d3 with dftd3_version = 2).
+// Modules/constants.f90 (CODATA 2018): BOHR_RADIUS_SI, HARTREE_SI, ELECTRONVOLT_SI;
+// AUTOEV = HARTREE_SI / ELECTRONVOLT_SI = 27.211386245988. C6 [eV A^6] = C6 [Eh bohr^6] * AUTOEV *
+// BOHR^6 with BOHR in Angstrom. R0 = 1.1 * r0ab [A] (QE divides r0ab by autoang and multiplies it
+// back by the Bohr radius: the relative difference is 4.4e-9 and is neglected).
+constexpr double QE_BOHR_RADIUS_SI = 0.529177210903e-10;
+constexpr double QE_HARTREE_SI = 4.3597447222071e-18;
+constexpr double QE_ELECTRONVOLT_SI = 1.602176634e-19;
+constexpr double QE_BOHR_A = QE_BOHR_RADIUS_SI * 1.0e10;
+constexpr double QE_AUTOEV = QE_HARTREE_SI / QE_ELECTRONVOLT_SI;
+constexpr double QE_RS6 = 1.1;
 // a warning is printed for cutoffs above this value (Angstrom)
 constexpr double WARN_CUTOFF = 200.0;
 constexpr int BLOCK_SIZE = 128;
@@ -578,25 +590,99 @@ void ensure_size(GPU_Vector<T>& v, const size_t n)
 }
 } // namespace
 
-void DFTD2::parse_tokens(const std::vector<std::string>& tokens, double& s6, double& rc)
+namespace
 {
-  if (tokens.size() != 2 && tokens.size() != 3) {
-    PRINT_INPUT_ERROR("dftd2 requires 1 or 2 parameters: dftd2 <s6> [<cutoff in Angstrom>].");
+// true if the whole token is a number (the cutoff is recognised only as such)
+bool is_number(const std::string& token)
+{
+  char* end = nullptr;
+  std::strtod(token.c_str(), &end);
+  return !token.empty() && end != token.c_str() && *end == '\0';
+}
+} // namespace
+
+void DFTD2::parse_tokens(
+  const std::vector<std::string>& tokens, double& s6, double& rc, Options& options)
+{
+  if (tokens.size() < 2) {
+    PRINT_INPUT_ERROR(
+      "dftd2 requires at least 1 parameter: dftd2 <s6> [<cutoff in Angstrom>] "
+      "[table grimme2006|qe] [trunc sf|plain].");
   }
   s6 = get_double_from_token(tokens[1], __FILE__, __LINE__);
   if (!(s6 > 0.0) || !std::isfinite(s6)) {
     PRINT_INPUT_ERROR("dftd2: s6 must be a positive number.");
   }
   rc = DEFAULT_CUTOFF;
-  if (tokens.size() == 3) {
-    rc = get_double_from_token(tokens[2], __FILE__, __LINE__);
+  options = Options();
+  size_t next = 2;
+  bool has_cutoff = false;
+  if (next < tokens.size() && is_number(tokens[next])) {
+    rc = get_double_from_token(tokens[next], __FILE__, __LINE__);
     if (!(rc > 0.0) || !std::isfinite(rc)) {
       PRINT_INPUT_ERROR("dftd2: cutoff must be a positive number (Angstrom).");
     }
+    has_cutoff = true;
+    ++next;
+  }
+  bool has_table = false;
+  bool has_trunc = false;
+  while (next < tokens.size()) {
+    const std::string& key = tokens[next];
+    if (key == "table" || key == "trunc") {
+      const bool is_table = (key == "table");
+      const char* const valid = is_table ? "grimme2006 or qe" : "sf or plain";
+      if (is_table ? has_table : has_trunc) {
+        PRINT_INPUT_ERROR(("dftd2: the option '" + key + "' can only be given once.").c_str());
+      }
+      if (next + 1 >= tokens.size()) {
+        PRINT_INPUT_ERROR(
+          ("dftd2: the option '" + key + "' needs a value (" + valid + ").").c_str());
+      }
+      const std::string& value = tokens[next + 1];
+      if (is_table) {
+        if (value != "grimme2006" && value != "qe") {
+          PRINT_INPUT_ERROR(
+            ("dftd2: unknown table '" + value + "'; the valid values of 'table' are " + valid +
+             " (lower case).")
+              .c_str());
+        }
+        options.table_qe = (value == "qe");
+        has_table = true;
+      } else {
+        if (value != "sf" && value != "plain") {
+          PRINT_INPUT_ERROR(
+            ("dftd2: unknown truncation '" + value + "'; the valid values of 'trunc' are " + valid +
+             " (lower case).")
+              .c_str());
+        }
+        options.trunc_plain = (value == "plain");
+        has_trunc = true;
+      }
+      next += 2;
+    } else if (is_number(key)) {
+      PRINT_INPUT_ERROR(
+        ("dftd2: unexpected number '" + key +
+         "'; the cutoff, if given, must come directly after s6 and before the options "
+         "'table' and 'trunc'.")
+          .c_str());
+    } else {
+      PRINT_INPUT_ERROR(
+        ("dftd2: unknown token '" + key +
+         "'; the valid options are 'table grimme2006|qe' and 'trunc sf|plain'.")
+          .c_str());
+    }
+  }
+  if ((options.table_qe || options.trunc_plain) && !has_cutoff) {
+    PRINT_INPUT_ERROR(
+      "dftd2: the cutoff must be given explicitly with 'table qe' or 'trunc plain' "
+      "(dftd2 <s6> <cutoff> ...), so that it matches the cutoff used to generate the reference "
+      "data.");
   }
 }
 
-bool DFTD2::find_in_run_input(const RunInput& run_input, double& s6, double& rc)
+bool DFTD2::find_in_run_input(
+  const RunInput& run_input, double& s6, double& rc, Options& options)
 {
   bool found = false;
   for (const auto& line : run_input.lines()) {
@@ -604,7 +690,7 @@ bool DFTD2::find_in_run_input(const RunInput& run_input, double& s6, double& rc)
       if (found) {
         PRINT_INPUT_ERROR("dftd2 can only appear once.");
       }
-      parse_tokens(line.tokens, s6, rc);
+      parse_tokens(line.tokens, s6, rc, options);
       found = true;
     }
   }
@@ -615,10 +701,14 @@ bool DFTD2::find_in_run_input(const RunInput& run_input, double& s6, double& rc)
 }
 
 void DFTD2::initialize(
-  const double s6_in, const double rc_in, const std::vector<int>& atomic_numbers)
+  const double s6_in,
+  const double rc_in,
+  const Options& options_in,
+  const std::vector<int>& atomic_numbers)
 {
   enabled = true;
   s6 = s6_in;
+  options = options_in;
   // The device code uses single-precision distances, so the cutoff is rounded to float once here;
   // the shift terms phi(rc), phi'(rc), the cutoff test and the cell search all use this same value.
   rc = static_cast<double>(static_cast<float>(rc_in));
@@ -656,10 +746,22 @@ void DFTD2::initialize(
         // NaN makes any accidental use visible
         p.x = p.y = p.z = p.w = std::nanf("");
       } else {
-        const double s6c6 = s6 * std::sqrt(DFTD2_C6_EV_A6[za] * DFTD2_C6_EV_A6[zb]);
-        const double R0 = DFTD2_R0_A[za] + DFTD2_R0_A[zb];
-        double phic, dphic;
-        phi_dphi(rc, s6c6, R0, phic, dphic);
+        double s6c6, R0;
+        if (options.table_qe) {
+          // C6 of the first reference point of both atoms, R0 = rs6 * r0ab (0-based Z in the table)
+          const int zs = std::min(za, zb) - 1;
+          const int zl = std::max(za, zb) - 1;
+          const int idx = zl * (zl + 1) / 2 + zs;
+          s6c6 = s6 * DFTD2QE_C6_EH_BOHR6[idx] * QE_AUTOEV * std::pow(QE_BOHR_A, 6);
+          R0 = QE_RS6 * DFTD2QE_R0AB_A[idx];
+        } else {
+          s6c6 = s6 * std::sqrt(DFTD2_C6_EV_A6[za] * DFTD2_C6_EV_A6[zb]);
+          R0 = DFTD2_R0_A[za] + DFTD2_R0_A[zb];
+        }
+        double phic = 0.0, dphic = 0.0;
+        if (!options.trunc_plain) {
+          phi_dphi(rc, s6c6, R0, phic, dphic);
+        }
         p.x = static_cast<float>(s6c6);
         p.y = static_cast<float>(R0);
         p.z = static_cast<float>(phic);
@@ -671,7 +773,17 @@ void DFTD2::initialize(
   pair_param_.resize(table.size());
   pair_param_.copy_from_host(table.data());
 
-  printf("Use the DFT-D2 correction (s6 = %g, shifted-force cutoff = %g A).\n", s6, rc);
+  if (options.trunc_plain) {
+    printf("Use the DFT-D2 correction (s6 = %g, cutoff = %g A).\n", s6, rc);
+  } else {
+    printf("Use the DFT-D2 correction (s6 = %g, shifted-force cutoff = %g A).\n", s6, rc);
+  }
+  if (options.table_qe) {
+    printf("    table = qe (C6 of the first DFT-D3 reference point, R0 = 1.1 r0ab).\n");
+  }
+  if (options.trunc_plain) {
+    printf("    trunc = plain (hard cutoff, no shifted-force terms).\n");
+  }
   if (rc > WARN_CUTOFF) {
     printf(
       "Warning: the dftd2 cutoff (%g A) is larger than %g A; the cost grows as the cube of the "
@@ -706,7 +818,8 @@ void DFTD2::check_elements(const GPU_Vector<int>& type)
         msg += " (Z=" + std::to_string(z) + ")";
       }
     }
-    msg += ". The built-in DFT-D2 table covers Z <= 86 (H-Rn) only.";
+    msg += options.table_qe ? ". The 'table qe' parameters cover Z <= 86 (H-Rn) only."
+                            : ". The built-in DFT-D2 table covers Z <= 86 (H-Rn) only.";
     PRINT_INPUT_ERROR(msg.c_str());
   }
   elements_checked_ = true;
