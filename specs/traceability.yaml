@@ -30,10 +30,10 @@ requirements:
     title: dftd2 QE-compatible table, plain cutoff and speed-up
     source: specs/requirements/DR-004-dftd2-qe-compat.md
     design: specs/design/DES-0004-dftd2-qe-compat-plan.md
-    adrs: [specs/decisions/ADR-0004-dftd2-table-trunc-keyword.md]   # Accepted 2026-11-06
-    verification: []
-    tests: []   # waits for DR-003 to be merged into develop (human decision 2026-11-06)
-    status: planned
+    adrs: [specs/decisions/ADR-0004-dftd2-table-trunc-keyword.md, specs/decisions/ADR-0005-dftd2-numerics.md]
+    verification: [specs/verification/VER-0025-dftd2-qe-parameters, specs/verification/VER-0026-dftd2-qe-compat]
+    tests: [tests_pytest/test_dftd2_qe.py, tests_pytest/test_dftd2_qe_extended.py]   # R1, R2, R4 implemented and verified (VER-0026): AC-1, 2 (R1/R2), 3, 4, 5, 6, 8 met; full regression = 37 known + 4 unrelated; pytest 1075 passed. R3 stage 1 gate met (float accumulators -83% kernel time, VER-0026 sec. 4); R3 stage 2 (accurate float accumulation, ADR-0005) in progress: AC-7 (performance, informative) open. Open: manifest cases (runner design conflict); A100 timing by the requester; QE 7.2 binary never run (verification against the requester's 7.2 data and QE 7.6-dev only)
+    status: partial
 # Example entry:
 # - id: DR-001
 #   title: Short requirement title
