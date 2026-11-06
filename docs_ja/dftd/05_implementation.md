@@ -227,7 +227,7 @@ L_ab = exp(-4 (CN_1 − CNref_1[a])²  − 4 (CN_2 − CNref_2[b])²)
 
 小箱の最適化の前は、float の項を double の `atomicAdd` で加えていました。float 累積への変更は丸めレベルの変更で、AC-1 の許容値内であることを確認しています（最大の変化は graphite の dE：3.94e-6 → 4.63e-6、許容値は 7.88e-6 [VER-0013]）。
 
-D2 は逆で、ペアの項は float、**累積は double** です（`D2:383-385, 436-470`）。
+D2 は、DR-004 の R3（2026-11-06、ADR-0005）の前は逆で、ペアの項は float、**累積は double** でした（`D2:383-385, 436-470`、以下の行番号はこの変更前のもの）。R3 以降は、ペアの項は float のまま、累積を **TwoSum で補償した float の和**にし、4 セルごとに double の累積へ足します（`CompensatedSum`、`PairSums`、`FLUSH_CELLS = 4`。サブスレッドの縮約は double のまま、atomic なし）。FP64 が FP32 の 1/64 の GPU で、カーネル時間が約 78 % 減りました（VER-0026 §4、R3 の Stage 2 の記録）。
 
 ### W < 1e-30 の fallback（upstream 由来の挙動）
 
@@ -401,7 +401,7 @@ cost          = N * cells_visited / num_cells  +  3.0 * cells_visited
 | 位置 | 全体では double の配列。D3 の小箱の近傍リストは中心原子の位置を float に丸める（`const float x1 = g_x[n1]`、`D3:302-304`）。相手の位置は double のまま変位を作って float に落とす。D3 の大箱は、double の座標差を作ってから float にする（`D3:968-970`） | コード読解。**影響の大きさは評価していません**（AC-1 の許容値は参照テストで満たされている） |
 | D3 のペア演算 | float。累積も float、最後に double 配列へ 1 回加算 | 5.4 節 |
 | カットオフ判定 | float の距離² を `rc²` と比較（D3、D2）。**境界（r ≈ rc）では、2 つの原子の一方からだけ受理されることがあり**、その場合ニュートンの第 3 法則の相手の力が付かない。力のオーダーはカットオフでの力 | VER-0013 Round-off |
-| D2 のペア演算 | float。累積は double。`rc` は float に丸めた値で統一 | 5.6 節 |
+| D2 のペア演算 | float。累積は補償付き float（4 セルごとに double へ足す。R3 以降。以前は double）。`rc` は float に丸めた値で統一 | 5.6 節 |
 | D2 のシフト項 | `φ(rc)`、`φ'(rc)` を double で求め、float に格納 | `D2:659-666` |
 | 定数 `HartreeBohr6` | `0.597527426643772f`。CODATA 2018 から求めた値より相対 +8.7×10⁻⁷ 大きい（出典はコードに明記されていない）。AC-1 の限界 2×10⁻⁶ の約 44% を、これだけで使う | UPSTREAM-0002 B |
 | 極端な CN | float の重みのアンダーフロー（5.4 節）。`dftd3` の参照実装と異なる C6 を選ぶ | UPSTREAM-0001 |

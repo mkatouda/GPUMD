@@ -6,7 +6,8 @@
 | `ptfe_cryst157_{vol000,volm05,volm10,volm15}.xyz` | 4 PTFE crystal structures (45 atoms, C/F, triclinic cell 5.69 x 4.92 x 19.7 A at vol000; volumes -5 / -10 / -15 %) | requester |
 | `ref_cryst157_<vol>_{qe,grimme2006}_{plain,sf}_rc12.xyz` | reference energy, forces, virial (s6 = 0.75, rc = 12 A), 16 files | `d2_reference.py` (run by the requester) |
 | `summary_rc12.csv` | energy per atom, max force, virial trace/3 of the 16 reference cases | requester |
-| `default_frozen.json`, `generate_default_frozen.py` | output of the PRE-CHANGE binary for `dftd2 0.75` and `dftd2 0.75 12` (bitwise reference for AC-2) | `generate_default_frozen.py` |
+| `default_frozen.json`, `generate_default_frozen.py` | output of the R3 binary (compensated float accumulation, ADR-0005) for `dftd2 0.75` and `dftd2 0.75 12` (bitwise run-to-run reference for AC-2); regenerated once, 2026-11-06 | `generate_default_frozen.py` |
+| `default_frozen_pre_r3.json` | the same for the PRE-CHANGE binary (develop `af269060`, double accumulation); reference of the AC-1-level tolerance comparison of the R3 change (`test_default_form_matches_pre_r3_frozen_output_within_ac1_caps`) | `generate_default_frozen.py` (earlier generation, byte-identical copy of the former `default_frozen.json`) |
 | `water27.xyz`, `graphite.xyz`, `water27_tri.xyz`, `benzene_dimer.xyz`, `tiny24.xyz` | structures of the frozen cases (copies of `../dftd3/` and `../dftd3_zero/`, so that this directory is self-contained) | copies |
 | `zero_nep_H_C_O_Cu.txt` | all-zero NEP (copy of `../dftd3_zero/`): a run gives the D2 contribution alone, bit-reproducible | copy |
 
@@ -32,18 +33,19 @@ energy 2e-6 |E_ref|; virial 2e-6 max|W_ref|; force 1e-5 max|F_ref|. The D2 part 
 on NEP89 (the NEP part cancels). `grimme2006/sf` (the unchanged default path) is the harness check of the
 comparison conventions: it must pass on the pre-change binary.
 
-## Default-path bit identity (`default_frozen.json`)
-- Content: dump.xyz lines 2.. (`precision double`: energy, virial, species, positions, forces) of a static run with the all-zero
+## Default-path frozen outputs (`default_frozen.json`, `default_frozen_pre_r3.json`)
+- Content (both files): dump.xyz lines 2.. (`precision double`: energy, virial, species, positions, forces) of a static run with the all-zero
   NEP and `dftd2 0.75` / `dftd2 0.75 12`, plus the stdout lines containing "DFT-D2", for 5 structures
   (small boxes: water27 9.3 A cubic, graphite, water27_tri; non-periodic benzene_dimer and tiny24, a 40 A box,
   for the large-box path). The `stress="..."` field is removed (varies run to run with the zero potential).
-- Binary: develop `af269060`, `src/force/dftd2.cu` unmodified (sha256 recorded in the JSON), `-arch=sm_86`, CUDA 12.3,
-  RTX A6000. Each run was repeated 3 times (separate processes) and was bit-identical; a second complete
-  generation produced a byte-identical JSON. The D2 kernels use no atomics, so the output is deterministic
-  (unlike the DR-003 BJ case, no single-warp restriction was necessary).
-- If the test fails only on another GPU / CUDA version, regenerate with the unchanged pre-change binary on that
-  machine, never with the new binary.
-- Regeneration: `python generate_default_frozen.py <pre-change gpumd> <source description> <sha256 of dftd2.cu>`.
+- `default_frozen_pre_r3.json`: binary develop `af269060`, `src/force/dftd2.cu` unmodified (sha256 recorded in the JSON), `-arch=sm_86`,
+  CUDA 12.3, RTX A6000; valid bitwise reference for the R1/R2 change (DR-004 AC-2, VER-0026). Each run was repeated 3 times and was bit-identical.
+  Since the R3 change it is used only by the tolerance comparison (energy and virial 2e-6, force 1e-5 relative, DR-002 AC-1 caps).
+- `default_frozen.json`: regenerated ONCE on 2026-11-06 with the R3 binary (compensated float accumulation of the per-thread partial sums,
+  ADR-0005 item 5; reason: the accumulation precision changes the last digits of every `dftd2` result). Human decision of the same date;
+  not a precedent. The bitwise tests of the default form now compare run-to-run against this file. The D2 kernels use no atomics.
+- If a bitwise test fails only on another GPU / CUDA version, check run-to-run reproducibility first; never regenerate to make a test pass.
+- Regeneration tool: `python generate_default_frozen.py <gpumd> <source description> <sha256 of dftd2.cu> [pre-change|r3]`.
 
 ## Finite-difference systems
 Sparse C/F cells (3 atoms triclinic, periodic; 6 atoms open) built deterministically in the test; rc is placed in a gap

@@ -1,9 +1,12 @@
-"""Freeze the output of the PRE-CHANGE binary for the default-path compatibility test (DR-004 AC-2).
+"""Freeze the output of a gpumd binary for the default-path tests (DR-004 AC-2; ADR-0005 item 5).
 
-Writes default_frozen.json next to this file. Run it ONCE, with a gpumd binary built from the
-unmodified develop HEAD (before any `table`/`trunc` change; the commit is recorded):
+Writes default_frozen.json next to this file. Two generations exist:
+  1. `pre-change` (develop af269060, double accumulation): now kept as default_frozen_pre_r3.json
+     and used by the tolerance comparison of the R3 change (not regenerated).
+  2. `r3` (R3 binary, compensated float accumulation): default_frozen.json, regenerated ONCE on
+     2026-11-06 (ADR-0005 item 5: the accumulation precision changes the last digits); not a precedent.
 
-    python generate_default_frozen.py <path/to/pre-change/gpumd> <source-description> <dftd2.cu-sha256>
+    python generate_default_frozen.py <path/to/gpumd> <source-description> <dftd2.cu-sha256> [pre-change|r3]
 
 For each structure and each default-form input (`dftd2 0.75`, `dftd2 0.75 12`) it stores the dump.xyz
 lines 2.. (header with energy and virial, then species, positions and forces, `precision double`) of a
@@ -12,7 +15,7 @@ and must be bit-identical (the D2 kernels use no atomics). The potential is the 
 `zero_nep_H_C_O_Cu.txt` (zero energy, force and virial exactly), so the output is the D2 contribution
 alone and NEP's own run-to-run noise is absent. The `stress="..."` field of the header is removed: with
 a zero potential it varies from run to run (also on the same binary).
-Never regenerate it with a changed binary.
+Never regenerate it to make a failing test pass.
 """
 import json
 import re
@@ -52,9 +55,13 @@ def run(exe, structure, line):
 
 if __name__ == '__main__':
     exe, source, sha = sys.argv[1], sys.argv[2], sys.argv[3]
+    label = sys.argv[4] if len(sys.argv) > 4 else 'pre-change'
+    assert label in ('pre-change', 'r3')
+    binary = {'pre-change': 'pre-change gpumd (dftd2 without table/trunc options)',
+              'r3': 'R3 gpumd (compensated float accumulation, ADR-0005); regenerated once, 2026-11-06'}[label]
     gpu = subprocess.run(['nvidia-smi', '--query-gpu=name,driver_version', '--format=csv,noheader'],
                          capture_output=True, text=True).stdout.strip()
-    out = {'_provenance': {'binary': 'pre-change gpumd (dftd2 without table/trunc options)',
+    out = {'_provenance': {'binary': binary,
                            'source': source, 'dftd2_cu_sha256': sha, 'gpu_and_driver': gpu,
                            'repeats': 3, 'note': 'bitwise reference; see generate_default_frozen.py'}}
     for name, (fname, note) in CASES.items():
