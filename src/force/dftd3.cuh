@@ -27,12 +27,20 @@ public:
     float s8 = 0.0;
     float a1 = 0.0;
     float a2 = 0.0;
+    int damping = 0; // 0: BJ damping, 1: zero damping, D3(0) (DR-003)
+    float sr6 = 0.0; // zero damping only: scaling of R0 in f6 (alpha6 = 14)
+    float sr8 = 1.0; // zero damping only: scaling of R0 in f8 (alpha8 = 16)
     int atomic_number[94];
   };
+
+  // Damping selector of the dftd3 keyword (ADR-0003): `dftd3 <functional> <rc> <rc_cn> [zero|bj]`.
+  // Checks the number of tokens, exits with a message on error, and returns "bj" or "zero".
+  static std::string parse_damping(const std::vector<std::string>& tokens);
 
   DFTD3_Para dftd3_para;
 
   bool enabled = false;
+  bool elements_checked = false; // zero damping: atom types of the structure checked (Z <= 86)
   float rc_radial = 15.0;
   float rc_angular = 10.0;
   GPU_Vector<float> cn;
@@ -91,5 +99,8 @@ public:
     std::string& ex_functional,
     const float rc_radial,
     const float rc_angular,
-    const std::string& potential_file_name);
+    const std::string& potential_file_name,
+    const std::string& damping = "bj");
+
+  void check_elements(const GPU_Vector<int>& type);
 };

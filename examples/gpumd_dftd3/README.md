@@ -21,5 +21,12 @@ about 600-700 K within the first 100 steps (50 fs). This is a short demonstratio
 The total energy (kinetic + potential, columns 2 and 3 of `thermo.out`) stays constant within about 0.06 eV in the NVE run.
 For production use, equilibrate first (for example with an NVT or NPT run) and then use the equilibrated structure.
 
+## Zero damping variant
+
+`run_zero.in` is identical except for the last token of the dftd3 line (`dftd3 pbe 12 6 zero`), which selects the D3(0)
+zero-damping instead of Becke-Johnson damping (the default, equivalent to `dftd3 pbe 12 6 bj`). The PBE parameters of the
+two dampings differ and cannot be set by the user; D3(0) is available for H-Rn only (see the manual page of `dftd3`).
+`gpumd` always reads `run.in` from the current directory, so run it in a scratch copy with `cp run_zero.in run.in` first (the potential path in `run_zero.in` is relative to the example directory, as in `run.in`).
+
 To obtain the contribution of the correction alone, run once with and once without the `dftd3` line
 and subtract the energies and forces (use `time_step 0` and `run 1` for a single-point comparison).

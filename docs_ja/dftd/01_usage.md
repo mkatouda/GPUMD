@@ -5,7 +5,7 @@
 ## 1.1 構文
 
 ```
-dftd3 <functional> <potential_cutoff> <coordination_number_cutoff>
+dftd3 <functional> <potential_cutoff> <coordination_number_cutoff> [zero|bj]
 dftd2 <s6> [<cutoff>]
 ```
 
@@ -18,8 +18,9 @@ dftd2 <s6> [<cutoff>]
 | `functional` | 汎関数名（BJ ダンピングのパラメータ選択） | なし | なし（必須） | 大文字小文字は区別しない（内部で小文字化）。対応名は 1.2 節 |
 | `potential_cutoff`（`rc_pot`） | D3 ポテンシャルのカットオフ半径 | Å | なし（必須） | コード内部では `rc_radial` |
 | `coordination_number_cutoff`（`rc_cn`） | 配位数を数えるカットオフ半径 | Å | なし（必須） | コード内部では `rc_angular` |
+| `damping`（任意） | ダンピング関数：`bj`（Becke-Johnson）または `zero`（ゼロダンピング、D3(0)） | なし | `bj` | 小文字のみ（大文字小文字を区別する）。それ以外の値、または 6 トークン以上は入力エラーで、メッセージに有効値を示す（DR-003、ADR-0003） |
 
-- トークン数はちょうど 4（`dftd3` を含む）でなければなりません [`nep.cu:53-58`, `nep_charge.cu:151-156`]。
+- トークン数は 4（BJ、既定）または 5（5 番目が `zero` か `bj`）でなければなりません（`dftd3` を含む）。4 未満は `dftd3 must have 3 parameters ...`、5 番目が不正または 6 以上はエラーです [`DFTD3::parse_damping`、`nep.cu`、`nep_charge.cu` から呼ばれる]。起動時の出力に `damping = bj` または `damping = zero (D3(0))` の行が加わります（既存の行の文言と順序は変わりません）。
 - 二つのカットオフの値域は**コードで検査されません**（負値、0、`rc_cn` > `rc_pot` も黙って受理されます。1.10 節の注意 3）。
 - `functional` は、NEP の訓練データを作った汎関数に合わせます [dftd3.rst]。
 
@@ -36,7 +37,7 @@ dftd2 <s6> [<cutoff>]
 
 ## 1.2 対応する汎関数（`dftd3`）
 
-BJ ダンピング専用です。コード（`D3:1818-1871`、`set_para`）に登録されている 54 個の名前を次に示します（`lcwpbe` と `lc-wpbe08` は同一パラメータなので、パラメータセットとしては 53 種類）。綴りは**そのまま**入力してください。ハイフンやアンダースコアの正規化はありません（`hse-hjs`、`lc-wpbe08`、`dsd-pbep86` にはハイフンが含まれ、`b97d`、`camb3lyp`、`mn12sx` には含まれません）。
+以下は BJ ダンピング（既定）の名前です。ゼロダンピングの対応汎関数は本節の末尾に示します。コード（`D3:1818-1871`、`set_para`）に登録されている 54 個の名前を次に示します（`lcwpbe` と `lc-wpbe08` は同一パラメータなので、パラメータセットとしては 53 種類）。綴りは**そのまま**入力してください。ハイフンやアンダースコアの正規化はありません（`hse-hjs`、`lc-wpbe08`、`dsd-pbep86` にはハイフンが含まれ、`b97d`、`camb3lyp`、`mn12sx` には含まれません）。
 
 | | | | | | |
 |---|---|---|---|---|---|
@@ -53,6 +54,14 @@ BJ ダンピング専用です。コード（`D3:1818-1871`、`set_para`）に�
 - 各名前の（s6, a1, s8, a2）の値はコードの `set_para` 呼び出しにあります。起動時に、選ばれた値が標準出力に表示されます（1.5 節）。例えば `pbe` は s6 = 1、a1 = 0.4289、s8 = 0.7875、a2 = 4.4407 Bohr です [`D3:1818-1871`。この値は VER-0001 でも使われている]。
 - **注意**：パラメータ表と C6 参照表（`dftd3para.cuh`）の出典（どの版の表か）は、コードにもフォーク内の仕様書にも記載がありません [UPSTREAM-0002 G]。`dftd3.rst` は Bonn 大学の BJ 汎関数一覧へのリンクのみを示し、名前を列挙していません。コードの 54 個の名前の一部がその一覧に無い可能性がありますが、確認していません。
 - 上記以外の名前を指定すると、次のメッセージで停止します（1.6 節）。
+
+### ゼロダンピング D3(0)（`dftd3 <f> <rc> <rc_cn> zero`）
+
+エネルギーは E = -Σ[ s6 C6 f6(r)/r^6 + s8 C8 f8(r)/r^8 ]、f_n(r) = 1/(1 + 6 (r/(sr_n R0))^(-alpha_n))（alpha6 = 14、alpha8 = 16）です（Grimme ら、J. Chem. Phys. 132, 154104 (2010)）。パラメータ（def2-QZVP 版）は dftd3-lib（コミット `3c99ee9`）から生成したもので、ユーザーは変更できません。sr6 は汎関数ごとに異なり、sr8 = 1 は `slaterdiracexchange`（sr6 = 0.999、sr8 = 0.697、s8 = -1.957）以外のすべてで成り立ちます。s6 = 1 でないのは二重ハイブリッドの `b2plyp`（0.64）、`pwpb95`（0.82）、`b2gpplyp`（0.56）、`ptpss`（0.75）だけです（全表は `src/force/dftd3zero_table.cuh`）。汎関数名は小文字・ハイフンなしで、D3(0) 表の名前です（BJ 表の名前ではありません）：`b1b95 b2gpplyp b2plyp b3lyp b3pw91 b97d bhlyp blyp bmk bop bp86 bpbe camb3lyp hcth120 hf hse06 lcwpbe m05 m052x m06 m06hf m06l m062x mpw1b95 mpwb1k mpwlyp olyp opbe otpss pbe pbe0 pbe38 pbesol ptpss pw6b95 pwb6k pwpb95 revpbe revpbe0 revpbe38 revssb rpbe rpw86pbe ssb tpss tpss0 tpssh slaterdiracexchange`（48 個）。選んだダンピングに表が無い汎関数は、ダンピング名と汎関数名を示すエラーになり、もう一方のダンピングへの暗黙の切り替えはありません。名前の多くは BJ 表にも同じ綴りで存在しますが、`hse06`、`m05`、`m052x`、`m06`、`m06l`、`m062x`、`m06hf`、`slaterdiracexchange` はゼロダンピングにのみあります。逆に BJ 表の `hse-hjs` にはゼロダンピング側の対応がなく、`hse06` は別の汎関数定義です（別名ではありません）。
+
+- 元素は H-Rn（Z <= 86）に限ります（DR-003 D5）。構造に Z >= 87 の原子種があると、最初の力の評価で元素名を示してエラー終了します（この検査は最初の力評価時に 1 回だけで、実行中に原子種が変わっても再実行されません）。モデルファイルに載っているだけの元素は対象外です。`bj` には適用されません。
+- 二体項のみです。三体項（Axilrod-Teller-Muto）は実装していません。Quantum ESPRESSO の既定（`dftd3_version = 3`、`dftd3_threebody = .true.`）とは三体項の分だけ異なります。
+- 長さは Å で扱い、R0 は Å で表になっており、換算せずそのまま使います（r/R0 の形でのみ現れるため）。dftd3-lib は bohr 値を 0.52917726 で換算するので、simple-dftd3・dftd3-lib とはダンピング領域で約 1.5 ppm の差があります（ADR-0003 項目 9）。
 
 ## 1.3 制限
 
@@ -136,7 +145,10 @@ Warning: the dftd2 cutoff (<値> A) is larger than 200 A; the cost grows as the 
 
 | メッセージ（原文） | 出力先 | 原因 | 対処 |
 |---|---|---|---|
-| `dftd3 must have 3 parameters` | 標準出力 | `dftd3` 行のトークン数が 4 でない | `dftd3 <functional> <rc_pot> <rc_cn>` の 3 引数にする |
+| `dftd3 must have 3 parameters (...) and an optional damping (zero or bj)` | 標準出力 | `dftd3` 行のトークン数が 4 未満 | `dftd3 <functional> <rc_pot> <rc_cn> [zero\|bj]` にする |
+| `dftd3 has too many parameters ...` / `dftd3 damping must be zero or bj (lower case), not <token>` | 標準出力 | 6 トークン以上、または 5 番目が `zero`・`bj` 以外 | 構文を確認する |
+| `The <functional> functional is not supported for DFT-D3 with zero damping.` | 標準出力 | `zero` で表に無い汎関数 | 本節の名前を使う（`bj` にしたいなら `bj` を明示） |
+| `dftd3 with zero damping has no parameters for element(s): <元素 (Z=n)> ...` | 標準エラー | `zero` で構造に Z >= 87 の原子種がある（最初の力評価時） | 該当元素を含まない構造にするか `bj` を使う |
 | `The <functional> functional is not supported for DFT-D3 with BJ damping.`（汎関数名は小文字で表示） | 標準出力 | 未対応の汎関数名 | 1.2 節の名前を使う。綴り（ハイフンの有無）を確認 |
 | `DFTD3 only supports NEP models.` | 標準エラー | 最初の `potential` ファイルの 1 行目が `nep` で始まらない | NEP のファイルを最初の `potential` に指定する |
 | `Cannot open potential file.` | 標準エラー | D3 側でポテンシャルファイルを開けない | パスを確認する |
