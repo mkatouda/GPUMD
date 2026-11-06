@@ -29,14 +29,17 @@ hard cutoff phi(r) for r < rc without any shift.
 
 Pair search: one cell list (counting sort) in fractional coordinates; one thread per atom
 loops over the neighboring cells including periodic images (the same kernel handles cells
-smaller or larger than the cutoff). Forces and virials are accumulated per atom in registers
-(double); there is no atomicAdd on forces. Candidate positions are stored in float relative to the
-center of their cell; the displacement between two cell centers is formed in double and rounded once
-to float. The pair vector is then (pj - pi) + offset in float: the offset (up to about k*width, i.e.
-about rc) is rounded and the sum is rounded again, so each component has an absolute error of about
-6e-8 * (pair distance + cell width), independent of the box size and of the distance from the
-origin. For close pairs this is up to about (1 + width/r) times larger than rounding the exact
-double vector once (about 6e-8 * r); e.g. r = 3 A and width = 12 A: about 5 times (2e-7 -> 1e-6 A).
+smaller or larger than the cutoff). Energy, forces and virials are accumulated per atom in registers
+as compensated float sums (TwoSum, see CompensatedSum; ADR-0005) that are added to double
+accumulators every FLUSH_CELLS neighbor cells; the sub-threads of an atom are added in double; there
+is no atomicAdd on forces. Candidate positions are stored in float
+relative to the center of their cell; the displacement between two cell centers is formed in double
+and rounded once to float. The pair vector is then (pj - pi) + offset in float: the offset (up to
+about k*width, i.e. about rc) is rounded and the sum is rounded again, so each component has an
+absolute error of about 6e-8 * (pair distance + cell width), independent of the box size and of the
+distance from the origin. For close pairs this is up to about (1 + width/r) times larger than
+rounding the exact double vector once (about 6e-8 * r); e.g. r = 3 A and width = 12 A: about 5 times
+(2e-7 -> 1e-6 A).
 ------------------------------------------------------------------------------*/
 
 #include "dftd2.cuh"
@@ -81,6 +84,11 @@ constexpr int REDUCE_BLOCK_SIZE = 256;
 constexpr int MAX_NUM_SUB = 32;
 constexpr double MIN_CANDIDATES_PER_THREAD = 32.0;
 constexpr int NUM_REDUCE = 13; // E, F (3), W (9) per atom
+// The compensated float sums of a thread are added to double accumulators after this many neighbor
+// cells. It bounds the number of terms per float sum (and so the second-order error of the
+// compensation: net force / largest force of dense water at rc = 30 A is 8e-14 (4e-12 without the
+// flush; the test cap is 1e-12)); the cost is 13 double additions per flush (ADR-0005).
+constexpr int FLUSH_CELLS = 4;
 // The number of cells per direction is chosen by a cost estimate (see choose_cell_counts):
 // candidate counts are floor(kk * width / rc) for kk = 1..MAX_CELL_RANGE (cell width >= rc / kk).
 constexpr int MAX_CELL_RANGE = 6;
@@ -279,6 +287,50 @@ __global__ void place_atoms(
   g_sorted_index[begin + rank] = i;
 }
 
+// Float sum with a running compensation term (error-free TwoSum of each addition): value() = sum
+// + err is the sum of the terms with an error of about one float rounding (relative to the sum of
+// their magnitudes) instead of one per term, and no FP64 operation is needed per pair (FP64 is
+// 1/64 of FP32 on GA102). TwoSum must not be reassociated; without fast-math the compiler does not
+// do so. The terms must be passed as already rounded floats (no contraction into the sum).
+struct CompensatedSum {
+  float sum = 0.0f;
+  float err = 0.0f;
+  __device__ __forceinline__ void add(const float x)
+  {
+    const float t = sum + x;
+    const float bb = t - sum;
+    err += (sum - (t - bb)) + (x - bb);
+    sum = t;
+  }
+  __device__ __forceinline__ double value() const
+  {
+    return static_cast<double>(sum) + static_cast<double>(err);
+  }
+};
+
+// The 13 per-atom sums of one thread: compensated float partial sums and their double totals.
+// Index: 0 = sum of phi_sf, 1..3 = force, 4..12 = sums of dx * fp (xx, yy, zz, xy, xz, yz, yx, zx,
+// zy), the order of SubReduce.
+struct PairSums {
+  CompensatedSum part[NUM_REDUCE];
+  double total[NUM_REDUCE];
+  __device__ PairSums()
+  {
+#pragma unroll
+    for (int c = 0; c < NUM_REDUCE; ++c) {
+      total[c] = 0.0;
+    }
+  }
+  __device__ __forceinline__ void flush()
+  {
+#pragma unroll
+    for (int c = 0; c < NUM_REDUCE; ++c) {
+      total[c] += part[c].value();
+      part[c] = CompensatedSum();
+    }
+  }
+};
+
 // Sum over the NUM_SUB consecutive threads that share an atom, in a fixed tree order; the result is
 // left in the first thread (sub == 0) of the group. The shared array exists only for NUM_SUB > 1.
 template <int NUM_SUB>
@@ -399,9 +451,8 @@ __global__ void dftd2_pair_kernel(
   const int cz = cell_i / (grid.n[0] * grid.n[1]);
   const float rc2 = rc * rc;
 
-  double e_i = 0.0, fx = 0.0, fy = 0.0, fz = 0.0;
-  double v_xx = 0.0, v_yy = 0.0, v_zz = 0.0, v_xy = 0.0, v_xz = 0.0, v_yz = 0.0;
-  double v_yx = 0.0, v_zx = 0.0, v_zy = 0.0;
+  PairSums sums;
+  int cells_since_flush = 0;
 
   const int oz_begin = valid ? -grid.k[2] : 1;
   const int oz_end = valid ? grid.k[2] : 0; // empty range for invalid threads
@@ -467,27 +518,40 @@ __global__ void dftd2_pair_kernel(
           const float dphi = -par.x * (dfdr * r6inv - 6.0f * f * r6inv * rinv);
           const float phi_sf = phi - par.z - par.w * (r - rc);
           const float dphi_sf = dphi - par.w;
-          e_i += 0.5 * static_cast<double>(phi_sf);
+          sums.part[0].add(phi_sf);
           const float g = dphi_sf * rinv;
-          const float fpx = g * dx; // force on i from this neighbor
-          const float fpy = g * dy;
-          const float fpz = g * dz;
-          fx += fpx;
-          fy += fpy;
-          fz += fpz;
-          v_xx -= 0.5 * static_cast<double>(dx * fpx);
-          v_yy -= 0.5 * static_cast<double>(dy * fpy);
-          v_zz -= 0.5 * static_cast<double>(dz * fpz);
-          v_xy -= 0.5 * static_cast<double>(dx * fpy);
-          v_xz -= 0.5 * static_cast<double>(dx * fpz);
-          v_yz -= 0.5 * static_cast<double>(dy * fpz);
-          v_yx -= 0.5 * static_cast<double>(dy * fpx);
-          v_zx -= 0.5 * static_cast<double>(dz * fpx);
-          v_zy -= 0.5 * static_cast<double>(dz * fpy);
+          // products are rounded to float before they enter the compensated sums
+          const float fpx = __fmul_rn(g, dx); // force on i from this neighbor
+          const float fpy = __fmul_rn(g, dy);
+          const float fpz = __fmul_rn(g, dz);
+          sums.part[1].add(fpx);
+          sums.part[2].add(fpy);
+          sums.part[3].add(fpz);
+          sums.part[4].add(__fmul_rn(dx, fpx));
+          sums.part[5].add(__fmul_rn(dy, fpy));
+          sums.part[6].add(__fmul_rn(dz, fpz));
+          sums.part[7].add(__fmul_rn(dx, fpy));
+          sums.part[8].add(__fmul_rn(dx, fpz));
+          sums.part[9].add(__fmul_rn(dy, fpz));
+          sums.part[10].add(__fmul_rn(dy, fpx));
+          sums.part[11].add(__fmul_rn(dz, fpx));
+          sums.part[12].add(__fmul_rn(dz, fpy));
+        }
+        if (++cells_since_flush == FLUSH_CELLS) {
+          sums.flush();
+          cells_since_flush = 0;
         }
       }
     }
   }
+
+  sums.flush();
+  // E = 1/2 sum phi_sf, W = -1/2 sum (dx fp) (the factors are exact)
+  double e_i = 0.5 * sums.total[0];
+  double fx = sums.total[1], fy = sums.total[2], fz = sums.total[3];
+  double v_xx = -0.5 * sums.total[4], v_yy = -0.5 * sums.total[5], v_zz = -0.5 * sums.total[6];
+  double v_xy = -0.5 * sums.total[7], v_xz = -0.5 * sums.total[8], v_yz = -0.5 * sums.total[9];
+  double v_yx = -0.5 * sums.total[10], v_zx = -0.5 * sums.total[11], v_zy = -0.5 * sums.total[12];
 
   SubReduce<NUM_SUB>::run(
     tid, sub, e_i, fx, fy, fz, v_xx, v_yy, v_zz, v_xy, v_xz, v_yz, v_yx, v_zx, v_zy);

@@ -10,8 +10,11 @@ Groups
    numpy reference (fixtures/dftd2_qe/ref_*.xyz; they are the oracle, never regenerated). The
    `grimme2006/sf` form is the harness check (passes on the pre-change binary).
    CPU only: the stored files equal `d2_reference.py` (the documented oracle) evaluated now.
-2. Default compatibility (AC-2): bitwise comparison with the frozen output of the pre-change binary
-   (fixtures/dftd2_qe/default_frozen.json), header block text, no `table`/`trunc` header lines.
+2. Default compatibility (AC-2): bitwise comparison with the frozen output of the binary of the R3
+   commit (fixtures/dftd2_qe/default_frozen.json; ADR-0005 item 5: regenerated once because the
+   accumulation precision changed the last digits), header block text, no `table`/`trunc` header
+   lines; and a tolerance comparison (DR-002 AC-1 caps) with the frozen output of the pre-R3 binary
+   (default_frozen_pre_r3.json, develop af269060).
 3. Parser and input errors (ADR-0004 items 1, 2, 4, 6; AC-6); header lines of non-default options (item 7).
 4. Replication (AC-4); 5. Finite-difference force and virial consistency (AC-5).
 
@@ -181,6 +184,7 @@ def test_dftd2_matches_requester_reference(name, mode, tmp_path):
 # 2. Default compatibility (AC-2)
 # ---------------------------------------------------------------------------------------------
 FROZEN = json.load(open(FIXTURE_DIR / 'default_frozen.json'))
+FROZEN_PRE_R3 = json.load(open(FIXTURE_DIR / 'default_frozen_pre_r3.json'))
 FROZEN_CASES = [k for k in FROZEN if not k.startswith('_')]
 FROZEN_INPUTS = ['dftd2 0.75', 'dftd2 0.75 12']
 
@@ -188,10 +192,10 @@ FROZEN_INPUTS = ['dftd2 0.75', 'dftd2 0.75 12']
 @fast
 @pytest.mark.parametrize('d2_line', FROZEN_INPUTS)
 @pytest.mark.parametrize('name', FROZEN_CASES)
-def test_default_form_bit_identical_to_pre_change_binary(name, d2_line, tmp_path):
+def test_default_form_bit_identical_to_frozen_output(name, d2_line, tmp_path):
     """Dump text (energy, virial, forces; `precision double`) and the DFT-D2 header lines of the
-    default-form inputs equal the frozen output of the pre-change binary, byte for byte; the default
-    output has no `table`/`trunc` lines (ADR-0004 item 7)."""
+    default-form inputs equal the frozen output of the R3 binary (run-to-run reproducibility), byte
+    for byte; the default output has no `table`/`trunc` lines (ADR-0004 item 7)."""
     case = FROZEN[name]
     result, *_ = run_gpumd(tmp_path, read(FIXTURE_DIR / case['structure']), d2_line, model=ZERO_NEP)
     assert dump_lines(tmp_path) == case['inputs'][d2_line]['D2']
@@ -199,11 +203,40 @@ def test_default_form_bit_identical_to_pre_change_binary(name, d2_line, tmp_path
     assert not [ln for ln in result.stdout.splitlines() if OPTION_LINE.search(ln)]
 
 
+def parse_dump_lines(lines):
+    """energy, forces (n x 3), virial (3 x 3) from stored dump.xyz lines 2.. (header, then atoms)."""
+    energy = float(re.search(r'energy=([-0-9.eE+]+)', lines[0]).group(1))
+    virial = np.array(re.search(r'virial="([^"]+)"', lines[0]).group(1).split(), float).reshape(3, 3)
+    forces = np.array([ln.split()[4:7] for ln in lines[1:]], float)
+    return energy, forces, virial
+
+
+@fast
+@pytest.mark.parametrize('d2_line', FROZEN_INPUTS)
+@pytest.mark.parametrize('name', [k for k in FROZEN_PRE_R3 if not k.startswith('_')])
+def test_default_form_matches_pre_r3_frozen_output_within_ac1_caps(name, d2_line, tmp_path, record_property):
+    """ADR-0005 item 5 (a): the R3 binary (compensated float accumulation) against the frozen
+    output of the pre-R3 binary (develop af269060, double accumulation), at the DR-002 AC-1 level:
+    energy and virial 2e-6 of |E_old| and max|W_old|, forces 1e-5 of max|F_old|. The measured
+    differences are recorded (pytest -s prints them)."""
+    case = FROZEN_PRE_R3[name]
+    result, *_ = run_gpumd(tmp_path, read(FIXTURE_DIR / case['structure']), d2_line, model=ZERO_NEP)
+    e0, f0, w0 = parse_dump_lines(case['inputs'][d2_line]['D2'])
+    e1, f1, w1 = parse_dump_lines(dump_lines(tmp_path))
+    de, dw, df = abs(e1 - e0) / abs(e0), np.abs(w1 - w0).max() / np.abs(w0).max(), np.abs(f1 - f0).max() / np.abs(f0).max()
+    for key, val, cap in (('energy', de, REL_CAP_EV), ('virial', dw, REL_CAP_EV), ('force', df, REL_CAP_F)):
+        record_property(f'{key}_diff_cap_fraction', f'{val / cap:.3e}')
+    print(f'\nPRE-R3 {name} / {d2_line}: dE {de:.2e} ({de / REL_CAP_EV:.1%} of cap), '
+          f'dW {dw:.2e} ({dw / REL_CAP_EV:.1%}), dF {df:.2e} ({df / REL_CAP_F:.1%})')
+    assert d2_header(result.stdout) == case['inputs'][d2_line]['header']
+    assert de <= REL_CAP_EV and dw <= REL_CAP_EV and df <= REL_CAP_F
+
+
 @fast
 @pytest.mark.parametrize('name', FROZEN_CASES)
-def test_explicit_default_options_bit_identical_to_pre_change_binary(name, tmp_path):
+def test_explicit_default_options_bit_identical_to_frozen_output(name, tmp_path):
     """`table grimme2006 trunc sf` (explicit defaults), with and without a cutoff, reproduces the
-    pre-change output bit for bit, header block included."""
+    frozen default-form output bit for bit, header block included."""
     case = FROZEN[name]
     atoms = read(FIXTURE_DIR / case['structure'])
     for base, line in (('dftd2 0.75', 'dftd2 0.75 table grimme2006 trunc sf'),
