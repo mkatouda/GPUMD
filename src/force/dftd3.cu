@@ -59,15 +59,16 @@ const std::string ELEMENTS[NUM_ELEMENTS] = {
 // so the weights w[k] = exp(-4 (cn - cn_ref_k)^2) of every atom are computed once (after its
 // coordination number is known) and the pair loops only multiply and sum. The table holds
 // max_cn weights per atom; weights of reference points beyond num_cn are not read.
+template <typename T>
 static __device__ __forceinline__ void
-store_cn_weights(const int z1, const float cn, const int n1, float* g_cn_weight)
+store_cn_weights(const int z1, const T cn, const int n1, float* g_cn_weight)
 {
   const int num_cn_1 = num_cn[z1];
   for (int k = 0; k < max_cn; ++k) {
     float w = 0.0f;
     if (k < num_cn_1) {
-      const float diff = cn - cn_ref[z1 * max_cn + k];
-      w = exp(-4.0f * diff * diff);
+      const T diff = cn - (T)cn_ref[z1 * max_cn + k];
+      w = (float)exp((T)-4 * diff * diff);
     }
     g_cn_weight[n1 * max_cn + k] = w;
   }
@@ -250,6 +251,34 @@ static __device__ __forceinline__ void d3_damped_pair(
   }
 }
 
+// Coordination number of atom n1 summed in type T (float: BJ, double: zero damping).
+template <typename T>
+static __device__ __forceinline__ T cn_sum_small_box(
+  const int N,
+  const int n1,
+  const int z1,
+  const int* g_NN_angular,
+  const int* g_NL_angular,
+  const int* g_type,
+  const DFTD3::DFTD3_Para& dftd3_para,
+  const float* g_x12,
+  const float* g_y12,
+  const float* g_z12)
+{
+  T R_cov_1 = (T)Bohr * (T)covalent_radius[z1];
+  T cn_temp = 0;
+  for (int i1 = 0; i1 < g_NN_angular[n1]; ++i1) {
+    int index = i1 * N + n1;
+    int n2 = g_NL_angular[index];
+    int z2 = dftd3_para.atomic_number[g_type[n2]];
+    T R_cov_2 = (T)Bohr * (T)covalent_radius[z2];
+    T r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
+    T d12 = sqrt(r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2]);
+    cn_temp += (T)1 / (exp((T)-16 * ((R_cov_1 + R_cov_2) / d12 - (T)1)) + (T)1);
+  }
+  return cn_temp;
+}
+
 void __global__ find_dftd3_coordination_number_small_box(
   DFTD3::DFTD3_Para dftd3_para,
   const int N,
@@ -265,19 +294,17 @@ void __global__ find_dftd3_coordination_number_small_box(
   int n1 = blockIdx.x * blockDim.x + threadIdx.x;
   if (n1 < N) {
     int z1 = dftd3_para.atomic_number[g_type[n1]];
-    float R_cov_1 = Bohr * covalent_radius[z1];
-    float cn_temp = 0.0f;
-    for (int i1 = 0; i1 < g_NN_angular[n1]; ++i1) {
-      int index = i1 * N + n1;
-      int n2 = g_NL_angular[index];
-      int z2 = dftd3_para.atomic_number[g_type[n2]];
-      float R_cov_2 = Bohr * covalent_radius[z2];
-      float r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
-      float d12 = sqrt(r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2]);
-      cn_temp += 1.0f / (exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f)) + 1.0f);
+    if (dftd3_para.damping == 0) { // BJ: float arithmetic
+      const float cn_temp = cn_sum_small_box<float>(
+        N, n1, z1, g_NN_angular, g_NL_angular, g_type, dftd3_para, g_x12, g_y12, g_z12);
+      g_cn[n1] = cn_temp;
+      store_cn_weights(z1, cn_temp, n1, g_cn_weight);
+    } else { // zero damping: double CN, weights from the double CN, g_cn stored as float
+      const double cn_temp = cn_sum_small_box<double>(
+        N, n1, z1, g_NN_angular, g_NL_angular, g_type, dftd3_para, g_x12, g_y12, g_z12);
+      g_cn[n1] = (float)cn_temp;
+      store_cn_weights(z1, cn_temp, n1, g_cn_weight);
     }
-    g_cn[n1] = cn_temp;
-    store_cn_weights(z1, cn_temp, n1, g_cn_weight);
   }
 }
 
