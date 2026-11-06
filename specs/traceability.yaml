@@ -26,6 +26,14 @@ requirements:
     verification: []
     tests: []   # Phase 1 (parameter provenance) started 2026-11-06
     status: planned
+  - id: DR-004
+    title: dftd2 QE-compatible table, plain cutoff and speed-up
+    source: specs/requirements/DR-004-dftd2-qe-compat.md
+    design: specs/design/DES-0004-dftd2-qe-compat-plan.md
+    adrs: []   # ADR-0004 (table/trunc keyword extension) to be written in DES-0004 Phase 0
+    verification: []
+    tests: []   # waits for DR-003 to be merged into develop (human decision 2026-11-06)
+    status: planned
 # Example entry:
 # - id: DR-001
 #   title: Short requirement title
