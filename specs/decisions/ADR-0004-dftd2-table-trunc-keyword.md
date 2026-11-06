@@ -22,8 +22,12 @@ without changing existing inputs or results.
      exactly as before.
 2. Parsing errors (informative messages that list the valid values): unknown `table` or `trunc`
    value, missing value after a keyword, repeated option, unknown token, more tokens than the
-   grammar allows. Value matching is case sensitive, lower case (as ADR-0003). Existing messages
-   for the legacy forms keep their meaning.
+   grammar allows. Value matching is case sensitive, lower case (as ADR-0003). Revised
+   2026-11-06 (review of the implementation): the wording of the error messages for MALFORMED
+   legacy-form inputs may change (`dftd2` alone, a non-numeric 2nd token, extra tokens): they are
+   still input errors with the same exit behavior, and the new messages name the offending token
+   and the valid forms. Messages for the valid legacy forms and every successful run are
+   unchanged.
 3. `table qe` (QE `dftd3_version = 2`, DR-004): C6_ij from the D3 table (first reference point of
    both atoms), R0_ij = `rs6 * r0ab_ij` with rs6 = 1.1, steepness 20 (as `D_DAMP`), r0ab in
    Angstrom from the table shared with DR-003; `s6` stays user-given (no functional table).
@@ -46,9 +50,12 @@ without changing existing inputs or results.
    used to generate the labels"). Rationale: the purpose of these options is to reproduce a
    specific label setting; the 30 A default belongs to the Grimme 2006 / shifted-force convergence
    study of DR-002 and would silently differ from QE-based labels. (Approved by the human.)
-7. Header output: existing `dftd2` output lines keep their text and order. Lines for the new
-   options (`table = qe`, `trunc = plain`) are printed only when the value is not the default, so
-   the output of every existing input is byte-identical (same policy as ADR-0003 item 4).
+7. Header output: for default inputs (`table grimme2006`, `trunc sf`) every existing `dftd2`
+   output line keeps its text and order (byte-identical output). Lines for the new options
+   (`table = qe`, `trunc = plain`) are printed only when the value is not the default. Revised
+   2026-11-06 (review of the implementation): with `trunc plain` the first header line reads
+   `cutoff = %g A` instead of `shifted-force cutoff = %g A`, because there is no shift and the
+   old wording would be false. This affects non-default inputs only.
 8. Unchanged: once only; exclusive with `dftd3`; NEP, NEP_Charge, qNEP and `nep_vdw`/`qnep3_vdw`
    scope of DR-002 D4; multi-GPU rejection; DFT-D3 behavior.
 9. Defaults are bit-identical: the default path (`grimme2006`, `sf`) must reproduce the pre-change

@@ -41,8 +41,10 @@ D3. QE version (revised 2026-11-06 after the source and release-note comparison)
     tables; the Phase 1 check against the source decides, and the manual says so.
 
 ## Decisions P1-P5 (proposed in the draft, approved with this requirement on 2026-11-06; P1 still needs ADR-0004)
-P1. Syntax: `dftd2 <s6> <rc> [table grimme2006|qe] [trunc sf|plain]`; options in any order after
-    `rc`; defaults `table grimme2006`, `trunc sf` (= current behavior). Needs ADR-0004.
+P1. Syntax: `dftd2 <s6> [<rc>] [table grimme2006|qe] [trunc sf|plain]`; options in any order after
+    `s6` / `rc`; defaults `table grimme2006`, `trunc sf` (= current behavior, `rc` default 30 A);
+    `rc` must be given explicitly when `table qe` or `trunc plain` is used (ADR-0004 item 6,
+    approved 2026-11-06). Decided in ADR-0004 (accepted).
 P2. With `table qe`, rs6 = 1.1 and alp6 = 20 are fixed (as QE PBE); `s6` stays user-given (DR-002 D2).
     The damping in the kernel is r / (rs6 R0_ij) with R0_ij from `r0ab`; kernel unchanged except
     for the table content.
