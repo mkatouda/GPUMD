@@ -1,31 +1,33 @@
 # GPUMD 向け DFT-D3 / DFT-D2 分散力補正 日本語マニュアル
 
-本マニュアルは、GPUMD フォーク（mkatouda/GPUMD）で実装・最適化した **DFT-D3（BJ ダンピング）** と **DFT-D2** の分散力補正（`dftd3` / `dftd2` キーワード）について、利用者と開発者の両方に向けて日本語でまとめたものです。フォーク固有の資料であり、upstream（brucefan1983/GPUMD）の公式マニュアルではありません。数値や主張は `specs/`（要求仕様 DR-xxx、検証記録 VER-xxxx、upstream 課題 UPSTREAM-xxxx）と `doc/gpumd/input_parameters/dftd3.rst`・`dftd2.rst`、およびソースコードの読解に基づいています。出典は各所の角括弧に示します。
+本マニュアルは、GPUMD フォーク（mkatouda/GPUMD）で実装・最適化した **DFT-D3（BJ ダンピングとゼロダンピング D3(0)）** と **DFT-D2**（Grimme 2006 の表と、Quantum ESPRESSO 7.2 の `dftd3_version = 2` の表）の分散力補正（`dftd3` / `dftd2` キーワード）について、利用者と開発者の両方に向けて日本語でまとめたものです。フォーク固有の資料であり、upstream（brucefan1983/GPUMD）の公式マニュアルではありません。数値や主張は `specs/`（要求仕様 DR-001〜DR-004、ADR-0002〜0005、検証記録 VER-xxxx、upstream 課題 UPSTREAM-xxxx）と `doc/gpumd/input_parameters/dftd3.rst`・`dftd2.rst`、およびソースコードの読解に基づいています。出典は各所の角括弧に示します。
 
 ## 版情報
 
 | 項目 | 内容 |
 |---|---|
-| 対象ブランチ | フォークの `develop` ブランチ（本文書作成時の HEAD は `8fe8ab99`。D3 コードの最終コミットは `0c353281`。その後 upstream/master `ddc6e2d2` をマージ済み（検証は VER-0022）） |
+| 対象ブランチ | フォークの `develop` ブランチ。本改訂時点の HEAD は `aba6b28b`（DR-004 R3 のマージ）。対象とする要求は DR-001〜DR-004（D3 の高速化、D2、D3(0) ゼロダンピング、D2 の QE 互換テーブルと単純打ち切りと高速化）。初版（2026-11-04）の HEAD は `8fe8ab99`（D3 コードの最終コミットは `0c353281`、その後 upstream/master `ddc6e2d2` をマージ済み、検証は VER-0022） |
 | 動作確認環境 | NVIDIA RTX A6000（sm_86）、CUDA 12.3（`/usr/local/cuda`）[VER-0018, VER-0020 ヘッダ] |
 | ビルド | `cd src && make CUDA_ARCH="-arch=sm_86" -j4` |
 | 未検証の環境 | HIP（AMD/ROCm）ビルド、sm_60 未満、RTX A6000 以外の GPU、CUDA 12.3 以外 [DR-001 AC-5 注記, VER-0019] |
-| 作成日 | 2026-11-04 |
+| 作成日 | 初版 2026-11-04、本改訂 2026-11-07 |
+| 本改訂で追加した検証記録 | VER-0023（D3(0) のパラメータの出典）、VER-0024（D3(0) の Phase 4 検証）、VER-0025（QE `dftd3_version = 2` のパラメータの出典）、VER-0026（`dftd2` の `table qe` / `trunc plain` の検証と R3 高速化） |
+| ソースのパス表記 | 本改訂で更新した章（00、01、02、03、06、A1〜A3）のソースファイルのパスは、`develop` `aba6b28b` 時点のもの（upstream の再構成でサブフォルダに移動する**前**）です（例：`src/force/dftd3.cu`）。04・05 章は未更新（下の目次） |
 
 ## 目次
 
 | 章 | ファイル | 内容 | 備考 |
 |---|---|---|---|
-| 0 | [00_introduction.md](00_introduction.md) | 位置づけ、D2/D3 の使い分け、環境、読み方 | 完成 |
-| 1 | [01_usage.md](01_usage.md) | 入力構文、全引数、制限、エラーメッセージ、入力例、注意事項 | 完成 |
-| 2 | [02_theory.md](02_theory.md) | 理論（実装されている式） | 完成 |
-| 3 | [03_benchmark.md](03_benchmark.md) | 計算コスト・ベンチマーク | 完成 |
-| 4 | [04_source_structure.md](04_source_structure.md) | ソースコード構成 | 完成 |
-| 5 | [05_implementation.md](05_implementation.md) | 実装技法（最適化の詳細） | 完成 |
-| 6 | [06_verification.md](06_verification.md) | 検証（精度、エネルギー保存、回帰、受入基準） | 完成 |
-| A1 | [A1_derivation_d3.md](A1_derivation_d3.md) | 付録：D3(BJ) の式の導出 | 完成 |
-| A2 | [A2_derivation_d2.md](A2_derivation_d2.md) | 付録：D2 の式の導出 | 完成 |
-| A3 | [A3_reproduce.md](A3_reproduce.md) | 付録：検証・測定の再現手順 | 完成 |
+| 0 | [00_introduction.md](00_introduction.md) | 位置づけ、D2/D3（BJ/ゼロ）の使い分け、環境、読み方 | 完成（D3(0)・QE 型 D2 を追記済み） |
+| 1 | [01_usage.md](01_usage.md) | 入力構文、全引数、制限、エラーメッセージ、入力例、注意事項 | 完成（D3(0)・`table`/`trunc` を追記済み） |
+| 2 | [02_theory.md](02_theory.md) | 理論（実装されている式） | 完成（D3(0) の式は 2.2 節に追記） |
+| 3 | [03_benchmark.md](03_benchmark.md) | 計算コスト・ベンチマーク | 完成（D3(0) のコストと R3 後の D2 を追記済み） |
+| 4 | [04_source_structure.md](04_source_structure.md) | ソースコード構成 | **D3(0)・D2 QE の追記は今後（upstream マージ後）**。現状は BJ の D3 と Grimme 2006 の D2 の構成のみ |
+| 5 | [05_implementation.md](05_implementation.md) | 実装技法（最適化の詳細） | **D3(0)・D2 QE の追記は今後（upstream マージ後）**。D2 の累算の記述だけは R3 に合わせて更新済み |
+| 6 | [06_verification.md](06_verification.md) | 検証（精度、エネルギー保存、回帰、受入基準） | 完成（DR-003・DR-004 の節を追記済み） |
+| A1 | [A1_derivation_d3.md](A1_derivation_d3.md) | 付録：D3(BJ) と D3(0) の式の導出 | 完成（D3(0) の導出を A1.9 節に追記） |
+| A2 | [A2_derivation_d2.md](A2_derivation_d2.md) | 付録：D2（QE 型を含む）の式の導出 | 完成（QE 型 D2、単純打ち切り、補償付き累算を A2.8〜A2.9 節に追記） |
+| A3 | [A3_reproduce.md](A3_reproduce.md) | 付録：検証・測定の再現手順 | 完成（新規テスト、スクリプト、出典、履歴を追記済み） |
 
 ## 読者別の読み方
 
@@ -34,7 +36,8 @@
 | まず使ってみたい利用者 | 00 → 01（入力例とエラーメッセージ）→ 03（コストの見積もり） |
 | 結果の信頼性を知りたい利用者・共同研究者 | 00 → 01 の「既知の制限と注意事項」→ 06 |
 | 理論的な背景を知りたい方 | 02 → A1, A2 |
-| コードを読む・修正する開発者 | 04 → 05 → 06 → A3（再現手順） |
+| コードを読む・修正する開発者 | 04 → 05 → 06 → A3（再現手順）。D3(0)・D2 QE のコードは 04・05 章が未更新なので、当面は 02 章の式の対応と A1.9・A2.8 節、`src/force/dftd3.cu`・`dftd2.cu` のコメントを併用 |
+| QE（`dftd3_version = 2` または `3`）で作ったラベルに合わせて D3(0)・D2 を足し戻したい方 | 00 の 0.3 節 → 01（`zero`、`table qe`、`trunc plain`）→ 06 の 6.10・6.11 節（精度と未測定事項） |
 | 計算コストを見積もりたい方 | 01 の「カットオフの選び方」→ 03 |
 
 ## 表記上の約束
