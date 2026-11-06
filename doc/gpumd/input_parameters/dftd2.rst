@@ -11,11 +11,17 @@ It is an *external* correction: it is not assumed to be part of the data the NEP
 Syntax
 ------
 
-  dftd2 <s6> [<cutoff>]
+  dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 
 where :attr:`s6` is the dimensionless global scaling factor (must be positive; there is no functional table, the value is given by the user) and :attr:`cutoff` is the cutoff radius in units of Angstrom (must be positive).
 If :attr:`cutoff` is omitted, a default of 30 Angstrom is used.
 The default is the smallest cutoff in a 12-30 Angstrom scan (grid 12, 16, 20, 25, 30; reference 40 Angstrom) for which the D2 energy per atom (within 0.5 meV), the forces and the pressure (within 0.02 GPa) agree with a 40 Angstrom cutoff for water, graphite and MgO (light elements only; see Truncation effects). A warning is printed for cutoffs above 200 Angstrom. The cost grows quickly with the cutoff (on an RTX A6000, the D2 correction at 30 Angstrom adds about 1.1 times the NEP evaluation time for 648 water atoms and about 10 times for 41,472 atoms); a smaller cutoff can be specified explicitly if a lower accuracy is acceptable.
+
+The optional keywords :attr:`table` and :attr:`trunc` select the parameter table and the truncation; they are keyword/value pairs that may be given in any order, each at most once, after the (optional) cutoff. The values are case sensitive (lower case).
+The cutoff is recognised only as the second parameter, directly after :attr:`s6`; a number after an option is an error.
+The defaults are ``table grimme2006`` and ``trunc sf``, which is the behavior described in the rest of this page: an input without options gives results and screen output identical to those of versions without these options.
+``table qe`` and ``trunc plain`` require an explicit cutoff (an input without a cutoff is an error), so that the cutoff matches the one that was used to generate the reference data (for example the labels of the training set): the default of 30 Angstrom belongs to the shifted-force convergence study described below.
+For example, ``dftd2 0.75 12 table qe trunc plain`` gives the D2 form of Quantum ESPRESSO 7.2 with ``dftd3_version = 2`` and a hard cutoff of 12 Angstrom (the own cutoff of Quantum ESPRESSO is 50.2 Å, so give the value that was used for the reference data). When the energy, forces or virial of the NEP training data include such a correction, the table and the truncation of the correction used in the simulation should be the same as those used to generate the data: record them with the data and set them identically in ``run.in``.
 
 This keyword can be put anywhere in the ``run.in`` input file.
 It may appear only once and cannot be combined with :ref:`dftd3 <kw_dftd3>`.
@@ -35,10 +41,31 @@ The energy is :math:`E=\sum_{i<j}\phi_\mathrm{sf}(r_{ij})`.
 
 Units: positions and :math:`r_\mathrm{c}` in Angstrom, :math:`C_6` in eV Å\ :sup:`6` (converted from the tabulated J nm\ :sup:`6` mol\ :sup:`-1` with 1 E\ :sub:`h` = 2625.4999 kJ/mol and 1 E\ :sub:`h` = 27.21138505 eV; the value of the bohr radius enters the conversion twice and cancels, so only these two energy constants matter), :math:`R_0` in Angstrom (1.1 times the tabulated :math:`r_0`), energy in eV, force in eV/Å, virial in eV.
 
+Options :attr:`table` and :attr:`trunc`
+---------------------------------------
+
+``table grimme2006`` (default) is the DFT-D2 parameter table of [Grimme2006]_ described above.
+
+``table qe`` uses the pair parameters of the ``dftd3_version = 2`` option of Quantum ESPRESSO 7.2 (``dft-d3`` module, ``pars.f90`` and ``core.f90`` of tag ``qe-7.2``, commit ``b4c5e8de``). The QE input documentation (``INPUT_PW``) describes this option as "Original Grimme-D2 parametrization"; this is inaccurate for ``dftd3_version = 2``: the energy is the D2 functional form evaluated with DFT-D3 tables, namely
+
+.. math::
+
+   C_{6,ij} = C_6^{\mathrm{D3}}(Z_i,Z_j;\ \text{first reference point of both atoms}), \qquad R_{0,ij} = 1.1\, r_{0,ij}^{\mathrm{D3}},
+
+with the damping function and :math:`d=20` unchanged. The :math:`C_6` is the coefficient of the first stored DFT-D3 reference point of the two elements (not a geometric mean of atomic values, and no coordination-number dependence). It is a fixed pair value and is not the free-atom :math:`C_6` for every element: the first reference point of H has the coordination number 0.9118 (the H\ :sub:`2` value) and that of Ce has 2.7991; :math:`r_{0,ij}^{\mathrm{D3}}` is the D3 cutoff radius (``r0ab``, in Angstrom). :attr:`s6` is still given by the user (there is no functional table; ``dftd3_version = 2`` with ``input_dft = 'pbe'`` corresponds to :math:`s_6=0.75`).
+The tables cover **Z ≤ 86 (H-Rn)**; an atom type with Z ≥ 87 in the structure is an input error naming the element(s), detected when the correction is first evaluated.
+The :math:`C_6` values are tabulated in :math:`E_\mathrm{h}\,a_0^6` and converted on the host in double precision with the CODATA 2018 constants of Quantum ESPRESSO 7.2 (:math:`a_0` = 0.529177210903 Å, :math:`E_\mathrm{h}` = 27.211386245988 eV). The tables are generated by ``tools/Miscellaneous/dftd2/generate_dftd2qe_table.py`` from the Quantum ESPRESSO sources into ``src/force/dftd2qe_table.cuh``.
+Quantum ESPRESSO divides ``r0ab`` by a Bohr radius of 0.52917720859 Å and multiplies it back with its own constant; this changes :math:`R_0` by a relative 4.4e-9 and is not reproduced (on purpose). In addition, QE 7.2 stores ``r0ab`` (and the values of :math:`s_6` other than 0.75) as single-precision literals: the relative differences to the decimal values are up to 5.9e-8 in :math:`r_0` and up to 1.2e-6 in the damping exponent :math:`d (r/R_0-1)`. Agreement with QE 7.2 is therefore expected to about 1e-6 relative, i.e. the results are consistent with QE 7.2, not identical to it. This was verified against the 7.2 tables and data supplied by the requester and against QE 7.6-dev (verification of the implementation against the source tables and a numpy reference, not validation against experiment); QE 7.2 itself was never run by the fork.
+``table qe`` reproduces the ``dftd3_version = 2`` energy only. It is **not** the real DFT-D2 of QE (``vdw_corr = 'grimme-d2'``: its own table and ``london_rcut`` = 200 bohr); ``table grimme2006 trunc plain`` has not been validated against that option. ``dftd3_version = 2`` with ``input_dft = 'dsd-blyp'`` uses a damping steepness of 60, which ``table qe`` cannot reproduce (the steepness is fixed to 20).
+Quantum ESPRESSO is described in P. Giannozzi et al., J. Phys.: Condens. Matter 21, 395502 (2009), 29, 465901 (2017) and J. Chem. Phys. 152, 154105 (2020).
+
+``trunc sf`` (default) is the shifted-force truncation described in the next section. ``trunc plain`` is a hard cutoff, :math:`\phi_\mathrm{plain}(r)=\phi(r)` for :math:`r<r_\mathrm{c}` and 0 otherwise (as in Quantum ESPRESSO, which also does not shift); the shift terms are not used. Both truncations can be combined with both tables.
+With ``trunc plain`` the energy and the force are discontinuous at the cutoff. A pair crossing :math:`r_\mathrm{c}` changes the energy by a step of :math:`|\phi(r_\mathrm{c})|` (about 7e-6 eV for a C-C pair at 12 Å with ``table qe`` and :math:`s_6=0.75`) and the force by a step of about :math:`6|\phi(r_\mathrm{c})|/r_\mathrm{c}` (about 3.7e-6 eV/Å); the sizes decrease as :math:`r_\mathrm{c}^{-6}` and :math:`r_\mathrm{c}^{-7}` with the cutoff. In an NVE simulation the total energy therefore shows small steps. A systematic drift is not expected in equilibrium, because pairs cross the cutoff in both directions and the steps cancel on average; a short NVE measurement found no visible drift: in a 20 ps NVE run of a 180-atom PTFE crystal at 300 K (NEP89 + ``dftd2 0.75 12 table qe``, 0.5 fs, 3 seeds per variant) the fitted slope of the total energy is |slope| <= 2e-4 meV/atom/ps for ``trunc plain`` and <= 1e-4 meV/atom/ps for ``trunc sf``, and the standard deviation of the total energy is 5.1-5.7e-4 eV for ``plain`` and 4.9-5.1e-4 eV for ``sf``; the single steps of 7e-6 eV are far below the step-to-step noise of the integration (median 9e-5 eV), so they are not resolved. The pair convention is :math:`r<r_\mathrm{c}`: a pair at exactly :math:`r_\mathrm{c}` is excluded, while QE excludes only :math:`r>r_\mathrm{c}` (the difference is negligible). The force and the virial are the exact derivatives of the smooth part inside the cutoff; the delta-function contribution of the cutoff itself is not included.
+
 Shifted-force truncation
 ------------------------
 
-The sum is truncated with a shifted-force scheme so that both energy and force go to zero continuously at the cutoff:
+This section applies to ``trunc sf`` (default). The sum is truncated with a shifted-force scheme so that both energy and force go to zero continuously at the cutoff:
 
 .. math::
 
@@ -77,7 +104,7 @@ For heavy, dense elements the error is much larger: for fcc Au (4.078 Å lattice
 Parameters and element coverage
 --------------------------------
 
-The built-in :math:`C_6` and :math:`R_0` table covers the elements **H to Rn (Z ≤ 86)** only.
+This section describes ``table grimme2006`` (default); the limits of ``table qe`` are given above. The built-in :math:`C_6` and :math:`R_0` table covers the elements **H to Rn (Z ≤ 86)** only.
 It is generated by script from the DFT-D2 parameters stored in ``dftd3-lib`` (``prg/extras.f90``, subroutine ``loadoldpar``, commit ``3c99ee9``), following S. Grimme, J. Comput. Chem. 27, 1787 (2006).
 The values for H–Xe agree with the table of Grimme (2006) as reprinted in a secondary source (the Turbomole manual); they were not compared with the original paper directly.
 The published table of Grimme (2006) gives H to Xe (Z = 1-54). The values for **Z = 55-86 and the group values for Sc-Zn and Y-Cd come from a single source, the** ``dftd3-lib`` **table**, and some of them are group-filled (for example, Ce-Lu share one value); they should not be regarded as independently verified.
@@ -128,6 +155,13 @@ Example
   dftd2 0.75 15
 
 This adds the DFT-D2 correction with :math:`s_6=0.75` and a cutoff of 15 Angstrom to the NEP model.
+
+.. code::
+
+  potential nep89.txt
+  dftd2 0.75 12 table qe trunc plain
+
+This adds the D2 form with the DFT-D3 tables and a hard cutoff of 12 Angstrom, matching Quantum ESPRESSO ``dftd3_version = 2`` data generated with a 12 Angstrom cutoff.
 
 Tips
 ----

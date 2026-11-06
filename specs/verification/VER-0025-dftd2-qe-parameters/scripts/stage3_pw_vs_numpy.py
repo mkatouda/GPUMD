@@ -58,7 +58,7 @@ def parse(path):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('work'); ap.add_argument('--pw', default='/home/katouda/bin/qe/bin/pw.x')
-    ap.add_argument('--np', type=int, default=4); ap.add_argument('--run', action='store_true'); a = ap.parse_args()
+    ap.add_argument('--np', type=int, default=4); ap.add_argument('--r0scale', type=float, default=1.0, help='scale r0ab of the numpy reference (QE autoang effect: 1 + 4.371e-9)'); ap.add_argument('--run', action='store_true'); a = ap.parse_args()
     os.makedirs(a.work, exist_ok=True)
     for d3 in (True, False):
         nm = os.path.join(a.work, 'd3.in' if d3 else 'no.in'); write_input(nm, d3)
@@ -68,6 +68,8 @@ def main():
     e1, F1, S1, et1 = parse(os.path.join(a.work, 'd3.out')); e0, F0, S0, et0 = parse(os.path.join(a.work, 'no.out'))
     HA = 27.211386245988                                  # QE AUTOEV
     rc = np.sqrt(9000.0) * BOHR
+    d2r.QE_R0AB_A = {k: v * a.r0scale for k, v in d2r.QE_R0AB_A.items()}   # default 1.0: decimal r0ab as printed
+    print(f'r0ab scale factor applied to the numpy reference: {a.r0scale!r}')
     E, F, W = d2r.d2(SPEC, POS, CELL, 'qe', 'plain', rc)
     vol = abs(np.linalg.det(CELL))                       # A^3
     EQE = (et1 - et0) * HA                               # total-energy difference (XML, Hartree) -> eV

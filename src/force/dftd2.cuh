@@ -21,10 +21,18 @@ class Box;
 class RunInput;
 
 // DFT-D2 pairwise dispersion correction (S. Grimme, J. Comput. Chem. 27, 1787 (2006)),
-// added externally to a NEP model. Keyword: dftd2 <s6> [<cutoff in Angstrom>].
+// added externally to a NEP model. Keyword:
+// dftd2 <s6> [<cutoff in Angstrom>] [table grimme2006|qe] [trunc sf|plain].
 class DFTD2
 {
 public:
+  // Optional settings of the dftd2 keyword. The defaults (Grimme 2006 table, shifted-force
+  // truncation) are the original behavior.
+  struct Options {
+    bool table_qe = false;    // C6 / R0 of Quantum ESPRESSO dftd3_version = 2 (D3 tables)
+    bool trunc_plain = false; // hard cutoff without the shifted-force terms
+  };
+
   // Default cutoff (Angstrom) used when the cutoff is omitted
   // (chosen from a cutoff-convergence study).
   static constexpr double DEFAULT_CUTOFF = 30.0;
@@ -32,15 +40,22 @@ public:
   bool enabled = false;
   double s6 = 0.0;
   double rc = DEFAULT_CUTOFF;
+  Options options;
 
   // Parse the tokens of one "dftd2" line (exits with a specific message on invalid input).
-  static void parse_tokens(const std::vector<std::string>& tokens, double& s6, double& rc);
+  static void
+  parse_tokens(const std::vector<std::string>& tokens, double& s6, double& rc, Options& options);
 
   // Find and parse the (single) dftd2 line of run.in; returns false if there is none.
-  static bool find_in_run_input(const RunInput& run_input, double& s6, double& rc);
+  static bool
+  find_in_run_input(const RunInput& run_input, double& s6, double& rc, Options& options);
 
   // atomic_numbers[t] is the atomic number of potential type t.
-  void initialize(const double s6, const double rc, const std::vector<int>& atomic_numbers);
+  void initialize(
+    const double s6,
+    const double rc,
+    const Options& options,
+    const std::vector<int>& atomic_numbers);
 
   // Adds energy, force and virial of the D2 correction to the per-atom arrays.
   void compute(

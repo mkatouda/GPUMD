@@ -346,13 +346,14 @@ NEP_Charge_VDW::NEP_Charge_VDW(
   // The dftd2 correction is external to the built-in vdW term of this model (double counting is
   // the user's responsibility, see the manual).
   double dftd2_s6, dftd2_rc;
-  if (DFTD2::find_in_run_input(run_input, dftd2_s6, dftd2_rc)) {
+  DFTD2::Options dftd2_options;
+  if (DFTD2::find_in_run_input(run_input, dftd2_s6, dftd2_rc, dftd2_options)) {
     has_dftd2 = true;
     std::vector<int> atomic_numbers(paramb.num_types);
     for (int n = 0; n < paramb.num_types; ++n) {
       atomic_numbers[n] = zbl.atomic_numbers[n];
     }
-    dftd2.initialize(dftd2_s6, dftd2_rc, atomic_numbers);
+    dftd2.initialize(dftd2_s6, dftd2_rc, dftd2_options, atomic_numbers);
   }
 }
 
