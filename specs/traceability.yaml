@@ -24,8 +24,8 @@ requirements:
     design: specs/design/DES-0003-dftd3-zero-damping-plan.md
     adrs: [specs/decisions/ADR-0003-dftd3-damping-keyword.md, specs/decisions/ADR-0002-dftd3-optimization-numerics.md]
     verification: [specs/verification/VER-0023-dftd3-zero-parameters, specs/verification/VER-0024-dftd3-zero-phase4]
-    tests: [tests_pytest/test_dftd3_zero.py]   # AC-1,2,3,4,4b,6,7,8 met (VER-0023/0024): reference 20/20 within ADR-0002 caps (graphite virial margin 22%, floor ~1e-6 set by the length-constant convention), BJ bit identity, parser/errors, FD, tiny r, sanitizer clean, pytest 945 passed, full regression = 37 known + 4 unrelated (VER-0024 sec. 6). AC-5 NOT met: large-box vs small-box virial differs by 1.14 x cap on heavy_cluster (BJ develop: 1.72 x cap, pre-existing); recorded as a known limitation by human decision 2026-11-06, origin unidentified. Pending: manifest cases for the regression suite (runner design conflict, human decision); BJ whole-step slowdown 1.003-1.042 (borderline, noise-level judged by the human); Z >= 87 and three-body not supported
-    status: partial
+    tests: [tests_pytest/test_dftd3_zero.py]   # AC-1,2,3,4,4b,6,7,8 met (VER-0023/0024): reference 20/20 within ADR-0002 caps (graphite virial margin 22%, floor ~1e-6 set by the length-constant convention), BJ bit identity, parser/errors, FD, tiny r, sanitizer clean, pytest 945 passed, full regression = 37 known + 4 unrelated (VER-0024 sec. 6). Status implemented with UNMET items recorded: AC-5 NOT met (large-box vs small-box virial differs by 1.14 x cap on heavy_cluster; BJ develop 1.72 x cap, pre-existing; origin unidentified), accepted as an exception by human decision 2026-11-06. Pending/open: manifest cases for the regression suite (runner design conflict, human decision); BJ whole-step slowdown 1.003-1.042 (borderline, noise-level judged by the human); Z >= 87 and three-body not supported
+    status: implemented
   - id: DR-004
     title: dftd2 QE-compatible table, plain cutoff and speed-up
     source: specs/requirements/DR-004-dftd2-qe-compat.md
