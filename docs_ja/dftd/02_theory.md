@@ -68,7 +68,7 @@ $$
 - 長さの定数は BJ と同じ `Bohr` で、simple-dftd3（CODATA 2018）との差により、ダンピング領域で相対 1.5×10⁻⁶ 程度の差が残ります [ADR-0003 項目 9, VER-0023 2 節]。
 - 三体項（ATM）は含みません。
 
-コードの対応（`src/force/dftd3.cu`、`develop` `aba6b28b`）：$g_n$ と $h_n = n - \alpha_n(1-f_n)$ は `d3_zero_term<n>`（167-205 行付近）、BJ とゼロの切り替えは `d3_damped_pair`（207-253 行付近）。表は `src/force/dftd3zero_table.cuh`（生成物）です。
+コードの対応（`src/force/dftd3/dftd3.cu`、`develop` `90bff065`）：$g_n$ と $h_n = n - \alpha_n(1-f_n)$ は `d3_zero_term<n>`（172-205 行）、BJ とゼロの切り替えは `d3_damped_pair`（212-253 行）。表は `src/force/dftd3/dftd3zero_table.cuh`（生成物）です。
 
 ### r2r4 と共有半径（コードに無い定義）
 

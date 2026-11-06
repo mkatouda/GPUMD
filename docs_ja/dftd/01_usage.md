@@ -9,7 +9,7 @@ dftd3 <functional> <potential_cutoff> <coordination_number_cutoff> [zero|bj]
 dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 ```
 
-どちらのキーワードも `run.in` の**任意の位置**に書けます（`run` の後ろでも読まれます）。ポテンシャルの生成時に `run.in` の全行が走査されるためです [コード: `nep.cu` のコンストラクタ、`DFTD2::find_in_run_input`。回帰テスト `dftd3_single_late` が `run 1` の後ろに `dftd3 pbe 4 3` を置く場合を確認]。
+どちらのキーワードも `run.in` の**任意の位置**に書けます（`run` の後ろでも読まれます）。ポテンシャルの生成時に `run.in` の全行が走査されるためです [コード: `src/force/nep/nep.cu` のコンストラクタ、`DFTD2::find_in_run_input`。回帰テスト `dftd3_single_late` が `run 1` の後ろに `dftd3 pbe 4 3` を置く場合を確認]。
 
 ### `dftd3` の引数
 
@@ -78,7 +78,7 @@ dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 | 制限 | 内容 | 出典 |
 |---|---|---|
 | 回数 | `dftd3` は 1 回だけ、`dftd2` も 1 回だけ | `run.cu:373-387` |
-| 排他 | `dftd3` と `dftd2` は同時に使えない（どちらの順でもエラー） | `run.cu:377-387`, `D2:610-612` |
+| 排他 | `dftd3` と `dftd2` は同時に使えない（どちらの順でもエラー） | `run.cu:363-376`, `D2:763-765` |
 
 ### 対応ポテンシャル
 
@@ -90,7 +90,7 @@ dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 | NEP を GPU 複数枚で使う場合（`NEP_MULTIGPU`） | エラー | エラー |
 | 上記以外（`tersoff`、`eam`、`lj`、`nep_ilp` など） | **黙って無視される**（エラーなし） | エラー |
 
-[出典: `force.cu:117-135`、`nep.cu`、`nep_charge.cu`、`nep_charge_vdw.cu`、`nep_multigpu.cu`、`run.cu:510-516`]
+[出典: `src/force/force.cu:142-166`、`src/force/nep/nep.cu`、`src/force/nep_charge/nep_charge.cu`、`src/force/nep_charge_vdw/nep_charge_vdw.cu`、`src/force/nep/nep_multigpu.cu`、`src/main_gpumd/run.cu:501-507`]
 
 `dftd3` が NEP 以外で黙って無視される点は、`dftd3.rst` にも「他のポテンシャルでは効果がない」と記載されています。`dftd2` はエラーになる点と非対称です（1.10 節の注意 1）。
 

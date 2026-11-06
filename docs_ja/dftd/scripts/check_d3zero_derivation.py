@@ -3,7 +3,7 @@
 CPU, NumPy, float64 (plus float32 for the overflow test).  Parameter tables are SYNTHETIC (random C6
 references, made-up reference CNs and R0): the check concerns the algebra of the derivatives and the
 overflow-safe evaluation, not the values of the D3 tables.  Formulas follow the code
-(src/force/dftd3.cu: d3_zero_term, d3_damped_pair); the CN machinery is that of check_d3_derivation.py.
+(src/force/dftd3/dftd3.cu: d3_zero_term, d3_damped_pair); the CN machinery is that of check_d3_derivation.py.
 Run:  python check_d3zero_derivation.py
 """
 import os

@@ -6,13 +6,13 @@
 
 | 項目 | 内容 |
 |---|---|
-| 対象ブランチ | フォークの `develop` ブランチ。本改訂時点の HEAD は `aba6b28b`（DR-004 R3 のマージ）。対象とする要求は DR-001〜DR-004（D3 の高速化、D2、D3(0) ゼロダンピング、D2 の QE 互換テーブルと単純打ち切りと高速化）。初版（2026-11-04）の HEAD は `8fe8ab99`（D3 コードの最終コミットは `0c353281`、その後 upstream/master `ddc6e2d2` をマージ済み、検証は VER-0022） |
+| 対象ブランチ | フォークの `develop` ブランチ。本改訂時点（2026-11-07）の対象 HEAD は `90bff065`（upstream/master `aa63ffdd` をマージし、VER-0027 でパス・ビルド・テストを確認した状態。マージ前の `develop` は `aba6b28b`、DR-004 R3 のマージ）。対象とする要求は DR-001〜DR-004（D3 の高速化、D2、D3(0) ゼロダンピング、D2 の QE 互換テーブルと単純打ち切りと高速化）。初版（2026-11-04）の HEAD は `8fe8ab99`（D3 コードの最終コミットは `0c353281`、その後 upstream/master `ddc6e2d2` をマージ済み、検証は VER-0022） |
 | 動作確認環境 | NVIDIA RTX A6000（sm_86）、CUDA 12.3（`/usr/local/cuda`）[VER-0018, VER-0020 ヘッダ] |
 | ビルド | `cd src && make CUDA_ARCH="-arch=sm_86" -j4` |
 | 未検証の環境 | HIP（AMD/ROCm）ビルド、sm_60 未満、RTX A6000 以外の GPU、CUDA 12.3 以外 [DR-001 AC-5 注記, VER-0019] |
 | 作成日 | 初版 2026-11-04、本改訂 2026-11-07 |
-| 本改訂で追加した検証記録 | VER-0023（D3(0) のパラメータの出典）、VER-0024（D3(0) の Phase 4 検証）、VER-0025（QE `dftd3_version = 2` のパラメータの出典）、VER-0026（`dftd2` の `table qe` / `trunc plain` の検証と R3 高速化） |
-| ソースのパス表記 | 本改訂で更新した章（00、01、02、03、06、A1〜A3）のソースファイルのパスは、`develop` `aba6b28b` 時点のもの（upstream の再構成でサブフォルダに移動する**前**）です（例：`src/force/dftd3.cu`）。04・05 章は未更新（下の目次） |
+| 本改訂で追加した検証記録 | VER-0023（D3(0) のパラメータの出典）、VER-0024（D3(0) の Phase 4 検証）、VER-0025（QE `dftd3_version = 2` のパラメータの出典）、VER-0026（`dftd2` の `table qe` / `trunc plain` の検証と R3 高速化）、VER-0027（upstream/master `aa63ffdd` のマージ：パス、ビルド、テスト） |
+| ソースのパス表記 | 全章のソースファイルのパスを、upstream の再構成（サブフォルダ化）**後**の現在の配置に揃えました。D3 は `src/force/dftd3/`（`dftd3.cu`、`dftd3.cuh`、`dftd3para.cuh`、`dftd3zero_table.cuh`）、NEP 系は `src/force/nep/nep.cu`、`src/force/nep_charge/nep_charge.cu`、`src/force/nep_charge_vdw/nep_charge_vdw.cu`、`src/force/nep/nep_multigpu.cu`、フォーク固有の D2 は `src/force/` 直下（`dftd2.cu`、`dftd2.cuh`、`dftd2para.cuh`、`dftd2qe_table.cuh`）。**04・05 章の行番号は `90bff065` で再導出済み**です。00〜03、06、A1〜A3 章の `D3:n`、`D2:n` 形式の**行番号の引用**は `aba6b28b` 時点（再構成前、D3(0)・R3 の直後）のまま再導出していないため、ずれている可能性があります（関数名で探してください）。履歴上の記述（VER 記録の引用、「当時のパス」と明記したもの）は当時のパスのままです |
 
 ## 目次
 
@@ -22,8 +22,8 @@
 | 1 | [01_usage.md](01_usage.md) | 入力構文、全引数、制限、エラーメッセージ、入力例、注意事項 | 完成（D3(0)・`table`/`trunc` を追記済み） |
 | 2 | [02_theory.md](02_theory.md) | 理論（実装されている式） | 完成（D3(0) の式は 2.2 節に追記） |
 | 3 | [03_benchmark.md](03_benchmark.md) | 計算コスト・ベンチマーク | 完成（D3(0) のコストと R3 後の D2 を追記済み） |
-| 4 | [04_source_structure.md](04_source_structure.md) | ソースコード構成 | **D3(0)・D2 QE の追記は今後（upstream マージ後）**。現状は BJ の D3 と Grimme 2006 の D2 の構成のみ |
-| 5 | [05_implementation.md](05_implementation.md) | 実装技法（最適化の詳細） | **D3(0)・D2 QE の追記は今後（upstream マージ後）**。D2 の累算の記述だけは R3 に合わせて更新済み |
+| 4 | [04_source_structure.md](04_source_structure.md) | ソースコード構成 | 完成（`90bff065`。サブフォルダ再構成後のパス、D3(0)・D2 QE のファイル、テスト、行番号を再導出） |
+| 5 | [05_implementation.md](05_implementation.md) | 実装技法（最適化の詳細） | 完成（`90bff065`。D3(0) の減衰ヘルパーと倍精度 CN（5.1.3〜5.1.6）、D2 の QE 互換の表と補償付き float 累算（5.6.5〜5.6.6）、精度の余裕の表、既知の限界を追記。行番号を再導出） |
 | 6 | [06_verification.md](06_verification.md) | 検証（精度、エネルギー保存、回帰、受入基準） | 完成（DR-003・DR-004 の節を追記済み） |
 | A1 | [A1_derivation_d3.md](A1_derivation_d3.md) | 付録：D3(BJ) と D3(0) の式の導出 | 完成（D3(0) の導出を A1.9 節に追記） |
 | A2 | [A2_derivation_d2.md](A2_derivation_d2.md) | 付録：D2（QE 型を含む）の式の導出 | 完成（QE 型 D2、単純打ち切り、補償付き累算を A2.8〜A2.9 節に追記） |
@@ -36,7 +36,7 @@
 | まず使ってみたい利用者 | 00 → 01（入力例とエラーメッセージ）→ 03（コストの見積もり） |
 | 結果の信頼性を知りたい利用者・共同研究者 | 00 → 01 の「既知の制限と注意事項」→ 06 |
 | 理論的な背景を知りたい方 | 02 → A1, A2 |
-| コードを読む・修正する開発者 | 04 → 05 → 06 → A3（再現手順）。D3(0)・D2 QE のコードは 04・05 章が未更新なので、当面は 02 章の式の対応と A1.9・A2.8 節、`src/force/dftd3.cu`・`dftd2.cu` のコメントを併用 |
+| コードを読む・修正する開発者 | 04 → 05 → 06 → A3（再現手順）。式とコードの対応は 02 章と A1.9・A2.8 節 |
 | QE（`dftd3_version = 2` または `3`）で作ったラベルに合わせて D3(0)・D2 を足し戻したい方 | 00 の 0.3 節 → 01（`zero`、`table qe`、`trunc plain`）→ 06 の 6.10・6.11 節（精度と未測定事項） |
 | 計算コストを見積もりたい方 | 01 の「カットオフの選び方」→ 03 |
 
