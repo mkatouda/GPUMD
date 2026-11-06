@@ -21,8 +21,11 @@ exactly 4 tokens (`NEP::initialize_dftd3`, `NEP_Charge::initialize_dftd3`). Zero
    error that names both (`... not supported for DFT-D3 with <zero|BJ> damping`); there is no
    fallback to the other damping.
 4. `bj` (explicit or default) must reproduce the previous binary's results bit for bit
-   (DR-003 AC-3). The printed header gains a damping line; the existing lines keep their
-   text and order. Tools that parse the BJ output must keep working (checked in review).
+   (DR-003 AC-3) AND its printed output unchanged: the header gets NO damping line for BJ.
+   Only zero damping adds a line `damping = zero (D3(0))` after `functional =`; the existing
+   lines keep their text and order. (Revised 2026-11-06 after the full regression run: a
+   `damping = bj` line changed the stdout of `dftd3_duplicate` against the master baseline;
+   decided by the human, option (a).)
 5. The BJ code path is not altered numerically; the shared helper that selects the damping
    is verified for this by the bit-identity test.
 6. Unchanged: `dftd3` may appear once; mutually exclusive with `dftd2`; rejected on
