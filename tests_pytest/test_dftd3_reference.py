@@ -7,7 +7,7 @@ provenance. They are never regenerated to make this test pass.
 
 The D3 contribution is isolated as (run with `dftd3`) - (same run without it), using NEP89 for
 the underlying potential; both runs are static (`time_step 0`, one step). Cases cover both code
-paths of src/force/dftd3.cu: the "small box" path (a periodic thickness <= 2.5 x the pair
+paths of src/force/dftd3/dftd3.cu: the "small box" path (a periodic thickness <= 2.5 x the pair
 cutoff, plus the non-periodic case) and the "large box" path (cell lists).
 
 Tolerance for each quantity is min(cap, max(2 x BASELINE, floor)): the caps are the limits of

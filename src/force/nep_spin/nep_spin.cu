@@ -30,7 +30,7 @@ heat transport, Phys. Rev. B. 104, 104309 (2021).
 #include "nep_spin_small_box.cuh"
 #include "utilities/error.cuh"
 #include "utilities/gpu_macro.cuh"
-#include "utilities/nep_spin_model_file.cuh"
+#include "utilities/nep_io/nep_spin_model_file.cuh"
 #include "utilities/nep_utilities.cuh"
 #include <algorithm>
 #include <cmath>
@@ -1979,6 +1979,7 @@ void NEP_Spin::compute(
         potential.data());
       GPU_CHECK_KERNEL
     }
+    save_force_snapshot(force, mforce);
     return;
   }
 
@@ -2193,5 +2194,17 @@ void NEP_Spin::compute(
       virial.data(),
       potential.data());
     GPU_CHECK_KERNEL
+  }
+  save_force_snapshot(force, mforce);
+}
+
+void NEP_Spin::save_force_snapshot(
+  const GPU_Vector<double>& force, const GPU_Vector<double>& mforce)
+{
+  if (force_snapshot_) {
+    force_snapshot_->copy_from_device(force.data());
+    mforce_snapshot_->copy_from_device(mforce.data());
+    force_snapshot_ = nullptr;
+    mforce_snapshot_ = nullptr;
   }
 }

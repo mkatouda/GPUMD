@@ -18,7 +18,7 @@ to run (also on the same binary) while energy, virial and forces do not.
 
 Which binary: the dftd3 kernels of the develop HEAD (3b2c8db8) use atomicAdd, so even that binary
 is not bit-reproducible run to run (virial and forces differ in the last digits). The reference
-is therefore taken from the binary of the DR-001 dftd3 code (src/force/dftd3.cu with the
+is therefore taken from the binary of the DR-001 dftd3 code (src/force/dftd3/dftd3.cu with the
 fixed-order reductions; the sha256 of dftd3.cu is recorded), where energy, virial and forces are
 bit-reproducible.
 """

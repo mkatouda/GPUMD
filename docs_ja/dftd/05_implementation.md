@@ -2,7 +2,7 @@
 
 本章は、D3/D2 の GPU 実装で採用した技法と、検討して採用しなかった案を、開発者向けに説明します。ファイル構成とカーネルの一覧は 04 章、理論式は 02 章、検証結果は 06 章にあります。
 
-出典の略記は 04 章と同じです（`D3:n` = `src/force/dftd3.cu` の n 行目、`D2:n` = `src/force/dftd2.cu`、`P3:n` = `dftd3para.cuh`）。性能の数値は、すべて RTX A6000（sm_86、84 SM）、CUDA 12.3、NEP89、`dftd3 pbe 12 6` での nsys 測定です [DES-0001、各 VER]。他の GPU や HIP では測定していません。「導出」「推論」とあるものは、記録やコードから本マニュアル作成者が導いたもので、実行して確認していません。
+出典の略記は 04 章と同じです（`D3:n` = `src/force/dftd3/dftd3.cu` の n 行目、`D2:n` = `src/force/dftd2.cu`、`P3:n` = `dftd3para.cuh`）。性能の数値は、すべて RTX A6000（sm_86、84 SM）、CUDA 12.3、NEP89、`dftd3 pbe 12 6` での nsys 測定です [DES-0001、各 VER]。他の GPU や HIP では測定していません。「導出」「推論」とあるものは、記録やコードから本マニュアル作成者が導いたもので、実行して確認していません。
 
 ## 5.1 D3 の計算フロー
 
@@ -72,7 +72,7 @@ D3 のエネルギーは、ペアの距離 r だけでなく、両原子の配�
 | extra（大箱） | CN カーネルと同じセル走査をもう一度行う | master の `dftd3.cu:720-` |
 | `sm < 60` 向け | 手書きの `atomicAdd(double*)` フォールバック | master の `dftd3.cu:84-95` |
 
-master を `git show master:src/force/dftd3.cu` で取り出して確認した内容です。
+master を `git show master:src/force/dftd3/dftd3.cu` で取り出して確認した内容です。
 
 ### 最適化後の構造（本フォーク）
 

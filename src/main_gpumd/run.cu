@@ -30,7 +30,7 @@ Run simulation according to the inputs in the run.in file.
 #include "replicate.cuh"
 #include "run.cuh"
 #include "utilities/error.cuh"
-#include "utilities/compact_nep.cuh"
+#include "utilities/nep_io/compact_nep.cuh"
 #include "utilities/gpu_macro.cuh"
 #include "utilities/read_file.cuh"
 #include "utilities/run_input.cuh"
@@ -346,7 +346,7 @@ void Run::parse_one_keyword(
   } else if (tokens[0] == "velocity") {
     parse_velocity(tokens);
   } else if (tokens[0] == "ensemble") {
-    integrate.parse_ensemble(tokens, atom, box, group);
+    integrate.parse_ensemble(tokens, atom, box, group, force);
   } else if (tokens[0] == "time_step") {
     parse_time_step(tokens);
   } else if (tokens[0] == "correct_velocity") {

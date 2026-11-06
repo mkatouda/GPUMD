@@ -24,6 +24,9 @@ Below you can find a listing of keywords for the ``run.in`` input file.
    ensemble
    ensemble_standard
    ensemble_mttk
+   ensemble_tspin
+   ensemble_sib
+   ensemble_glsd
    ensemble_qtb
    ensemble_heat
    ensemble_ttm
@@ -54,6 +57,7 @@ Below you can find a listing of keywords for the ``run.in`` input file.
    :caption: Actions
 
    minimize
+   minimize_spin_fire
    run
    compute
    compute_chunk

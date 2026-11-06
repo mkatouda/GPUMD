@@ -16,7 +16,7 @@ alpha8 = 16, sr8 = 1, and (sr6, s8):
 The script asserts that these equal simple-dftd3's built-in parameters of the same functional
 (simple-dftd3 names: b-lyp, b3-lyp; the GPUMD keyword names are blyp, b3lyp, like the BJ table).
 
-Length constant. GPUMD (src/force/dftd3para.cuh) converts with Bohr = 0.5291772575069165 A, not
+Length constant. GPUMD (src/force/dftd3/dftd3para.cuh) converts with Bohr = 0.5291772575069165 A, not
 with CODATA2018 (0.529177210903 A) as simple-dftd3 does. Positions, cutoffs, gradients and virials
 are therefore converted with the GPUMD value (BOHR below). simple-dftd3's pair radii R0 (and
 covalent radii) are internally tabulated in bohr via CODATA2018, so the damping radius parameters
@@ -37,7 +37,7 @@ from dftd3 import __version__ as DFTD3_VERSION
 from dftd3.interface import DispersionModel, ZeroDampingParam
 
 HA = 27.211386245988
-BOHR = 0.5291772575069165           # GPUMD src/force/dftd3para.cuh `Bohr`
+BOHR = 0.5291772575069165           # GPUMD src/force/dftd3/dftd3para.cuh `Bohr`
 BOHR_CODATA2018 = 0.529177210903    # simple-dftd3 internal length constant (VER-0023 s2)
 
 HERE = Path(__file__).resolve().parent

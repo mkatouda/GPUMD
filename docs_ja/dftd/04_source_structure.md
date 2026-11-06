@@ -6,11 +6,11 @@
 
 | 略記 | 意味 |
 |---|---|
-| `D3:n` | `src/force/dftd3.cu` の n 行目 |
-| `D3h:n` | `src/force/dftd3.cuh` の n 行目 |
+| `D3:n` | `src/force/dftd3/dftd3.cu` の n 行目 |
+| `D3h:n` | `src/force/dftd3/dftd3.cuh` の n 行目 |
 | `D2:n` | `src/force/dftd2.cu` の n 行目 |
 | `D2h:n` | `src/force/dftd2.cuh` の n 行目 |
-| `P3:n` | `src/force/dftd3para.cuh` の n 行目 |
+| `P3:n` | `src/force/dftd3/dftd3para.cuh` の n 行目 |
 | `VER-xxxx`、`DES-xxxx` | `specs/` の検証記録・設計書 |
 
 「推論」「導出」とあるものは、コードや記録から本マニュアル作成者が導いたもので、実行して確認していません。
@@ -21,9 +21,9 @@
 
 | ファイル | 内容 | 行数 |
 |---|---|---|
-| `src/force/dftd3.cu` | クラス `DFTD3` の実装。全 D3 カーネル、汎関数パラメータ表（`initialize`）、ホスト側の制御（`compute`、`compute_small_box`、`compute_large_box`） | 1894 |
-| `src/force/dftd3.cuh` | クラス `DFTD3` の宣言（メンバー、GPU バッファ） | 95 |
-| `src/force/dftd3para.cuh` | 定数 `Bohr`、`Bohr2`、`HartreeBohr6`、`max_elem=94`、`max_cn=5`、`max_cn2=25`、`__constant__` の `num_cn`、`cn_ref`、`r2r4`、`covalent_radius`、ホスト側の `c6_ref_cpu[111625]`（`P3:22-28, 29, 34, 76, 90, 104`）。値の出典はコードに書かれていません（UPSTREAM-0002 G） | 12507 |
+| `src/force/dftd3/dftd3.cu` | クラス `DFTD3` の実装。全 D3 カーネル、汎関数パラメータ表（`initialize`）、ホスト側の制御（`compute`、`compute_small_box`、`compute_large_box`） | 1894 |
+| `src/force/dftd3/dftd3.cuh` | クラス `DFTD3` の宣言（メンバー、GPU バッファ） | 95 |
+| `src/force/dftd3/dftd3para.cuh` | 定数 `Bohr`、`Bohr2`、`HartreeBohr6`、`max_elem=94`、`max_cn=5`、`max_cn2=25`、`__constant__` の `num_cn`、`cn_ref`、`r2r4`、`covalent_radius`、ホスト側の `c6_ref_cpu[111625]`（`P3:22-28, 29, 34, 76, 90, 104`）。値の出典はコードに書かれていません（UPSTREAM-0002 G） | 12507 |
 | `src/force/dftd2.cu` | クラス `DFTD2` の実装。D2 の全カーネル、構文解析、初期化、元素検査、`compute` | 879 |
 | `src/force/dftd2.cuh` | クラス `DFTD2` の宣言 | 75 |
 | `src/force/dftd2para.cuh` | **生成ファイル**。`DFTD2_C6_EV_A6[87]`、`DFTD2_R0_A[87]`（添字は原子番号 Z、`DFTD2_MAX_Z 86`）。ヘッダに dftd3-lib `prg/extras.f90` の `loadoldpar` への参照が書かれている | 207 |
@@ -35,8 +35,8 @@
 
 | ファイル | 追加内容 |
 |---|---|
-| `src/force/nep.cu` / `nep.cuh` | メンバー `DFTD3 dftd3; DFTD2 dftd2; bool has_dftd3, has_dftd2;`、`initialize_dftd3()`、`initialize_dftd2()`、`compute()` 末尾の呼び出し（4.2 節） |
-| `src/force/nep_charge.cu` / `nep_charge.cuh` | 同上（`NEP_Charge`） |
+| `src/force/nep/nep.cu` / `nep.cuh` | メンバー `DFTD3 dftd3; DFTD2 dftd2; bool has_dftd3, has_dftd2;`、`initialize_dftd3()`、`initialize_dftd2()`、`compute()` 末尾の呼び出し（4.2 節） |
+| `src/force/nep_charge/nep_charge.cu` / `nep_charge.cuh` | 同上（`NEP_Charge`） |
 | `src/force/nep_charge_vdw/nep_charge_vdw.cu` / `.cuh` | `dftd2` のみ。`dftd3` はエラー |
 | `src/force/nep_multigpu.cu` | `dftd3` / `dftd2` があればエラー |
 | `src/force/force.cuh` | `all_potentials_are_nep()`、`has_any_potential()`（`force.cuh:92-100`） |

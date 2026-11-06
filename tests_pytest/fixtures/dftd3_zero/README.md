@@ -19,7 +19,7 @@ test, `../dftd3/*.xyz` (`../dftd3/generate_reference.py`); they are not duplicat
   revPBE 0.923 / 1.010; BLYP 1.094 / 1.682; B3LYP 1.261 / 1.703; TPSS 1.166 / 1.105.
 - Real-space cutoffs equal to those given to GPUMD (pair = `rc_potential`, CN = `rc_cn`), as in the BJ test.
 - **Length constant.** All lengths (positions, cutoffs, gradient and virial conversion) use the constant of
-  `src/force/dftd3para.cuh`, `Bohr = 0.5291772575069165` A, not CODATA2018 (0.529177210903 A) of
+  `src/force/dftd3/dftd3para.cuh`, `Bohr = 0.5291772575069165` A, not CODATA2018 (0.529177210903 A) of
   simple-dftd3. simple-dftd3's internal pair radii R0 follow CODATA2018, so `sr6` and `sr8` are multiplied by
   0.529177210903/0.5291772575069165 so that r/R0 equals the ratio of Angstrom quantities (R0 table in
   Angstrom). With alpha = 14/16 an inconsistent constant changes the energy by up to 1.5e-6 relative

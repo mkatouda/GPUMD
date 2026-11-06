@@ -1,6 +1,6 @@
 # 第1章 使い方
 
-本章では `run.in` の `dftd3` と `dftd2` キーワードの書き方、全引数、制限、メッセージ、入力例、注意事項を説明します。出典の記号：`D3` = `src/force/dftd3.cu`、`D2` = `src/force/dftd2.cu`、`run.cu` = `src/main_gpumd/run.cu`（行番号は `develop` ブランチ `8fe8ab99` 時点。コード読解で確認したもので、メッセージの文言は grep で確認済み）。
+本章では `run.in` の `dftd3` と `dftd2` キーワードの書き方、全引数、制限、メッセージ、入力例、注意事項を説明します。出典の記号：`D3` = `src/force/dftd3/dftd3.cu`、`D2` = `src/force/dftd2.cu`、`run.cu` = `src/main_gpumd/run.cu`（行番号は `develop` ブランチ `8fe8ab99` 時点。コード読解で確認したもので、メッセージの文言は grep で確認済み）。
 
 ## 1.1 構文
 
@@ -65,7 +65,7 @@ dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 
 ### ゼロダンピング D3(0)（`dftd3 <f> <rc> <rc_cn> zero`）
 
-エネルギーは E = -Σ[ s6 C6 f6(r)/r^6 + s8 C8 f8(r)/r^8 ]、f_n(r) = 1/(1 + 6 (r/(sr_n R0))^(-alpha_n))（alpha6 = 14、alpha8 = 16）です（Grimme ら、J. Chem. Phys. 132, 154104 (2010)）。パラメータ（def2-QZVP 版）は dftd3-lib（コミット `3c99ee9`）から生成したもので、ユーザーは変更できません。sr6 は汎関数ごとに異なり、sr8 = 1 は `slaterdiracexchange`（sr6 = 0.999、sr8 = 0.697、s8 = -1.957）以外のすべてで成り立ちます。s6 = 1 でないのは二重ハイブリッドの `b2plyp`（0.64）、`pwpb95`（0.82）、`b2gpplyp`（0.56）、`ptpss`（0.75）だけです（全表は `src/force/dftd3zero_table.cuh`）。汎関数名は小文字・ハイフンなしで、D3(0) 表の名前です（BJ 表の名前ではありません）：`b1b95 b2gpplyp b2plyp b3lyp b3pw91 b97d bhlyp blyp bmk bop bp86 bpbe camb3lyp hcth120 hf hse06 lcwpbe m05 m052x m06 m06hf m06l m062x mpw1b95 mpwb1k mpwlyp olyp opbe otpss pbe pbe0 pbe38 pbesol ptpss pw6b95 pwb6k pwpb95 revpbe revpbe0 revpbe38 revssb rpbe rpw86pbe ssb tpss tpss0 tpssh slaterdiracexchange`（48 個）。選んだダンピングに表が無い汎関数は、ダンピング名と汎関数名を示すエラーになり、もう一方のダンピングへの暗黙の切り替えはありません。名前の多くは BJ 表にも同じ綴りで存在しますが、`hse06`、`m05`、`m052x`、`m06`、`m06l`、`m062x`、`m06hf`、`slaterdiracexchange` はゼロダンピングにのみあります。逆に BJ 表の `hse-hjs` にはゼロダンピング側の対応がなく、`hse06` は別の汎関数定義です（別名ではありません）。
+エネルギーは E = -Σ[ s6 C6 f6(r)/r^6 + s8 C8 f8(r)/r^8 ]、f_n(r) = 1/(1 + 6 (r/(sr_n R0))^(-alpha_n))（alpha6 = 14、alpha8 = 16）です（Grimme ら、J. Chem. Phys. 132, 154104 (2010)）。パラメータ（def2-QZVP 版）は dftd3-lib（コミット `3c99ee9`）から生成したもので、ユーザーは変更できません。sr6 は汎関数ごとに異なり、sr8 = 1 は `slaterdiracexchange`（sr6 = 0.999、sr8 = 0.697、s8 = -1.957）以外のすべてで成り立ちます。s6 = 1 でないのは二重ハイブリッドの `b2plyp`（0.64）、`pwpb95`（0.82）、`b2gpplyp`（0.56）、`ptpss`（0.75）だけです（全表は `src/force/dftd3/dftd3zero_table.cuh`）。汎関数名は小文字・ハイフンなしで、D3(0) 表の名前です（BJ 表の名前ではありません）：`b1b95 b2gpplyp b2plyp b3lyp b3pw91 b97d bhlyp blyp bmk bop bp86 bpbe camb3lyp hcth120 hf hse06 lcwpbe m05 m052x m06 m06hf m06l m062x mpw1b95 mpwb1k mpwlyp olyp opbe otpss pbe pbe0 pbe38 pbesol ptpss pw6b95 pwb6k pwpb95 revpbe revpbe0 revpbe38 revssb rpbe rpw86pbe ssb tpss tpss0 tpssh slaterdiracexchange`（48 個）。選んだダンピングに表が無い汎関数は、ダンピング名と汎関数名を示すエラーになり、もう一方のダンピングへの暗黙の切り替えはありません。名前の多くは BJ 表にも同じ綴りで存在しますが、`hse06`、`m05`、`m052x`、`m06`、`m06l`、`m062x`、`m06hf`、`slaterdiracexchange` はゼロダンピングにのみあります。逆に BJ 表の `hse-hjs` にはゼロダンピング側の対応がなく、`hse06` は別の汎関数定義です（別名ではありません）。
 
 - 元素は H-Rn（Z <= 86）に限ります（DR-003 D5）。構造に Z >= 87 の原子種があると、最初の力の評価で元素名を示してエラー終了します（この検査は最初の力評価時に 1 回だけで、実行中に原子種が変わっても再実行されません）。モデルファイルに載っているだけの元素は対象外です。`bj` には適用されません。
 - 二体項のみです。三体項（Axilrod-Teller-Muto）は実装していません。Quantum ESPRESSO の既定（`dftd3_version = 3`、`dftd3_threebody = .true.`）とは三体項の分だけ異なります。

@@ -1,6 +1,6 @@
 # 第2章 理論（実装されている式）
 
-本章は、`dftd3` と `dftd2` が**実際にコードで計算している式**をまとめます。結論（式）を先に示し、導出は付録 [A1](A1_derivation_d3.md)（D3）と [A2](A2_derivation_d2.md)（D2）に回します。各式にはソースの行番号を付けます。出典の記号：`D3` = `src/force/dftd3.cu`、`D2` = `src/force/dftd2.cu`、`P3` = `src/force/dftd3para.cuh`（行番号は `develop` ブランチ `cd0242e0` の内容を読んだもの）。
+本章は、`dftd3` と `dftd2` が**実際にコードで計算している式**をまとめます。結論（式）を先に示し、導出は付録 [A1](A1_derivation_d3.md)（D3）と [A2](A2_derivation_d2.md)（D2）に回します。各式にはソースの行番号を付けます。出典の記号：`D3` = `src/force/dftd3/dftd3.cu`、`D2` = `src/force/dftd2.cu`、`P3` = `src/force/dftd3/dftd3para.cuh`（行番号は `develop` ブランチ `cd0242e0` の内容を読んだもの）。
 
 要点は次のとおりです。
 

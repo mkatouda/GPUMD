@@ -3,7 +3,7 @@
 CPU, NumPy, float64, a few atoms, tiny runtime.  The parameter tables are SYNTHETIC (random C6
 references, made-up reference CNs): the check concerns the algebra of the derivatives, not the
 numerical values of the D3 tables.  The formulas are written in the same form as the code
-(src/force/dftd3.cu): per ordered pair (i,j), r = r_j - r_i, per-atom virial split of the CN term.
+(src/force/dftd3/dftd3.cu): per ordered pair (i,j), r = r_j - r_i, per-atom virial split of the CN term.
 Run:  python check_d3_derivation.py
 """
 import numpy as np

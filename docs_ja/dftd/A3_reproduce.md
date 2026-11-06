@@ -102,7 +102,7 @@ CPU のみ（Python、NumPy）、数秒で終わります。いずれも `python
 |---|---|---|
 | D2 の C6, R0（H〜Rn、$Z\le86$） | dftd3-lib（コミット `3c99ee9`、Grimme の DFTD3 V3.1 Rev 1 の再配布）の `prg/extras.f90` の `loadoldpar`。`tests_pytest/fixtures/dftd2/generate_params.py` が `dftd2_params.csv` と `src/force/dftd2para.cuh` を生成 [VER-0003 1 節] | H〜Xe の 54 元素は Turbomole マニュアルの表 6.3（Grimme 2006 の再掲）と**不一致 0 件**で照合済み（C6 は完全一致、R0 は 6e-4 Å 以内）。Cs〜Rn（$Z=55$〜86）は dftd3-lib のみで、グループ値（例：Ce〜Lu で C6 = 140.68、$r_0$ = 1.594）の穴埋めを含み、**他の出典との照合は無い** [VER-0003 2 節] |
 | D2 の $s_6$ | ユーザーが指定。汎関数ごとの値は文献を参照（PBE は 0.75） | コードに表は無い |
-| D3 の汎関数パラメータ（$s_6, s_8, a_1, a_2$）と表（`c6_ref_cpu`, `cn_ref`, `num_cn`, `r2r4`, `covalent_radius`） | `src/force/dftd3.cu` の `set_para` と `dftd3para.cuh` に値のみ。**コード中に出典の記載が無い** | 出典は不明。`dftd3.rst` は Bonn 大学のページの汎関数リストを参照しているが、コード中は 54 の名前で、リスト（未照合）と一致するかは確認していない。PBE の値は simple-dftd3 の参照値と 6.2 節の精度で一致 [VER-0001] |
+| D3 の汎関数パラメータ（$s_6, s_8, a_1, a_2$）と表（`c6_ref_cpu`, `cn_ref`, `num_cn`, `r2r4`, `covalent_radius`） | `src/force/dftd3/dftd3.cu` の `set_para` と `dftd3para.cuh` に値のみ。**コード中に出典の記載が無い** | 出典は不明。`dftd3.rst` は Bonn 大学のページの汎関数リストを参照しているが、コード中は 54 の名前で、リスト（未照合）と一致するかは確認していない。PBE の値は simple-dftd3 の参照値と 6.2 節の精度で一致 [VER-0001] |
 | D3 の定数 `HartreeBohr6` など | コード中に出典なし（2.7 節、UPSTREAM-0002 B） | CODATA 2018 から求めた値に対し相対 +8.7e-7 |
 | 参照実装 | simple-dftd3 1.7.0（conda-forge の `dftd3-python`）、dftd3-lib（D2 のオラクル） | 同一のパラメータを使うので、パラメータ表の独立な検証にはならない（D2 は VER-0003 の表照合で別途確認） |
 | 理論文献 | D3: Grimme et al., J. Chem. Phys. 132, 154104 (2010)、BJ: Grimme, Ehrlich, Goerigk, J. Comput. Chem. 32, 1456 (2011)（`dftd3.rst` の [Grimme2010], [Grimme2011]、`dftd3.cu` のヘッダ）。D2: Grimme, J. Comput. Chem. 27, 1787 (2006)（`dftd2.cu` のヘッダ） | |
@@ -134,4 +134,4 @@ CPU のみ（Python、NumPy）、数秒で終わります。いずれも `python
 | 2026-11-04 | `b5301c0c`, `bafbb6b9`, `0c353281`, `251271b0` | UPSTREAM-0001 の記録、VER-0017〜0020。D3 コードの最終コミットは `0c353281` |
 | 2026-11-04 | `8fe8ab99` | UPSTREAM-0002 の記録 |
 
-上の履歴は `git log -- src/force/dftd3.cu src/force/dftd2.cu src/force/dftd2para.cuh specs/verification` の件名から抜粋したもので、コミットの内容は未再確認です。詳細は各 VER 記録と `specs/traceability.yaml` を参照してください。
+上の履歴は `git log -- src/force/dftd3/dftd3.cu src/force/dftd2.cu src/force/dftd2para.cuh specs/verification` の件名から抜粋したもので、コミットの内容は未再確認です。詳細は各 VER 記録と `specs/traceability.yaml` を参照してください。

@@ -1,0 +1,2082 @@
+/*
+    Copyright 2017 Zheyong Fan and GPUMD development team
+    This file is part of GPUMD.
+    GPUMD is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+    GPUMD is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Lesser General Public License for more details.
+    You should have received a copy of the GNU Lesser General Public License
+    along with GPUMD.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+/*----------------------------------------------------------------------------80
+DFT-D3:
+
+[1] Stefan Grimme, Jens Antony, Stephan Ehrlich, Helge Krieg,
+A consistent and accurate ab initio parametrization of density functional
+dispersion correction (DFT-D) for the 94 elements H-Pu,
+J. Chem. Phys. 132, 154104 (2010).
+
+[2] Stefan Grimme, Stephan Ehrlich, Lars Goerigk,
+Effect of the damping function in dispersion corrected density functional
+theory,
+J. Comput. Chem., 32, 1456 (2011).
+------------------------------------------------------------------------------*/
+
+#include "dftd3.cuh"
+#include "dftd3para.cuh"
+#include "dftd3zero_table.cuh"
+#include "model/box.cuh"
+#include "force/neighbor.cuh"
+#include "utilities/common.cuh"
+#include "utilities/gpu_macro.cuh"
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cstring>
+
+namespace
+{
+const int MN = 10000;          // maximum number of neighbors for one atom
+const int NL_BLOCK_SIZE = 128; // threads per atom in the small-box neighbor list build
+const std::string ELEMENTS[NUM_ELEMENTS] = {
+  "H",  "He", "Li", "Be", "B",  "C",  "N",  "O",  "F",  "Ne", "Na", "Mg", "Al", "Si", "P",  "S",
+  "Cl", "Ar", "K",  "Ca", "Sc", "Ti", "V",  "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge",
+  "As", "Se", "Br", "Kr", "Rb", "Sr", "Y",  "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd",
+  "In", "Sn", "Sb", "Te", "I",  "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd",
+  "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W",  "Re", "Os", "Ir", "Pt", "Au", "Hg",
+  "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U",  "Np", "Pu"};
+
+// The Gaussian weight of the C6 reference interpolation separates,
+//   L_ij = exp(-4 (cn_1 - cn_ref_i)^2 - 4 (cn_2 - cn_ref_j)^2) = w_1[i] * w_2[j],
+// so the weights w[k] = exp(-4 (cn - cn_ref_k)^2) of every atom are computed once (after its
+// coordination number is known) and the pair loops only multiply and sum. The table holds
+// max_cn weights per atom; weights of reference points beyond num_cn are not read.
+template <typename T>
+static __device__ __forceinline__ void
+store_cn_weights(const int z1, const T cn, const int n1, float* g_cn_weight)
+{
+  const int num_cn_1 = num_cn[z1];
+  for (int k = 0; k < max_cn; ++k) {
+    float w = 0.0f;
+    if (k < num_cn_1) {
+      const T diff = cn - (T)cn_ref[z1 * max_cn + k];
+      w = (float)exp((T)-4 * diff * diff);
+    }
+    g_cn_weight[n1 * max_cn + k] = w;
+  }
+}
+
+// Weights of the central atom n1: w, dw = w * (-8 diff) (derivative of L with respect to its
+// coordination number up to the factor of the other atom), and their sums.
+struct CnWeights {
+  float w[max_cn];
+  float dw[max_cn];
+  float sum_w;
+  float sum_dw;
+};
+
+static __device__ __forceinline__ void
+load_cn_weights(const int z1, const float cn_1, const float* g_cn_weight_1, CnWeights& cw)
+{
+  const int num_cn_1 = num_cn[z1];
+  cw.sum_w = 0.0f;
+  cw.sum_dw = 0.0f;
+#pragma unroll
+  for (int a = 0; a < max_cn; ++a) {
+    float w = 0.0f;
+    float dw = 0.0f;
+    if (a < num_cn_1) {
+      const float diff = cn_1 - cn_ref[z1 * max_cn + a];
+      w = g_cn_weight_1[a];
+      dw = w * (-8.0f * diff);
+    }
+    cw.w[a] = w;
+    cw.dw[a] = dw;
+    cw.sum_w += w;
+    cw.sum_dw += dw;
+  }
+}
+
+// C6 and its derivative with respect to the coordination number of atom 1 for one pair.
+static __device__ __forceinline__ void get_c6_factorized(
+  const int z1,
+  const int z2,
+  const int z12,
+  const int num_cn_1,
+  const CnWeights& cw,
+  const float* g_cn_weight_2,
+  const float* g_c6_ref,
+  float& c6,
+  float& dc6)
+{
+  c6 = 0.0f;
+  dc6 = 0.0f;
+  const int num_cn_2 = num_cn[z2];
+  if (num_cn_1 == 1 && num_cn_2 == 1) {
+    c6 = g_c6_ref[z12 * max_cn2];
+    return;
+  }
+  float w2[max_cn];
+  float sum_w2 = 0.0f;
+#pragma unroll
+  for (int b = 0; b < max_cn; ++b) {
+    w2[b] = (b < num_cn_2) ? g_cn_weight_2[b] : 0.0f;
+    sum_w2 += w2[b];
+  }
+  // g_c6_ref is stored for the pair (z_small, z_large); the first index runs over atom 1's
+  // references if z1 < z2 and over atom 2's otherwise.
+  const bool order = z1 < z2;
+  const int stride_a = order ? max_cn : 1;
+  const int stride_b = order ? 1 : max_cn;
+  const float* c6_pair = g_c6_ref + z12 * max_cn2;
+  float Z = 0.0f;
+  float dZ = 0.0f;
+#pragma unroll
+  for (int a = 0; a < max_cn; ++a) {
+    if (a < num_cn_1) {
+      float t = 0.0f;
+#pragma unroll
+      for (int b = 0; b < max_cn; ++b) {
+        if (b < num_cn_2) {
+          t += c6_pair[a * stride_a + b * stride_b] * w2[b];
+        }
+      }
+      Z += cw.w[a] * t;
+      dZ += cw.dw[a] * t;
+    }
+  }
+  float W = cw.sum_w * sum_w2;
+  const float dW = cw.sum_dw * sum_w2;
+  if (W < 1.0e-30f) {
+    c6 = c6_pair[(num_cn_1 - 1) * stride_a + (num_cn_2 - 1) * stride_b];
+  } else {
+    W = 1.0f / W;
+    c6 = Z * W;
+    dc6 = dZ * W - c6 * dW * W;
+  }
+}
+
+// Zero-damped term of one pair for the power n (6 or 8) and the exponent alpha = n + 8:
+//   g = f(r) / r^n,  f = 1 / (1 + 6 t^-alpha),  t = r / (sr_n R0),  inv_a = 1 / (sr_n R0),
+//   h = n - alpha (1 - f),   so that  dg/dr = -g h / r.
+// For t < 1 the form g = t^8 inv_a^n / (t^alpha + 6) is used, and for t >= 1 the form
+// g = r^-n / (1 + 6 t^-alpha); neither overflows for any r (and g -> 0 for r -> 0).
+template <int n>
+static __device__ __forceinline__ void
+d3_zero_term(const float r, const float inv_a, float& g, float& h)
+{
+  constexpr float alpha = n + 8;
+  const float t = r * inv_a;
+  if (t < 1.0f) {
+    const float t2 = t * t;
+    const float t4 = t2 * t2;
+    const float t8 = t4 * t4;
+    const float p = (n == 6) ? t8 * t4 * t2 : t8 * t8; // t^alpha <= 1
+    const float inv = 1.0f / (p + 6.0f);
+    float inv_a_n = 1.0f;
+#pragma unroll
+    for (int k = 0; k < n; ++k) {
+      inv_a_n *= inv_a;
+    }
+    g = t8 * inv_a_n * inv;
+    h = n - alpha * 6.0f * inv;
+  } else {
+    const float u = 1.0f / t;
+    const float u2 = u * u;
+    const float u4 = u2 * u2;
+    const float u8 = u4 * u4;
+    const float q = (n == 6) ? u8 * u4 * u2 : u8 * u8; // t^-alpha <= 1
+    const float finv = 1.0f / (1.0f + 6.0f * q);
+    const float ir = 1.0f / r;
+    const float ir2 = ir * ir;
+    const float ir4 = ir2 * ir2;
+    const float ir_n = (n == 6) ? ir4 * ir2 : ir4 * ir4;
+    g = ir_n * finv;
+    h = n - alpha * 6.0f * q * finv;
+  }
+}
+
+// Damped two-body pair terms shared by the small-box and large-box kernels (BJ and zero damping).
+// Inputs: atomic number indices z1, z2, c6 of the pair (eV A^6), c8/c6, squared distance d12_2.
+// Outputs: pe = half of the pair energy magnitude (full neighbor list), f2 with force factor
+// (force on atom 1 = 2 f2 r12), and the damped functions g6, g8 (the C6 and C8 coefficients
+// multiply s6 g6 and s8 g8 in the energy; used for the coordination-number derivative).
+static __device__ __forceinline__ void d3_damped_pair(
+  const DFTD3::DFTD3_Para& p,
+  const int z1,
+  const int z2,
+  const float c6,
+  const float c8_over_c6,
+  const float d12_2,
+  float& pe,
+  float& f2,
+  float& g6,
+  float& g8)
+{
+  const float c8 = c6 * c8_over_c6;
+  if (p.damping == 0) {
+    // BJ damping; operation order unchanged (DR-003 AC-3)
+    const float d12_4 = d12_2 * d12_2;
+    const float d12_6 = d12_4 * d12_2;
+    const float d12_8 = d12_6 * d12_2;
+    float damp = p.a1 * sqrt(c8_over_c6) + p.a2;
+    float damp_2 = damp * damp;
+    float damp_4 = damp_2 * damp_2;
+    float damp_6 = 1.0f / (d12_6 + damp_4 * damp_2);
+    float damp_8 = 1.0f / (d12_8 + damp_4 * damp_4);
+    pe = (p.s6 * c6 * damp_6 + p.s8 * c8 * damp_8) * 0.5f;
+    f2 =
+      p.s6 * c6 * 3.0f * d12_4 * (damp_6 * damp_6) + p.s8 * c8 * 4.0f * d12_6 * (damp_8 * damp_8);
+    g6 = damp_6;
+    g8 = damp_8;
+  } else {
+    // zero damping, D3(0); R0 in Angstrom (packed lower triangle of the symmetric table)
+    const int zl = z1 > z2 ? z1 : z2;
+    const int zs = z1 > z2 ? z2 : z1;
+    const float r0 = d3zero_r0ab[zl * (zl + 1) / 2 + zs];
+    const float r = sqrt(d12_2);
+    float h6, h8;
+    d3_zero_term<6>(r, 1.0f / (p.sr6 * r0), g6, h6);
+    d3_zero_term<8>(r, 1.0f / (p.sr8 * r0), g8, h8);
+    pe = (p.s6 * c6 * g6 + p.s8 * c8 * g8) * 0.5f;
+    // r = 0 (coincident atoms): finite zero force instead of 0/0
+    f2 = d12_2 > 0.0f ? 0.5f * (p.s6 * c6 * g6 * h6 + p.s8 * c8 * g8 * h8) / d12_2 : 0.0f;
+  }
+}
+
+// Coordination number of atom n1 summed in type T (float: BJ, double: zero damping).
+template <typename T>
+static __device__ __forceinline__ T cn_sum_small_box(
+  const int N,
+  const int n1,
+  const int z1,
+  const int* g_NN_angular,
+  const int* g_NL_angular,
+  const int* g_type,
+  const DFTD3::DFTD3_Para& dftd3_para,
+  const float* g_x12,
+  const float* g_y12,
+  const float* g_z12)
+{
+  T R_cov_1 = (T)Bohr * (T)covalent_radius[z1];
+  T cn_temp = 0;
+  for (int i1 = 0; i1 < g_NN_angular[n1]; ++i1) {
+    int index = i1 * N + n1;
+    int n2 = g_NL_angular[index];
+    int z2 = dftd3_para.atomic_number[g_type[n2]];
+    T R_cov_2 = (T)Bohr * (T)covalent_radius[z2];
+    T r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
+    T d12 = sqrt(r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2]);
+    cn_temp += (T)1 / (exp((T)-16 * ((R_cov_1 + R_cov_2) / d12 - (T)1)) + (T)1);
+  }
+  return cn_temp;
+}
+
+void __global__ find_dftd3_coordination_number_small_box(
+  DFTD3::DFTD3_Para dftd3_para,
+  const int N,
+  const int* g_NN_angular,
+  const int* g_NL_angular,
+  const int* g_type,
+  const float* g_x12,
+  const float* g_y12,
+  const float* g_z12,
+  float* g_cn,
+  float* g_cn_weight)
+{
+  int n1 = blockIdx.x * blockDim.x + threadIdx.x;
+  if (n1 < N) {
+    int z1 = dftd3_para.atomic_number[g_type[n1]];
+    if (dftd3_para.damping == 0) { // BJ: float arithmetic
+      const float cn_temp = cn_sum_small_box<float>(
+        N, n1, z1, g_NN_angular, g_NL_angular, g_type, dftd3_para, g_x12, g_y12, g_z12);
+      g_cn[n1] = cn_temp;
+      store_cn_weights(z1, cn_temp, n1, g_cn_weight);
+    } else { // zero damping: double CN, weights from the double CN, g_cn stored as float
+      const double cn_temp = cn_sum_small_box<double>(
+        N, n1, z1, g_NN_angular, g_NL_angular, g_type, dftd3_para, g_x12, g_y12, g_z12);
+      g_cn[n1] = (float)cn_temp;
+      store_cn_weights(z1, cn_temp, n1, g_cn_weight);
+    }
+  }
+}
+
+bool get_expanded_box(const double rc, const Box& box, DFTD3::ExpandedBox& ebox)
+{
+  double volume = box.get_volume();
+  double thickness_x = volume / box.get_area(0);
+  double thickness_y = volume / box.get_area(1);
+  double thickness_z = volume / box.get_area(2);
+  ebox.num_cells[0] = box.pbc_x ? int(ceil(2.0 * rc / thickness_x)) : 1;
+  ebox.num_cells[1] = box.pbc_y ? int(ceil(2.0 * rc / thickness_y)) : 1;
+  ebox.num_cells[2] = box.pbc_z ? int(ceil(2.0 * rc / thickness_z)) : 1;
+
+  bool is_small_box = false;
+  if (box.pbc_x && thickness_x <= 2.5 * rc) {
+    is_small_box = true;
+  }
+  if (box.pbc_y && thickness_y <= 2.5 * rc) {
+    is_small_box = true;
+  }
+  if (box.pbc_z && thickness_z <= 2.5 * rc) {
+    is_small_box = true;
+  }
+
+  if (is_small_box) {
+    if (thickness_x > 10 * rc || thickness_y > 10 * rc || thickness_z > 10 * rc) {
+      std::cout << "Error:\n"
+                << "    The box has\n"
+                << "        a thickness < 2.5 radial cutoffs in a periodic direction.\n"
+                << "        and a thickness > 10 radial cutoffs in another direction.\n"
+                << "    Please increase the periodic direction(s).\n";
+      exit(1);
+    }
+
+    ebox.h[0] = box.cpu_h[0] * ebox.num_cells[0];
+    ebox.h[3] = box.cpu_h[3] * ebox.num_cells[0];
+    ebox.h[6] = box.cpu_h[6] * ebox.num_cells[0];
+    ebox.h[1] = box.cpu_h[1] * ebox.num_cells[1];
+    ebox.h[4] = box.cpu_h[4] * ebox.num_cells[1];
+    ebox.h[7] = box.cpu_h[7] * ebox.num_cells[1];
+    ebox.h[2] = box.cpu_h[2] * ebox.num_cells[2];
+    ebox.h[5] = box.cpu_h[5] * ebox.num_cells[2];
+    ebox.h[8] = box.cpu_h[8] * ebox.num_cells[2];
+
+    ebox.h[9] = ebox.h[4] * ebox.h[8] - ebox.h[5] * ebox.h[7];
+    ebox.h[10] = ebox.h[2] * ebox.h[7] - ebox.h[1] * ebox.h[8];
+    ebox.h[11] = ebox.h[1] * ebox.h[5] - ebox.h[2] * ebox.h[4];
+    ebox.h[12] = ebox.h[5] * ebox.h[6] - ebox.h[3] * ebox.h[8];
+    ebox.h[13] = ebox.h[0] * ebox.h[8] - ebox.h[2] * ebox.h[6];
+    ebox.h[14] = ebox.h[2] * ebox.h[3] - ebox.h[0] * ebox.h[5];
+    ebox.h[15] = ebox.h[3] * ebox.h[7] - ebox.h[4] * ebox.h[6];
+    ebox.h[16] = ebox.h[1] * ebox.h[6] - ebox.h[0] * ebox.h[7];
+    ebox.h[17] = ebox.h[0] * ebox.h[4] - ebox.h[1] * ebox.h[3];
+    double det = ebox.h[0] * (ebox.h[4] * ebox.h[8] - ebox.h[5] * ebox.h[7]) +
+                  ebox.h[1] * (ebox.h[5] * ebox.h[6] - ebox.h[3] * ebox.h[8]) +
+                  ebox.h[2] * (ebox.h[3] * ebox.h[7] - ebox.h[4] * ebox.h[6]);
+    for (int n = 9; n < 18; n++) {
+      ebox.h[n] /= det;
+    }
+  }
+
+  return is_small_box;
+}
+
+static __device__ void apply_mic_small_box(
+  const Box& box, const DFTD3::ExpandedBox& ebox, float& x12, float& y12, float& z12)
+{
+  float sx12 = ebox.h[9] * x12 + ebox.h[10] * y12 + ebox.h[11] * z12;
+  float sy12 = ebox.h[12] * x12 + ebox.h[13] * y12 + ebox.h[14] * z12;
+  float sz12 = ebox.h[15] * x12 + ebox.h[16] * y12 + ebox.h[17] * z12;
+  if (box.pbc_x == 1)
+    sx12 -= nearbyint(sx12);
+  if (box.pbc_y == 1)
+    sy12 -= nearbyint(sy12);
+  if (box.pbc_z == 1)
+    sz12 -= nearbyint(sz12);
+  x12 = ebox.h[0] * sx12 + ebox.h[1] * sy12 + ebox.h[2] * sz12;
+  y12 = ebox.h[3] * sx12 + ebox.h[4] * sy12 + ebox.h[5] * sz12;
+  z12 = ebox.h[6] * sx12 + ebox.h[7] * sy12 + ebox.h[8] * sz12;
+}
+
+static __global__ void find_neighbor_list_small_box(
+  const float rc_radial_sq,
+  const float rc_angular_sq,
+  const int N,
+  const Box box,
+  const DFTD3::ExpandedBox ebox,
+  const double* __restrict__ g_x,
+  const double* __restrict__ g_y,
+  const double* __restrict__ g_z,
+  int* g_NN_radial,
+  int* g_NL_radial,
+  int* g_NN_angular,
+  int* g_NL_angular,
+  float* g_x12_radial,
+  float* g_y12_radial,
+  float* g_z12_radial,
+  float* g_x12_angular,
+  float* g_y12_angular,
+  float* g_z12_angular)
+{
+  // One thread block per central atom. The (n2, ia, ib, ic) candidates are visited in the same
+  // order as in the serial algorithm, in chunks of blockDim.x; an exclusive prefix sum inside the
+  // chunk gives every accepted candidate its slot, so the list order is unchanged.
+  // Requires blockDim.x == NL_BLOCK_SIZE.
+  __shared__ int s_radial[NL_BLOCK_SIZE];
+  __shared__ int s_angular[NL_BLOCK_SIZE];
+  const int n1 = blockIdx.x;
+  const int tid = threadIdx.x;
+  const float x1 = g_x[n1];
+  const float y1 = g_y[n1];
+  const float z1 = g_z[n1];
+  const int nb = ebox.num_cells[1];
+  const int nc = ebox.num_cells[2];
+  const int num_images = ebox.num_cells[0] * nb * nc;
+  const int num_candidates = N * num_images;
+  int count_radial = 0;
+  int count_angular = 0;
+  for (int k0 = 0; k0 < num_candidates; k0 += NL_BLOCK_SIZE) {
+    const int k = k0 + tid;
+    int n2 = 0;
+    float x12 = 0.0f;
+    float y12 = 0.0f;
+    float z12 = 0.0f;
+    int is_radial = 0;
+    int is_angular = 0;
+    if (k < num_candidates) {
+      n2 = k / num_images;
+      int image = k - n2 * num_images;
+      const int ia = image / (nb * nc);
+      image -= ia * (nb * nc);
+      const int ib = image / nc;
+      const int ic = image - ib * nc;
+      if (!(ia == 0 && ib == 0 && ic == 0 && n1 == n2)) { // exclude self
+        float delta[3];
+        delta[0] = box.cpu_h[0] * ia + box.cpu_h[1] * ib + box.cpu_h[2] * ic;
+        delta[1] = box.cpu_h[3] * ia + box.cpu_h[4] * ib + box.cpu_h[5] * ic;
+        delta[2] = box.cpu_h[6] * ia + box.cpu_h[7] * ib + box.cpu_h[8] * ic;
+
+        x12 = g_x[n2] + delta[0] - x1;
+        y12 = g_y[n2] + delta[1] - y1;
+        z12 = g_z[n2] + delta[2] - z1;
+
+        apply_mic_small_box(box, ebox, x12, y12, z12);
+
+        const float distance_square = x12 * x12 + y12 * y12 + z12 * z12;
+        is_radial = distance_square < rc_radial_sq;
+        is_angular = distance_square < rc_angular_sq;
+      }
+    }
+
+    // inclusive scan (Hillis-Steele) of the two flags
+    s_radial[tid] = is_radial;
+    s_angular[tid] = is_angular;
+    __syncthreads();
+    for (int offset = 1; offset < NL_BLOCK_SIZE; offset <<= 1) {
+      int add_radial = 0;
+      int add_angular = 0;
+      if (tid >= offset) {
+        add_radial = s_radial[tid - offset];
+        add_angular = s_angular[tid - offset];
+      }
+      __syncthreads();
+      s_radial[tid] += add_radial;
+      s_angular[tid] += add_angular;
+      __syncthreads();
+    }
+    const int pos_radial = count_radial + s_radial[tid] - is_radial;
+    const int pos_angular = count_angular + s_angular[tid] - is_angular;
+    if (is_radial) {
+      g_NL_radial[pos_radial * N + n1] = n2;
+      g_x12_radial[pos_radial * N + n1] = x12;
+      g_y12_radial[pos_radial * N + n1] = y12;
+      g_z12_radial[pos_radial * N + n1] = z12;
+    }
+    if (is_angular) {
+      g_NL_angular[pos_angular * N + n1] = n2;
+      g_x12_angular[pos_angular * N + n1] = x12;
+      g_y12_angular[pos_angular * N + n1] = y12;
+      g_z12_angular[pos_angular * N + n1] = z12;
+    }
+    count_radial += s_radial[NL_BLOCK_SIZE - 1];
+    count_angular += s_angular[NL_BLOCK_SIZE - 1];
+    __syncthreads(); // the shared arrays are reused in the next chunk
+  }
+  if (tid == 0) {
+    g_NN_radial[n1] = count_radial;
+    g_NN_angular[n1] = count_angular;
+  }
+}
+
+void find_atomic_number(const std::string& potential_file_name, int* atomic_number)
+{
+  std::ifstream input_potential(potential_file_name);
+  if (!input_potential.is_open()) {
+    PRINT_INPUT_ERROR("Cannot open potential file.");
+  }
+  std::string line;
+  std::getline(input_potential, line);
+  std::vector<std::string> tokens = get_tokens(line);
+  if (tokens[0].substr(0, 3) != "nep") {
+    PRINT_INPUT_ERROR("DFTD3 only supports NEP models.");
+  }
+
+  int num_types = get_int_from_token(tokens[1], __FILE__, __LINE__);
+
+  if (tokens.size() != 2 + num_types) {
+    std::cout << "The first line of the NEP model file should have " << num_types
+              << " atom symbols." << std::endl;
+    exit(1);
+  }
+
+  for (int n = 0; n < num_types; ++n) {
+    for (int m = 0; m < NUM_ELEMENTS; ++m) {
+      if (tokens[2 + n] == ELEMENTS[m]) {
+        atomic_number[n] = m;
+        break;
+      }
+    }
+    if (atomic_number[n] >= max_elem) {
+      std::cout << "DFTD3 only supports elements from H to Pu." << std::endl;
+      exit(1);
+    }
+  }
+
+  input_potential.close();
+}
+
+__device__ int find_neighbor_cell(
+  int cell_id,
+  int cell_id_x,
+  int cell_id_y,
+  int cell_id_z,
+  int nx,
+  int ny,
+  int nz,
+  int xx,
+  int yy,
+  int zz)
+{
+  int neighbor_cell = cell_id + zz * nx * ny + yy * nx + xx;
+  if (cell_id_x + xx < 0)
+    neighbor_cell += nx;
+  else if (cell_id_x + xx >= nx)
+    neighbor_cell -= nx;
+  if (cell_id_y + yy < 0)
+    neighbor_cell += ny * nx;
+  else if (cell_id_y + yy >= ny)
+    neighbor_cell -= ny * nx;
+  if (cell_id_z + zz < 0)
+    neighbor_cell += nz * ny * nx;
+  else if (cell_id_z + zz >= nz)
+    neighbor_cell -= nz * ny * nx;
+
+  return neighbor_cell;
+}
+
+constexpr int BLOCK_SIZE_LARGE_BOX = 128;
+constexpr int NUM_REDUCE_LARGE_BOX = 15;
+
+// Number of threads cooperating on one atom in the large-box kernels (a power of two, at most 16).
+// More threads per atom fill the GPU when N is small. The thresholds were tuned on an RTX A6000
+// (84 SMs): up to 16 threads per atom for N <= 4125 (about 6.6e4 threads), at most 8 above; the
+// total thread count N * num_sub is kept at or below 3.4e5, and one thread per atom is used for N
+// >= 1e5, where the GPU is already saturated. The number of threads per atom is also limited by the
+// number of neighbor cells an atom visits (5 per periodic axis, 1 otherwise).
+//
+// Test aid, intentionally undocumented for users: the environment variable
+// GPUMD_DFTD3_LARGE_BOX_NUM_SUB (1, 2, 4, 8 or 16) fixes the number of threads per atom, so that
+// every instantiation can be tested on the same system. A message is then printed once.
+static int get_num_sub_large_box(const int N, const Box& box)
+{
+  static const int forced = []() {
+    const char* env = std::getenv("GPUMD_DFTD3_LARGE_BOX_NUM_SUB");
+    if (env == nullptr) {
+      return 0;
+    }
+    const long value = std::atol(env);
+    return (value >= 1 && value <= 16 && (value & (value - 1)) == 0) ? static_cast<int>(value) : 0;
+  }();
+  if (forced > 0) {
+    static bool printed = false;
+    if (!printed) {
+      printed = true;
+      std::cout << "DFT-D3 large box: threads per atom = " << forced << std::endl;
+    }
+    return forced;
+  }
+  int num_sub = 1;
+  if (N < 100000) {
+    const int max_sub = (N <= 4125) ? 16 : 8;
+    while (num_sub < max_sub && N * (num_sub * 2) <= 340000) {
+      num_sub *= 2;
+    }
+  }
+  const int num_cells = (box.pbc_x ? 5 : 1) * (box.pbc_y ? 5 : 1) * (box.pbc_z ? 5 : 1);
+  while (num_sub > 1 && num_sub / 2 >= num_cells) {
+    num_sub /= 2;
+  }
+  return num_sub;
+}
+
+// Tree reduction over the num_sub consecutive threads that share one atom. All threads of the block
+// must call this (it contains __syncthreads()). The result is left in s_red[k][tid] of sub == 0.
+template <int num_sub, int num_values>
+__device__ __forceinline__ void
+reduce_sub_large_box(float (*s_red)[BLOCK_SIZE_LARGE_BOX], const int tid, const int sub)
+{
+  for (int offset = num_sub / 2; offset > 0; offset >>= 1) {
+    __syncthreads();
+    if (sub < offset) {
+      for (int k = 0; k < num_values; ++k) {
+        s_red[k][tid] += s_red[k][tid + offset];
+      }
+    }
+  }
+}
+
+// Small-box force kernels. num_sub (a power of two, at most the block size) consecutive threads
+// cooperate on one atom n1 and take every num_sub-th entry of its neighbor list; the partial sums
+// are reduced in a fixed tree order in shared memory, so the result does not depend on thread
+// scheduling. The neighbor list is full (every pair appears in the lists of both atoms), so each
+// atom collects its own force and virial from its own list only (no scattered updates of n2).
+constexpr int MAX_NUM_SUB_SMALL_BOX = BLOCK_SIZE_LARGE_BOX;
+
+template <int num_sub>
+__global__ void add_dftd3_force_small_box(
+  DFTD3::DFTD3_Para dftd3_para,
+  const int N,
+  const int* g_NN_radial,
+  const int* g_NL_radial,
+  const int* g_type,
+  const float* g_c6_ref,
+  const float* g_cn,
+  const float* g_cn_weight,
+  const float* g_x12,
+  const float* g_y12,
+  const float* g_z12,
+  double* g_potential,
+  double* g_fx,
+  double* g_fy,
+  double* g_fz,
+  double* g_virial,
+  float* g_dc6_sum,
+  float* g_dc8_sum)
+{
+  static_assert(
+    num_sub >= 1 && num_sub <= MAX_NUM_SUB_SMALL_BOX && (num_sub & (num_sub - 1)) == 0 &&
+      BLOCK_SIZE_LARGE_BOX % num_sub == 0,
+    "num_sub must be a power of two that divides the block size");
+  const int tid = threadIdx.x;
+  const int sub = tid % num_sub;
+  const int n1 = blockIdx.x * (blockDim.x / num_sub) + tid / num_sub;
+  const bool valid = n1 < N;
+  __shared__ float s_red[NUM_REDUCE_LARGE_BOX][BLOCK_SIZE_LARGE_BOX];
+  const int n1_safe = valid ? n1 : 0;
+  const int z1 = dftd3_para.atomic_number[g_type[n1_safe]];
+  const int num_cn_1 = num_cn[z1];
+  const float cn_1 = g_cn[n1_safe];
+  CnWeights cw;
+  load_cn_weights(z1, cn_1, g_cn_weight + n1_safe * max_cn, cw);
+  const int num_pairs = valid ? g_NN_radial[n1] : 0;
+  float dc6_sum = 0.0f;
+  float dc8_sum = 0.0f;
+  float s_pe = 0.0f;
+  float s_fx = 0.0f;
+  float s_fy = 0.0f;
+  float s_fz = 0.0f;
+  float s_sxx = 0.0f;
+  float s_sxy = 0.0f;
+  float s_sxz = 0.0f;
+  float s_syx = 0.0f;
+  float s_syy = 0.0f;
+  float s_syz = 0.0f;
+  float s_szx = 0.0f;
+  float s_szy = 0.0f;
+  float s_szz = 0.0f;
+  for (int i1 = sub; i1 < num_pairs; i1 += num_sub) {
+    const int index = i1 * N + n1;
+    const int n2 = g_NL_radial[index];
+    const int z2 = dftd3_para.atomic_number[g_type[n2]];
+    int z_small = z1, z_large = z2;
+    if (z1 > z2) {
+      z_small = z2;
+      z_large = z1;
+    }
+    const int z12 = z_small * max_elem - (z_small * (z_small - 1)) / 2 + (z_large - z_small);
+    const float r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
+    const float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
+    float c6;
+    float dc6;
+    get_c6_factorized(z1, z2, z12, num_cn_1, cw, g_cn_weight + n2 * max_cn, g_c6_ref, c6, dc6);
+    c6 *= HartreeBohr6;
+    dc6 *= HartreeBohr6;
+
+    const float c8_over_c6 = 3.0f * r2r4[z1] * r2r4[z2] * Bohr2;
+    float pe_pair, f2, g6, g8;
+    d3_damped_pair(dftd3_para, z1, z2, c6, c8_over_c6, d12_2, pe_pair, f2, g6, g8);
+    s_pe -= pe_pair;
+    float f12[3] = {r12[0] * f2, r12[1] * f2, r12[2] * f2};
+    s_fx += 2.0f * f12[0];
+    s_fy += 2.0f * f12[1];
+    s_fz += 2.0f * f12[2];
+    s_sxx -= r12[0] * f12[0];
+    s_sxy -= r12[0] * f12[1];
+    s_sxz -= r12[0] * f12[2];
+    s_syx -= r12[1] * f12[0];
+    s_syy -= r12[1] * f12[1];
+    s_syz -= r12[1] * f12[2];
+    s_szx -= r12[2] * f12[0];
+    s_szy -= r12[2] * f12[1];
+    s_szz -= r12[2] * f12[2];
+    dc6_sum += dc6 * dftd3_para.s6 * g6;
+    dc8_sum += dc6 * c8_over_c6 * dftd3_para.s8 * g8;
+  }
+  if (num_sub > 1) {
+    s_red[0][tid] = s_fx;
+    s_red[1][tid] = s_fy;
+    s_red[2][tid] = s_fz;
+    s_red[3][tid] = s_sxx;
+    s_red[4][tid] = s_sxy;
+    s_red[5][tid] = s_sxz;
+    s_red[6][tid] = s_syx;
+    s_red[7][tid] = s_syy;
+    s_red[8][tid] = s_syz;
+    s_red[9][tid] = s_szx;
+    s_red[10][tid] = s_szy;
+    s_red[11][tid] = s_szz;
+    s_red[12][tid] = s_pe;
+    s_red[13][tid] = dc6_sum;
+    s_red[14][tid] = dc8_sum;
+    reduce_sub_large_box<num_sub, NUM_REDUCE_LARGE_BOX>(s_red, tid, sub);
+  }
+  if (!valid || sub != 0) {
+    return;
+  }
+  if (num_sub > 1) {
+    s_fx = s_red[0][tid];
+    s_fy = s_red[1][tid];
+    s_fz = s_red[2][tid];
+    s_sxx = s_red[3][tid];
+    s_sxy = s_red[4][tid];
+    s_sxz = s_red[5][tid];
+    s_syx = s_red[6][tid];
+    s_syy = s_red[7][tid];
+    s_syz = s_red[8][tid];
+    s_szx = s_red[9][tid];
+    s_szy = s_red[10][tid];
+    s_szz = s_red[11][tid];
+    s_pe = s_red[12][tid];
+    dc6_sum = s_red[13][tid];
+    dc8_sum = s_red[14][tid];
+  }
+  g_fx[n1] += s_fx;
+  g_fy[n1] += s_fy;
+  g_fz[n1] += s_fz;
+  g_virial[n1 + 0 * N] += s_sxx;
+  g_virial[n1 + 1 * N] += s_syy;
+  g_virial[n1 + 2 * N] += s_szz;
+  g_virial[n1 + 3 * N] += s_sxy;
+  g_virial[n1 + 4 * N] += s_sxz;
+  g_virial[n1 + 5 * N] += s_syz;
+  g_virial[n1 + 6 * N] += s_syx;
+  g_virial[n1 + 7 * N] += s_szx;
+  g_virial[n1 + 8 * N] += s_szy;
+  g_potential[n1] += s_pe;
+  g_dc6_sum[n1] = dc6_sum;
+  g_dc8_sum[n1] = dc8_sum;
+}
+
+// The force of the coordination-number term on atom n1 from the pair (n1, n2) is
+// k12 * (D1 + D2) * r12 with D = dc6_sum + dc8_sum of the atom (the two atoms of a pair both
+// contribute), and its virial share (kept per atom as before) is -r12 x r12 * k12 * D2.
+template <int num_sub>
+__global__ void add_dftd3_force_extra_small_box(
+  DFTD3::DFTD3_Para dftd3_para,
+  const int N,
+  const int* g_NN_angular,
+  const int* g_NL_angular,
+  const int* g_type,
+  const float* g_dc6_sum,
+  const float* g_dc8_sum,
+  const float* g_x12,
+  const float* g_y12,
+  const float* g_z12,
+  double* g_fx,
+  double* g_fy,
+  double* g_fz,
+  double* g_virial)
+{
+  static_assert(
+    num_sub >= 1 && num_sub <= MAX_NUM_SUB_SMALL_BOX && (num_sub & (num_sub - 1)) == 0 &&
+      BLOCK_SIZE_LARGE_BOX % num_sub == 0,
+    "num_sub must be a power of two that divides the block size");
+  const int tid = threadIdx.x;
+  const int sub = tid % num_sub;
+  const int n1 = blockIdx.x * (blockDim.x / num_sub) + tid / num_sub;
+  const bool valid = n1 < N;
+  __shared__ float s_red[NUM_REDUCE_LARGE_BOX][BLOCK_SIZE_LARGE_BOX];
+  const int n1_safe = valid ? n1 : 0;
+  const int z1 = dftd3_para.atomic_number[g_type[n1_safe]];
+  const float R_cov_1 = Bohr * covalent_radius[z1];
+  const float dc_sum_1 = g_dc6_sum[n1_safe] + g_dc8_sum[n1_safe];
+  const int num_pairs = valid ? g_NN_angular[n1] : 0;
+  float s_fx = 0.0f;
+  float s_fy = 0.0f;
+  float s_fz = 0.0f;
+  float s_sxx = 0.0f;
+  float s_sxy = 0.0f;
+  float s_sxz = 0.0f;
+  float s_syx = 0.0f;
+  float s_syy = 0.0f;
+  float s_syz = 0.0f;
+  float s_szx = 0.0f;
+  float s_szy = 0.0f;
+  float s_szz = 0.0f;
+  for (int i1 = sub; i1 < num_pairs; i1 += num_sub) {
+    const int index = i1 * N + n1;
+    const int n2 = g_NL_angular[index];
+    const int z2 = dftd3_para.atomic_number[g_type[n2]];
+    const float R_cov_2 = Bohr * covalent_radius[z2];
+    const float r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
+    const float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
+    const float d12 = sqrt(d12_2);
+    const float cn_exp_factor = exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f));
+    const float dc_sum_2 = g_dc6_sum[n2] + g_dc8_sum[n2];
+    float k12 = cn_exp_factor * 16.0f * (R_cov_1 + R_cov_2); // not 8.0f
+    k12 /= (cn_exp_factor + 1.0f) * (cn_exp_factor + 1.0f) * d12 * d12_2;
+    const float f2 = k12 * (dc_sum_1 + dc_sum_2);
+    const float f2_virial = k12 * dc_sum_2;
+    s_fx += r12[0] * f2;
+    s_fy += r12[1] * f2;
+    s_fz += r12[2] * f2;
+    const float f12[3] = {r12[0] * f2_virial, r12[1] * f2_virial, r12[2] * f2_virial};
+    s_sxx -= r12[0] * f12[0];
+    s_sxy -= r12[0] * f12[1];
+    s_sxz -= r12[0] * f12[2];
+    s_syx -= r12[1] * f12[0];
+    s_syy -= r12[1] * f12[1];
+    s_syz -= r12[1] * f12[2];
+    s_szx -= r12[2] * f12[0];
+    s_szy -= r12[2] * f12[1];
+    s_szz -= r12[2] * f12[2];
+  }
+  if (num_sub > 1) {
+    s_red[0][tid] = s_fx;
+    s_red[1][tid] = s_fy;
+    s_red[2][tid] = s_fz;
+    s_red[3][tid] = s_sxx;
+    s_red[4][tid] = s_sxy;
+    s_red[5][tid] = s_sxz;
+    s_red[6][tid] = s_syx;
+    s_red[7][tid] = s_syy;
+    s_red[8][tid] = s_syz;
+    s_red[9][tid] = s_szx;
+    s_red[10][tid] = s_szy;
+    s_red[11][tid] = s_szz;
+    reduce_sub_large_box<num_sub, 12>(s_red, tid, sub);
+  }
+  if (!valid || sub != 0) {
+    return;
+  }
+  if (num_sub > 1) {
+    s_fx = s_red[0][tid];
+    s_fy = s_red[1][tid];
+    s_fz = s_red[2][tid];
+    s_sxx = s_red[3][tid];
+    s_sxy = s_red[4][tid];
+    s_sxz = s_red[5][tid];
+    s_syx = s_red[6][tid];
+    s_syy = s_red[7][tid];
+    s_syz = s_red[8][tid];
+    s_szx = s_red[9][tid];
+    s_szy = s_red[10][tid];
+    s_szz = s_red[11][tid];
+  }
+  g_fx[n1] += s_fx;
+  g_fy[n1] += s_fy;
+  g_fz[n1] += s_fz;
+  g_virial[n1 + 0 * N] += s_sxx;
+  g_virial[n1 + 1 * N] += s_syy;
+  g_virial[n1 + 2 * N] += s_szz;
+  g_virial[n1 + 3 * N] += s_sxy;
+  g_virial[n1 + 4 * N] += s_sxz;
+  g_virial[n1 + 5 * N] += s_syz;
+  g_virial[n1 + 6 * N] += s_syx;
+  g_virial[n1 + 7 * N] += s_szx;
+  g_virial[n1 + 8 * N] += s_szy;
+}
+
+// Number of threads per atom in the small-box force kernels (a power of two, at most
+// MAX_NUM_SUB_SMALL_BOX): the largest value for which the total thread count N * num_sub stays at
+// or below target_threads and every thread still has at least MIN_PAIRS_PER_THREAD expected list
+// entries. expected_pairs is the continuum estimate of the list length per atom. The kernels are
+// latency bound (a serial chain of dependent loads per list entry), so the target is several
+// resident threads per core: TARGET_THREADS_PER_SM was tuned on an RTX A6000 (84 SMs) with water
+// systems of 81 to 34,992 atoms; more threads per atom than this also split the list reads of one
+// warp over many rows and slow the kernels down for N above a few thousand.
+constexpr int TARGET_THREADS_PER_SM = 640;
+constexpr int MIN_PAIRS_PER_THREAD = 4;
+
+static int get_num_sub_small_box(const int N, const double expected_pairs, const int target_threads)
+{
+  int num_sub = 1;
+  while (num_sub < MAX_NUM_SUB_SMALL_BOX &&
+         static_cast<long long>(N) * (2 * num_sub) <= target_threads &&
+         expected_pairs >= MIN_PAIRS_PER_THREAD * (2 * num_sub)) {
+    num_sub *= 2;
+  }
+  return num_sub;
+}
+
+// Test aid, intentionally undocumented for users: the environment variable
+// GPUMD_DFTD3_SMALL_BOX_NUM_SUB (a power of two from 1 to MAX_NUM_SUB_SMALL_BOX) fixes the number
+// of threads per atom of the small-box force kernels, so that every instantiation can be tested
+// on the same system. A message with the chosen value is then printed once.
+static int get_forced_num_sub_small_box()
+{
+  static const int forced = []() {
+    const char* env = std::getenv("GPUMD_DFTD3_SMALL_BOX_NUM_SUB");
+    if (env == nullptr) {
+      return 0;
+    }
+    const long value = std::atol(env);
+    if (value >= 1 && value <= MAX_NUM_SUB_SMALL_BOX && (value & (value - 1)) == 0) {
+      return static_cast<int>(value);
+    }
+    return 0;
+  }();
+  return forced;
+}
+
+static int get_num_sub_small_box_for_device(const int N, const double expected_pairs)
+{
+  const int forced = get_forced_num_sub_small_box();
+  if (forced > 0) {
+    static bool printed = false;
+    if (!printed) {
+      printed = true;
+      std::cout << "DFT-D3 small box: threads per atom = " << forced << std::endl;
+    }
+    return forced;
+  }
+  static const int target_threads = []() {
+    int device_id = 0;
+    CHECK(gpuGetDevice(&device_id));
+    gpuDeviceProp device_prop;
+    CHECK(gpuGetDeviceProperties(&device_prop, device_id));
+    return device_prop.multiProcessorCount * TARGET_THREADS_PER_SM;
+  }();
+  return get_num_sub_small_box(N, expected_pairs, target_threads);
+}
+
+// The CN kernel stores the partners it accepts (r < rc_angular) in a list per (atom, thread) slot,
+// so that the extra kernel, which needs exactly the same pairs, does not repeat the cell traversal
+// (about four candidates are visited per accepted pair). The capacity per slot follows from the
+// mean number of partners (continuum estimate); a slot whose partners do not all fit is handled by
+// the extra kernel with the cell traversal, so a too small capacity costs time, never accuracy. The
+// list is not used (capacity 0) when it would take more than MAX_CN_LIST_BYTES.
+constexpr size_t MAX_CN_LIST_BYTES = size_t(256) << 20;
+
+// Test aid, intentionally undocumented for users: the environment variable
+// GPUMD_DFTD3_LARGE_BOX_LIST_CAPACITY (0 or larger) fixes the capacity per slot (0 switches the
+// list off). A message with the chosen value is printed once.
+static int
+get_cn_list_capacity(const int N, const int num_sub, const double rc_angular, const Box& box)
+{
+  static const int forced = []() {
+    const char* env = std::getenv("GPUMD_DFTD3_LARGE_BOX_LIST_CAPACITY");
+    if (env == nullptr) {
+      return -1;
+    }
+    const long value = std::atol(env);
+    return (value >= 0 && value <= 4096) ? static_cast<int>(value) : -1;
+  }();
+  int capacity = forced;
+  if (capacity >= 0) {
+    static bool printed = false;
+    if (!printed) {
+      printed = true;
+      std::cout << "DFT-D3 large box: neighbor list capacity per thread = " << capacity
+                << std::endl;
+    }
+  } else {
+    const double expected_pairs = N / box.get_volume() * (4.0 / 3.0) * 3.14159265358979323846 *
+                                  rc_angular * rc_angular * rc_angular;
+    // clamp in double: the estimate is huge (and the cast undefined) for a tiny volume
+    capacity = static_cast<int>(std::min(1.5 * expected_pairs / num_sub, 4096.0)) + 8;
+  }
+  const size_t list_bytes =
+    static_cast<size_t>(N) * num_sub * static_cast<size_t>(capacity) * sizeof(int);
+  if (list_bytes > MAX_CN_LIST_BYTES) {
+    capacity = 0;
+  }
+  return capacity;
+}
+
+template <int num_sub>
+__global__ void find_dftd3_coordination_number_large_box(
+  const DFTD3::DFTD3_Para dftd3_para,
+  const float rc,
+  const int N,
+  const int nx,
+  const int ny,
+  const int nz,
+  const Box box,
+  const int* g_type,
+  const int* g_cell_count,
+  const int* g_cell_count_sum,
+  const int* g_cell_contents,
+  const double* g_x,
+  const double* g_y,
+  const double* g_z,
+  float* g_cn,
+  float* g_cn_weight,
+  int* g_list,
+  int* g_list_count,
+  const int list_capacity)
+{
+  static_assert(
+    num_sub >= 1 && num_sub <= 16 && (num_sub & (num_sub - 1)) == 0 &&
+      BLOCK_SIZE_LARGE_BOX % num_sub == 0,
+    "num_sub must be a power of two, at most 16, and divide the block size");
+  const int tid = threadIdx.x;
+  const int sub = tid % num_sub;
+  const int n1 = blockIdx.x * (blockDim.x / num_sub) + tid / num_sub;
+  const bool valid = n1 < N;
+  __shared__ float s_red[1][BLOCK_SIZE_LARGE_BOX];
+  const int n1_safe = valid ? n1 : 0;
+
+  int atomic_number_1 = dftd3_para.atomic_number[g_type[n1_safe]];
+  float R_cov_1 = Bohr * covalent_radius[atomic_number_1];
+  float cn_temp = 0.0f;
+  const size_t num_slots = static_cast<size_t>(N) * num_sub;
+  const size_t slot = static_cast<size_t>(n1_safe) * num_sub + sub;
+  int num_accepted = 0;
+  double x1 = g_x[n1_safe];
+  double y1 = g_y[n1_safe];
+  double z1 = g_z[n1_safe];
+  int cell_id;
+  int cell_id_x;
+  int cell_id_y;
+  int cell_id_z;
+  find_cell_id(box, x1, y1, z1, 2.0f / rc, nx, ny, nz, cell_id_x, cell_id_y, cell_id_z, cell_id);
+
+  const int z_lim = box.pbc_z ? 2 : 0;
+  const int y_lim = box.pbc_y ? 2 : 0;
+  const int x_lim = box.pbc_x ? 2 : 0;
+  const int num_x = 2 * x_lim + 1;
+  const int num_y = 2 * y_lim + 1;
+  const int num_z = 2 * z_lim + 1;
+  for (int c = valid ? sub : num_x * num_y * num_z; c < num_x * num_y * num_z; c += num_sub) {
+    const int xx = c % num_x - x_lim;
+    const int yy = (c / num_x) % num_y - y_lim;
+    const int zz = c / (num_x * num_y) - z_lim;
+    {
+      {
+        int neighbor_cell =
+          find_neighbor_cell(cell_id, cell_id_x, cell_id_y, cell_id_z, nx, ny, nz, xx, yy, zz);
+        const int num_atoms_neighbor_cell = g_cell_count[neighbor_cell];
+        const int num_atoms_previous_cells = g_cell_count_sum[neighbor_cell];
+        for (int m = 0; m < num_atoms_neighbor_cell; ++m) {
+          const int n2 = g_cell_contents[num_atoms_previous_cells + m];
+          if (n1 == n2) {
+            continue;
+          }
+          float x12 = g_x[n2] - x1;
+          float y12 = g_y[n2] - y1;
+          float z12 = g_z[n2] - z1;
+          apply_mic(box, x12, y12, z12);
+          float r12[3] = {x12, y12, z12};
+          float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
+          if (d12_2 < rc * rc) {
+            int atomic_number_2 = dftd3_para.atomic_number[g_type[n2]];
+            float R_cov_2 = Bohr * covalent_radius[atomic_number_2];
+            float d12 = sqrt(d12_2);
+            cn_temp += 1.0f / (exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f)) + 1.0f);
+            if (num_accepted < list_capacity) {
+              g_list[num_accepted * num_slots + slot] = n2;
+            }
+            ++num_accepted;
+          }
+        }
+      }
+    }
+  }
+  if (valid && list_capacity > 0) {
+    g_list_count[slot] = num_accepted;
+  }
+  if (num_sub > 1) {
+    s_red[0][tid] = cn_temp;
+    reduce_sub_large_box<num_sub, 1>(s_red, tid, sub);
+  }
+  if (!valid || sub != 0) {
+    return;
+  }
+  if (num_sub > 1) {
+    cn_temp = s_red[0][tid];
+  }
+  g_cn[n1] = cn_temp;
+  store_cn_weights(atomic_number_1, cn_temp, n1, g_cn_weight);
+}
+
+template <int num_sub>
+__global__ void find_dftd3_force_large_box(
+  const DFTD3::DFTD3_Para dftd3_para,
+  const float rc,
+  const int N,
+  const int nx,
+  const int ny,
+  const int nz,
+  const Box box,
+  const int* g_type,
+  const int* g_cell_count,
+  const int* g_cell_count_sum,
+  const int* g_cell_contents,
+  const float* g_c6_ref,
+  const float* g_cn,
+  const float* g_cn_weight,
+  const double* g_x,
+  const double* g_y,
+  const double* g_z,
+  double* g_potential,
+  double* g_fx,
+  double* g_fy,
+  double* g_fz,
+  double* g_virial,
+  float* g_dc6_sum,
+  float* g_dc8_sum)
+{
+  // num_sub (power of two, divides blockDim.x) consecutive threads cooperate on one atom n1,
+  // each handling a strided subset of the neighbor cells; partial sums are reduced in shared
+  // memory.
+  static_assert(
+    num_sub >= 1 && num_sub <= 16 && (num_sub & (num_sub - 1)) == 0 &&
+      BLOCK_SIZE_LARGE_BOX % num_sub == 0,
+    "num_sub must be a power of two, at most 16, and divide the block size");
+  const int tid = threadIdx.x;
+  const int sub = tid % num_sub;
+  const int n1 = blockIdx.x * (blockDim.x / num_sub) + tid / num_sub;
+  const bool valid = n1 < N;
+  __shared__ float s_red[NUM_REDUCE_LARGE_BOX][BLOCK_SIZE_LARGE_BOX];
+  const int n1_safe = valid ? n1 : 0;
+  int atomic_number_1 = dftd3_para.atomic_number[g_type[n1_safe]];
+  int num_cn_1 = num_cn[atomic_number_1];
+  CnWeights cw;
+  load_cn_weights(atomic_number_1, g_cn[n1_safe], g_cn_weight + n1_safe * max_cn, cw);
+  float dc6_sum = 0.0f;
+  float dc8_sum = 0.0f;
+  float s_pe = 0.0f;
+  float s_fx = 0.0f;
+  float s_fy = 0.0f;
+  float s_fz = 0.0f;
+  float s_sxx = 0.0f;
+  float s_sxy = 0.0f;
+  float s_sxz = 0.0f;
+  float s_syx = 0.0f;
+  float s_syy = 0.0f;
+  float s_syz = 0.0f;
+  float s_szx = 0.0f;
+  float s_szy = 0.0f;
+  float s_szz = 0.0f;
+
+  double x1 = g_x[n1_safe];
+  double y1 = g_y[n1_safe];
+  double z1 = g_z[n1_safe];
+  int cell_id;
+  int cell_id_x;
+  int cell_id_y;
+  int cell_id_z;
+  find_cell_id(box, x1, y1, z1, 2.0f / rc, nx, ny, nz, cell_id_x, cell_id_y, cell_id_z, cell_id);
+
+  const int z_lim = box.pbc_z ? 2 : 0;
+  const int y_lim = box.pbc_y ? 2 : 0;
+  const int x_lim = box.pbc_x ? 2 : 0;
+  const int num_x = 2 * x_lim + 1;
+  const int num_y = 2 * y_lim + 1;
+  const int num_z = 2 * z_lim + 1;
+  for (int c = valid ? sub : num_x * num_y * num_z; c < num_x * num_y * num_z; c += num_sub) {
+    const int xx = c % num_x - x_lim;
+    const int yy = (c / num_x) % num_y - y_lim;
+    const int zz = c / (num_x * num_y) - z_lim;
+    {
+      {
+        int neighbor_cell =
+          find_neighbor_cell(cell_id, cell_id_x, cell_id_y, cell_id_z, nx, ny, nz, xx, yy, zz);
+        const int num_atoms_neighbor_cell = g_cell_count[neighbor_cell];
+        const int num_atoms_previous_cells = g_cell_count_sum[neighbor_cell];
+        for (int m = 0; m < num_atoms_neighbor_cell; ++m) {
+          const int n2 = g_cell_contents[num_atoms_previous_cells + m];
+          if (n1 == n2) {
+            continue;
+          }
+          float x12 = g_x[n2] - x1;
+          float y12 = g_y[n2] - y1;
+          float z12 = g_z[n2] - z1;
+          apply_mic(box, x12, y12, z12);
+          float r12[3] = {x12, y12, z12};
+          float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
+          if (d12_2 < rc * rc) {
+            int atomic_number_2 = dftd3_para.atomic_number[g_type[n2]];
+            int z_small = atomic_number_1, z_large = atomic_number_2;
+            if (atomic_number_1 > atomic_number_2) {
+              z_small = atomic_number_2;
+              z_large = atomic_number_1;
+            }
+            int z12 = z_small * max_elem - (z_small * (z_small - 1)) / 2 + (z_large - z_small);
+            float c6;
+            float dc6;
+            get_c6_factorized(
+              atomic_number_1,
+              atomic_number_2,
+              z12,
+              num_cn_1,
+              cw,
+              g_cn_weight + n2 * max_cn,
+              g_c6_ref,
+              c6,
+              dc6);
+            c6 *= HartreeBohr6;
+            dc6 *= HartreeBohr6;
+
+            const float c8_over_c6 = 3.0f * r2r4[atomic_number_1] * r2r4[atomic_number_2] * Bohr2;
+            float pe_pair, f2, g6, g8;
+            d3_damped_pair(
+              dftd3_para,
+              atomic_number_1,
+              atomic_number_2,
+              c6,
+              c8_over_c6,
+              d12_2,
+              pe_pair,
+              f2,
+              g6,
+              g8);
+            s_pe -= pe_pair;
+            float f12[3] = {r12[0] * f2, r12[1] * f2, r12[2] * f2};
+            s_fx += 2.0f * f12[0];
+            s_fy += 2.0f * f12[1];
+            s_fz += 2.0f * f12[2];
+            s_sxx -= r12[0] * f12[0];
+            s_sxy -= r12[0] * f12[1];
+            s_sxz -= r12[0] * f12[2];
+            s_syx -= r12[1] * f12[0];
+            s_syy -= r12[1] * f12[1];
+            s_syz -= r12[1] * f12[2];
+            s_szx -= r12[2] * f12[0];
+            s_szy -= r12[2] * f12[1];
+            s_szz -= r12[2] * f12[2];
+            dc6_sum += dc6 * dftd3_para.s6 * g6;
+            dc8_sum += dc6 * c8_over_c6 * dftd3_para.s8 * g8;
+          }
+        }
+      }
+    }
+  }
+  if (num_sub > 1) {
+    s_red[0][tid] = s_fx;
+    s_red[1][tid] = s_fy;
+    s_red[2][tid] = s_fz;
+    s_red[3][tid] = s_sxx;
+    s_red[4][tid] = s_sxy;
+    s_red[5][tid] = s_sxz;
+    s_red[6][tid] = s_syx;
+    s_red[7][tid] = s_syy;
+    s_red[8][tid] = s_syz;
+    s_red[9][tid] = s_szx;
+    s_red[10][tid] = s_szy;
+    s_red[11][tid] = s_szz;
+    s_red[12][tid] = s_pe;
+    s_red[13][tid] = dc6_sum;
+    s_red[14][tid] = dc8_sum;
+    reduce_sub_large_box<num_sub, NUM_REDUCE_LARGE_BOX>(s_red, tid, sub);
+  }
+  if (!valid || sub != 0) {
+    return;
+  }
+  if (num_sub > 1) {
+    s_fx = s_red[0][tid];
+    s_fy = s_red[1][tid];
+    s_fz = s_red[2][tid];
+    s_sxx = s_red[3][tid];
+    s_sxy = s_red[4][tid];
+    s_sxz = s_red[5][tid];
+    s_syx = s_red[6][tid];
+    s_syy = s_red[7][tid];
+    s_syz = s_red[8][tid];
+    s_szx = s_red[9][tid];
+    s_szy = s_red[10][tid];
+    s_szz = s_red[11][tid];
+    s_pe = s_red[12][tid];
+    dc6_sum = s_red[13][tid];
+    dc8_sum = s_red[14][tid];
+  }
+  g_fx[n1] += s_fx;
+  g_fy[n1] += s_fy;
+  g_fz[n1] += s_fz;
+  g_virial[n1 + 0 * N] += s_sxx;
+  g_virial[n1 + 1 * N] += s_syy;
+  g_virial[n1 + 2 * N] += s_szz;
+  g_virial[n1 + 3 * N] += s_sxy;
+  g_virial[n1 + 4 * N] += s_sxz;
+  g_virial[n1 + 5 * N] += s_syz;
+  g_virial[n1 + 6 * N] += s_syx;
+  g_virial[n1 + 7 * N] += s_szx;
+  g_virial[n1 + 8 * N] += s_szy;
+  g_potential[n1] += s_pe;
+  g_dc6_sum[n1] = dc6_sum;
+  g_dc8_sum[n1] = dc8_sum;
+}
+
+template <int num_sub>
+__global__ void find_dftd3_force_extra_large_box(
+  const DFTD3::DFTD3_Para dftd3_para,
+  const float rc,
+  const int N,
+  const int nx,
+  const int ny,
+  const int nz,
+  const Box box,
+  const int* g_type,
+  const int* g_cell_count,
+  const int* g_cell_count_sum,
+  const int* g_cell_contents,
+  const float* g_dc6_sum,
+  const float* g_dc8_sum,
+  const double* g_x,
+  const double* g_y,
+  const double* g_z,
+  double* g_fx,
+  double* g_fy,
+  double* g_fz,
+  double* g_virial,
+  const int* g_list,
+  const int* g_list_count,
+  const int list_capacity)
+{
+  static_assert(
+    num_sub >= 1 && num_sub <= 16 && (num_sub & (num_sub - 1)) == 0 &&
+      BLOCK_SIZE_LARGE_BOX % num_sub == 0,
+    "num_sub must be a power of two, at most 16, and divide the block size");
+  const int tid = threadIdx.x;
+  const int sub = tid % num_sub;
+  const int n1 = blockIdx.x * (blockDim.x / num_sub) + tid / num_sub;
+  const bool valid = n1 < N;
+  __shared__ float s_red[12][BLOCK_SIZE_LARGE_BOX];
+  const int n1_safe = valid ? n1 : 0;
+  int atomic_number_1 = dftd3_para.atomic_number[g_type[n1_safe]];
+  float R_cov_1 = Bohr * covalent_radius[atomic_number_1];
+  float dc6_sum_plus_dc8_sum_1 = g_dc6_sum[n1_safe] + g_dc8_sum[n1_safe];
+  float s_fx = 0.0f;
+  float s_fy = 0.0f;
+  float s_fz = 0.0f;
+  float s_sxx = 0.0f;
+  float s_sxy = 0.0f;
+  float s_sxz = 0.0f;
+  float s_syx = 0.0f;
+  float s_syy = 0.0f;
+  float s_syz = 0.0f;
+  float s_szx = 0.0f;
+  float s_szy = 0.0f;
+  float s_szz = 0.0f;
+
+  double x1 = g_x[n1_safe];
+  double y1 = g_y[n1_safe];
+  double z1 = g_z[n1_safe];
+  int cell_id;
+  int cell_id_x;
+  int cell_id_y;
+  int cell_id_z;
+  find_cell_id(box, x1, y1, z1, 2.0f / rc, nx, ny, nz, cell_id_x, cell_id_y, cell_id_z, cell_id);
+
+  // Accepted partners of this (atom, sub) slot stored by the CN kernel in the order of the same
+  // traversal; they are used when they all fitted into the list, otherwise the cell traversal is
+  // repeated. Both give the same pairs in the same order.
+  const size_t num_slots = static_cast<size_t>(N) * num_sub;
+  const size_t slot = static_cast<size_t>(n1_safe) * num_sub + sub;
+  const int num_listed = (valid && list_capacity > 0) ? g_list_count[slot] : -1;
+
+  auto add_pair = [&](const int n2) {
+    if (n1 == n2) {
+      return;
+    }
+    float x12 = g_x[n2] - x1;
+    float y12 = g_y[n2] - y1;
+    float z12 = g_z[n2] - z1;
+    apply_mic(box, x12, y12, z12);
+    float r12[3] = {x12, y12, z12};
+    float d12_2 = r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
+    if (d12_2 < rc * rc) {
+      int atomic_number_2 = dftd3_para.atomic_number[g_type[n2]];
+      float R_cov_2 = Bohr * covalent_radius[atomic_number_2];
+      float d12 = sqrt(d12_2);
+      float cn_exp_factor = exp(-16.0f * ((R_cov_1 + R_cov_2) / d12 - 1.0f));
+      float f12_factor = cn_exp_factor * 16.0f * (R_cov_1 + R_cov_2);
+      f12_factor /= (cn_exp_factor + 1.0f) * (cn_exp_factor + 1.0f) * d12 * d12_2;
+      float f21_factor = f12_factor;
+      f12_factor *= dc6_sum_plus_dc8_sum_1;
+      f21_factor *= -(g_dc6_sum[n2] + g_dc8_sum[n2]);
+      float f12[3] = {r12[0] * f12_factor, r12[1] * f12_factor, r12[2] * f12_factor};
+      float f21[3] = {r12[0] * f21_factor, r12[1] * f21_factor, r12[2] * f21_factor};
+      s_fx += f12[0] - f21[0];
+      s_fy += f12[1] - f21[1];
+      s_fz += f12[2] - f21[2];
+      s_sxx += r12[0] * f21[0];
+      s_sxy += r12[0] * f21[1];
+      s_sxz += r12[0] * f21[2];
+      s_syx += r12[1] * f21[0];
+      s_syy += r12[1] * f21[1];
+      s_syz += r12[1] * f21[2];
+      s_szx += r12[2] * f21[0];
+      s_szy += r12[2] * f21[1];
+      s_szz += r12[2] * f21[2];
+    }
+  };
+
+  if (num_listed >= 0 && num_listed <= list_capacity) {
+    for (int k = 0; k < num_listed; ++k) {
+      add_pair(g_list[k * num_slots + slot]);
+    }
+  } else {
+    const int z_lim = box.pbc_z ? 2 : 0;
+    const int y_lim = box.pbc_y ? 2 : 0;
+    const int x_lim = box.pbc_x ? 2 : 0;
+    const int num_x = 2 * x_lim + 1;
+    const int num_y = 2 * y_lim + 1;
+    const int num_z = 2 * z_lim + 1;
+    for (int c = valid ? sub : num_x * num_y * num_z; c < num_x * num_y * num_z; c += num_sub) {
+      const int xx = c % num_x - x_lim;
+      const int yy = (c / num_x) % num_y - y_lim;
+      const int zz = c / (num_x * num_y) - z_lim;
+      const int neighbor_cell =
+        find_neighbor_cell(cell_id, cell_id_x, cell_id_y, cell_id_z, nx, ny, nz, xx, yy, zz);
+      const int num_atoms_neighbor_cell = g_cell_count[neighbor_cell];
+      const int num_atoms_previous_cells = g_cell_count_sum[neighbor_cell];
+      for (int m = 0; m < num_atoms_neighbor_cell; ++m) {
+        add_pair(g_cell_contents[num_atoms_previous_cells + m]);
+      }
+    }
+  }
+  if (num_sub > 1) {
+    s_red[0][tid] = s_fx;
+    s_red[1][tid] = s_fy;
+    s_red[2][tid] = s_fz;
+    s_red[3][tid] = s_sxx;
+    s_red[4][tid] = s_sxy;
+    s_red[5][tid] = s_sxz;
+    s_red[6][tid] = s_syx;
+    s_red[7][tid] = s_syy;
+    s_red[8][tid] = s_syz;
+    s_red[9][tid] = s_szx;
+    s_red[10][tid] = s_szy;
+    s_red[11][tid] = s_szz;
+    reduce_sub_large_box<num_sub, 12>(s_red, tid, sub);
+  }
+  if (!valid || sub != 0) {
+    return;
+  }
+  if (num_sub > 1) {
+    s_fx = s_red[0][tid];
+    s_fy = s_red[1][tid];
+    s_fz = s_red[2][tid];
+    s_sxx = s_red[3][tid];
+    s_sxy = s_red[4][tid];
+    s_sxz = s_red[5][tid];
+    s_syx = s_red[6][tid];
+    s_syy = s_red[7][tid];
+    s_syz = s_red[8][tid];
+    s_szx = s_red[9][tid];
+    s_szy = s_red[10][tid];
+    s_szz = s_red[11][tid];
+  }
+  g_fx[n1] += s_fx;
+  g_fy[n1] += s_fy;
+  g_fz[n1] += s_fz;
+  g_virial[n1 + 0 * N] += s_sxx;
+  g_virial[n1 + 1 * N] += s_syy;
+  g_virial[n1 + 2 * N] += s_szz;
+  g_virial[n1 + 3 * N] += s_sxy;
+  g_virial[n1 + 4 * N] += s_sxz;
+  g_virial[n1 + 5 * N] += s_syz;
+  g_virial[n1 + 6 * N] += s_syx;
+  g_virial[n1 + 7 * N] += s_szx;
+  g_virial[n1 + 8 * N] += s_szy;
+}
+
+bool set_para(
+  const std::string& functional_input,
+  const std::string& functional_library,
+  const float s6,
+  const float a1,
+  const float s8,
+  const float a2,
+  DFTD3::DFTD3_Para& dftd3_para)
+{
+  if (functional_input == functional_library) {
+    dftd3_para.s6 = s6;
+    dftd3_para.a1 = a1;
+    dftd3_para.s8 = s8;
+    dftd3_para.a2 = a2 * Bohr;
+    return true;
+  }
+  return false;
+}
+
+} // namespace
+
+void DFTD3::compute_small_box(
+  Box& box,
+  const GPU_Vector<int>& type,
+  const GPU_Vector<double>& position_per_atom,
+  GPU_Vector<double>& potential_per_atom,
+  GPU_Vector<double>& force_per_atom,
+  GPU_Vector<double>& virial_per_atom)
+{
+  const int N = type.size();
+  const int size_x12 = N * MN;
+  if (NN_radial.size() == 0) {
+    cn.resize(N);
+    cn_weight.resize(N * max_cn);
+    dc6_sum.resize(N);
+    dc8_sum.resize(N);
+
+    NN_radial.resize(N);
+    NL_radial.resize(size_x12);
+    NN_angular.resize(N);
+    NL_angular.resize(size_x12);
+    r12.resize(size_x12 * 6);
+  }
+
+  if (N > 0) { // a zero-size grid is a launch error
+    // one block per atom; blockDim.x must equal NL_BLOCK_SIZE (the kernel's shared arrays)
+    find_neighbor_list_small_box<<<N, NL_BLOCK_SIZE>>>(
+      rc_radial * rc_radial,
+      rc_angular * rc_angular,
+      N,
+      box,
+      ebox,
+      position_per_atom.data(),
+      position_per_atom.data() + N,
+      position_per_atom.data() + N * 2,
+      NN_radial.data(),
+      NL_radial.data(),
+      NN_angular.data(),
+      NL_angular.data(),
+      r12.data(),
+      r12.data() + size_x12,
+      r12.data() + size_x12 * 2,
+      r12.data() + size_x12 * 3,
+      r12.data() + size_x12 * 4,
+      r12.data() + size_x12 * 5);
+    GPU_CHECK_KERNEL
+  }
+
+  find_dftd3_coordination_number_small_box<<<(N - 1) / 64 + 1, 64>>>(
+    dftd3_para,
+    N,
+    NN_angular.data(),
+    NL_angular.data(),
+    type.data(),
+    r12.data() + size_x12 * 3,
+    r12.data() + size_x12 * 4,
+    r12.data() + size_x12 * 5,
+    cn.data(),
+    cn_weight.data());
+  GPU_CHECK_KERNEL
+
+  if (N == 0) { // the force kernels read the atom 0 of every block
+    return;
+  }
+  // expected list lengths from the mean density (full lists: every pair is in both atoms' lists)
+  const double sphere = 4.0 / 3.0 * 3.14159265358979 / box.get_volume() * N;
+  const int num_sub_force =
+    get_num_sub_small_box_for_device(N, sphere * rc_radial * rc_radial * rc_radial);
+  const int num_sub_extra =
+    get_num_sub_small_box_for_device(N, sphere * rc_angular * rc_angular * rc_angular);
+  // one-thread-per-atom launches use smaller blocks (more blocks for small N)
+  const int block_force = (num_sub_force == 1) ? 64 : BLOCK_SIZE_LARGE_BOX;
+  const int blocks_force = (N * num_sub_force + block_force - 1) / block_force;
+  const int block_extra = (num_sub_extra == 1) ? 64 : BLOCK_SIZE_LARGE_BOX;
+  const int blocks_extra = (N * num_sub_extra + block_extra - 1) / block_extra;
+
+#define DFTD3_LAUNCH_FORCE_SMALL_BOX(NS)                                                           \
+  add_dftd3_force_small_box<NS><<<blocks_force, block_force>>>(                                    \
+    dftd3_para,                                                                                    \
+    N,                                                                                             \
+    NN_radial.data(),                                                                              \
+    NL_radial.data(),                                                                              \
+    type.data(),                                                                                   \
+    c6_ref.data(),                                                                                 \
+    cn.data(),                                                                                     \
+    cn_weight.data(),                                                                              \
+    r12.data(),                                                                                    \
+    r12.data() + size_x12,                                                                         \
+    r12.data() + size_x12 * 2,                                                                     \
+    potential_per_atom.data(),                                                                     \
+    force_per_atom.data(),                                                                         \
+    force_per_atom.data() + N,                                                                     \
+    force_per_atom.data() + N * 2,                                                                 \
+    virial_per_atom.data(),                                                                        \
+    dc6_sum.data(),                                                                                \
+    dc8_sum.data());
+  switch (num_sub_force) {
+    case 1:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(1)
+      break;
+    case 2:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(2)
+      break;
+    case 4:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(4)
+      break;
+    case 8:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(8)
+      break;
+    case 16:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(16)
+      break;
+    case 32:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(32)
+      break;
+    case 64:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(64)
+      break;
+    default:
+      DFTD3_LAUNCH_FORCE_SMALL_BOX(128)
+      break;
+  }
+#undef DFTD3_LAUNCH_FORCE_SMALL_BOX
+  GPU_CHECK_KERNEL
+
+#define DFTD3_LAUNCH_EXTRA_SMALL_BOX(NS)                                                           \
+  add_dftd3_force_extra_small_box<NS><<<blocks_extra, block_extra>>>(                              \
+    dftd3_para,                                                                                    \
+    N,                                                                                             \
+    NN_angular.data(),                                                                             \
+    NL_angular.data(),                                                                             \
+    type.data(),                                                                                   \
+    dc6_sum.data(),                                                                                \
+    dc8_sum.data(),                                                                                \
+    r12.data() + size_x12 * 3,                                                                     \
+    r12.data() + size_x12 * 4,                                                                     \
+    r12.data() + size_x12 * 5,                                                                     \
+    force_per_atom.data(),                                                                         \
+    force_per_atom.data() + N,                                                                     \
+    force_per_atom.data() + N * 2,                                                                 \
+    virial_per_atom.data());
+  switch (num_sub_extra) {
+    case 1:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(1)
+      break;
+    case 2:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(2)
+      break;
+    case 4:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(4)
+      break;
+    case 8:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(8)
+      break;
+    case 16:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(16)
+      break;
+    case 32:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(32)
+      break;
+    case 64:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(64)
+      break;
+    default:
+      DFTD3_LAUNCH_EXTRA_SMALL_BOX(128)
+      break;
+  }
+#undef DFTD3_LAUNCH_EXTRA_SMALL_BOX
+  GPU_CHECK_KERNEL
+}
+
+void DFTD3::compute_large_box(
+  Box& box,
+  const GPU_Vector<int>& type,
+  const GPU_Vector<double>& position_per_atom,
+  GPU_Vector<double>& potential_per_atom,
+  GPU_Vector<double>& force_per_atom,
+  GPU_Vector<double>& virial_per_atom)
+{
+  const int N = type.size();
+  if (N == 0) {
+    return;
+  }
+  const int num_sub = get_num_sub_large_box(N, box);
+  // one-thread-per-atom launches use smaller blocks (more blocks for small N)
+  const int block_size = (num_sub == 1) ? 64 : BLOCK_SIZE_LARGE_BOX;
+  const int num_blocks = (N * num_sub + block_size - 1) / block_size;
+  if (cn.size() == 0) {
+    cn.resize(N);
+    cn_weight.resize(N * max_cn);
+    dc6_sum.resize(N);
+    dc8_sum.resize(N);
+    cell_count_radial.resize(N);
+    cell_count_sum_radial.resize(N);
+    cell_contents_radial.resize(N);
+    cell_count_angular.resize(N);
+    cell_count_sum_angular.resize(N);
+    cell_contents_angular.resize(N);
+  }
+  const int list_capacity = get_cn_list_capacity(N, num_sub, rc_angular, box);
+  if (list_capacity > 0) {
+    // grow only, with 25% headroom (but within MAX_CN_LIST_BYTES): the capacity follows the box
+    // volume, which changes in a constant-pressure run, and resize() frees and allocates
+    const size_t num_slots = static_cast<size_t>(N) * num_sub;
+    const size_t list_needed = num_slots * list_capacity;
+    if (cn_list.size() < list_needed) {
+      cn_list.resize(std::max(
+        list_needed, std::min(list_needed + list_needed / 4, MAX_CN_LIST_BYTES / sizeof(int))));
+    }
+    if (cn_list_count.size() < num_slots) {
+      cn_list_count.resize(num_slots);
+    }
+  }
+
+  int num_bins_radial[3];
+  int num_bins_angular[3];
+  box.get_num_bins(0.5 * rc_radial, num_bins_radial);
+  box.get_num_bins(0.5 * rc_angular, num_bins_angular);
+
+  find_cell_list(
+    0.5 * rc_radial,
+    num_bins_radial,
+    box,
+    position_per_atom,
+    cell_count_radial,
+    cell_count_sum_radial,
+    cell_contents_radial);
+  find_cell_list(
+    0.5 * rc_angular,
+    num_bins_angular,
+    box,
+    position_per_atom,
+    cell_count_angular,
+    cell_count_sum_angular,
+    cell_contents_angular);
+
+#define DFTD3_LAUNCH_CN_LARGE_BOX(NS)                                                              \
+  find_dftd3_coordination_number_large_box<NS><<<num_blocks, block_size>>>(                        \
+    dftd3_para,                                                                                    \
+    rc_angular,                                                                                    \
+    N,                                                                                             \
+    num_bins_angular[0],                                                                           \
+    num_bins_angular[1],                                                                           \
+    num_bins_angular[2],                                                                           \
+    box,                                                                                           \
+    type.data(),                                                                                   \
+    cell_count_angular.data(),                                                                     \
+    cell_count_sum_angular.data(),                                                                 \
+    cell_contents_angular.data(),                                                                  \
+    position_per_atom.data(),                                                                      \
+    position_per_atom.data() + N,                                                                  \
+    position_per_atom.data() + N * 2,                                                              \
+    cn.data(),                                                                                     \
+    cn_weight.data(),                                                                              \
+    cn_list.data(),                                                                                \
+    cn_list_count.data(),                                                                          \
+    list_capacity);
+  switch (num_sub) {
+    case 1:
+      DFTD3_LAUNCH_CN_LARGE_BOX(1)
+      break;
+    case 2:
+      DFTD3_LAUNCH_CN_LARGE_BOX(2)
+      break;
+    case 4:
+      DFTD3_LAUNCH_CN_LARGE_BOX(4)
+      break;
+    case 8:
+      DFTD3_LAUNCH_CN_LARGE_BOX(8)
+      break;
+    case 16:
+      DFTD3_LAUNCH_CN_LARGE_BOX(16)
+      break;
+    default:
+      PRINT_INPUT_ERROR("Invalid number of threads per atom in DFT-D3.");
+      break;
+  }
+#undef DFTD3_LAUNCH_CN_LARGE_BOX
+  GPU_CHECK_KERNEL
+
+#define DFTD3_LAUNCH_FORCE_LARGE_BOX(NS)                                                           \
+  find_dftd3_force_large_box<NS><<<num_blocks, block_size>>>(                                      \
+    dftd3_para,                                                                                    \
+    rc_radial,                                                                                     \
+    N,                                                                                             \
+    num_bins_radial[0],                                                                            \
+    num_bins_radial[1],                                                                            \
+    num_bins_radial[2],                                                                            \
+    box,                                                                                           \
+    type.data(),                                                                                   \
+    cell_count_radial.data(),                                                                      \
+    cell_count_sum_radial.data(),                                                                  \
+    cell_contents_radial.data(),                                                                   \
+    c6_ref.data(),                                                                                 \
+    cn.data(),                                                                                     \
+    cn_weight.data(),                                                                              \
+    position_per_atom.data(),                                                                      \
+    position_per_atom.data() + N,                                                                  \
+    position_per_atom.data() + N * 2,                                                              \
+    potential_per_atom.data(),                                                                     \
+    force_per_atom.data(),                                                                         \
+    force_per_atom.data() + N,                                                                     \
+    force_per_atom.data() + N * 2,                                                                 \
+    virial_per_atom.data(),                                                                        \
+    dc6_sum.data(),                                                                                \
+    dc8_sum.data());
+  switch (num_sub) {
+    case 1:
+      DFTD3_LAUNCH_FORCE_LARGE_BOX(1)
+      break;
+    case 2:
+      DFTD3_LAUNCH_FORCE_LARGE_BOX(2)
+      break;
+    case 4:
+      DFTD3_LAUNCH_FORCE_LARGE_BOX(4)
+      break;
+    case 8:
+      DFTD3_LAUNCH_FORCE_LARGE_BOX(8)
+      break;
+    case 16:
+      DFTD3_LAUNCH_FORCE_LARGE_BOX(16)
+      break;
+    default:
+      PRINT_INPUT_ERROR("Invalid number of threads per atom in DFT-D3.");
+      break;
+  }
+#undef DFTD3_LAUNCH_FORCE_LARGE_BOX
+  GPU_CHECK_KERNEL
+
+#define DFTD3_LAUNCH_EXTRA_LARGE_BOX(NS)                                                           \
+  find_dftd3_force_extra_large_box<NS><<<num_blocks, block_size>>>(                                \
+    dftd3_para,                                                                                    \
+    rc_angular,                                                                                    \
+    N,                                                                                             \
+    num_bins_angular[0],                                                                           \
+    num_bins_angular[1],                                                                           \
+    num_bins_angular[2],                                                                           \
+    box,                                                                                           \
+    type.data(),                                                                                   \
+    cell_count_angular.data(),                                                                     \
+    cell_count_sum_angular.data(),                                                                 \
+    cell_contents_angular.data(),                                                                  \
+    dc6_sum.data(),                                                                                \
+    dc8_sum.data(),                                                                                \
+    position_per_atom.data(),                                                                      \
+    position_per_atom.data() + N,                                                                  \
+    position_per_atom.data() + N * 2,                                                              \
+    force_per_atom.data(),                                                                         \
+    force_per_atom.data() + N,                                                                     \
+    force_per_atom.data() + N * 2,                                                                 \
+    virial_per_atom.data(),                                                                        \
+    cn_list.data(),                                                                                \
+    cn_list_count.data(),                                                                          \
+    list_capacity);
+  switch (num_sub) {
+    case 1:
+      DFTD3_LAUNCH_EXTRA_LARGE_BOX(1)
+      break;
+    case 2:
+      DFTD3_LAUNCH_EXTRA_LARGE_BOX(2)
+      break;
+    case 4:
+      DFTD3_LAUNCH_EXTRA_LARGE_BOX(4)
+      break;
+    case 8:
+      DFTD3_LAUNCH_EXTRA_LARGE_BOX(8)
+      break;
+    case 16:
+      DFTD3_LAUNCH_EXTRA_LARGE_BOX(16)
+      break;
+    default:
+      PRINT_INPUT_ERROR("Invalid number of threads per atom in DFT-D3.");
+      break;
+  }
+#undef DFTD3_LAUNCH_EXTRA_LARGE_BOX
+  GPU_CHECK_KERNEL
+}
+
+void DFTD3::compute(
+  Box& box,
+  const GPU_Vector<int>& type,
+  const GPU_Vector<double>& position_per_atom,
+  GPU_Vector<double>& potential_per_atom,
+  GPU_Vector<double>& force_per_atom,
+  GPU_Vector<double>& virial_per_atom)
+{
+  if (dftd3_para.damping == 1 && !elements_checked) {
+    check_elements(type);
+  }
+  const bool is_small_box = get_expanded_box(rc_radial, box, ebox);
+
+  if (is_small_box) {
+    compute_small_box(
+      box, type, position_per_atom, potential_per_atom, force_per_atom, virial_per_atom);
+  } else {
+    compute_large_box(
+      box, type, position_per_atom, potential_per_atom, force_per_atom, virial_per_atom);
+  }
+}
+
+void DFTD3::initialize(
+  std::string& functional,
+  const float rc_potential,
+  const float rc_coordination_number,
+  const std::string& potential_file_name,
+  const std::string& damping)
+{
+  rc_radial = rc_potential;
+  rc_angular = rc_coordination_number;
+
+  std::transform(functional.begin(), functional.end(), functional.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+
+  const bool zero_damping = (damping == "zero");
+  dftd3_para.damping = zero_damping ? 1 : 0;
+  bool valid = false;
+
+  if (zero_damping) {
+    for (int k = 0; k < D3ZERO_NUM_PARAMS; ++k) {
+      if (functional == D3ZERO_PARAMS[k].name) {
+        dftd3_para.s6 = D3ZERO_PARAMS[k].s6;
+        dftd3_para.sr6 = D3ZERO_PARAMS[k].sr6;
+        dftd3_para.s8 = D3ZERO_PARAMS[k].s8;
+        dftd3_para.sr8 = D3ZERO_PARAMS[k].sr8;
+        valid = true;
+        break;
+      }
+    }
+  } else {
+    valid = valid || set_para(functional, "b1b95", 1.000, 0.2092, 1.4507, 5.5545, dftd3_para);
+    valid = valid || set_para(functional, "b2gpplyp", 0.560, 0.0000, 0.2597, 6.3332, dftd3_para);
+    valid = valid || set_para(functional, "b2plyp", 0.640, 0.3065, 0.9147, 5.0570, dftd3_para);
+    valid = valid || set_para(functional, "b3lyp", 1.000, 0.3981, 1.9889, 4.4211, dftd3_para);
+    valid = valid || set_para(functional, "b3pw91", 1.000, 0.4312, 2.8524, 4.4693, dftd3_para);
+    valid = valid || set_para(functional, "b97d", 1.000, 0.5545, 2.2609, 3.2297, dftd3_para);
+    valid = valid || set_para(functional, "bhlyp", 1.000, 0.2793, 1.0354, 4.9615, dftd3_para);
+    valid = valid || set_para(functional, "blyp", 1.000, 0.4298, 2.6996, 4.2359, dftd3_para);
+    valid = valid || set_para(functional, "bmk", 1.000, 0.1940, 2.0860, 5.9197, dftd3_para);
+    valid = valid || set_para(functional, "bop", 1.000, 0.4870, 3.295, 3.5043, dftd3_para);
+    valid = valid || set_para(functional, "bp86", 1.000, 0.3946, 3.2822, 4.8516, dftd3_para);
+    valid = valid || set_para(functional, "bpbe", 1.000, 0.4567, 4.0728, 4.3908, dftd3_para);
+    valid = valid || set_para(functional, "camb3lyp", 1.000, 0.3708, 2.0674, 5.4743, dftd3_para);
+    valid = valid || set_para(functional, "dsdblyp", 0.500, 0.0000, 0.2130, 6.0519, dftd3_para);
+    valid = valid || set_para(functional, "hcth120", 1.000, 0.3563, 1.0821, 4.3359, dftd3_para);
+    valid = valid || set_para(functional, "hf", 1.000, 0.3385, 0.9171, 2.883, dftd3_para);
+    valid = valid || set_para(functional, "hse-hjs", 1.000, 0.3830, 2.3100, 5.685, dftd3_para);
+    valid = valid || set_para(functional, "lc-wpbe08", 1.000, 0.3919, 1.8541, 5.0897, dftd3_para);
+    valid = valid || set_para(functional, "lcwpbe", 1.000, 0.3919, 1.8541, 5.0897, dftd3_para);
+    valid = valid || set_para(functional, "m11", 1.000, 0.0000, 2.8112, 10.1389, dftd3_para);
+    valid = valid || set_para(functional, "mn12l", 1.000, 0.0000, 2.2674, 9.1494, dftd3_para);
+    valid = valid || set_para(functional, "mn12sx", 1.000, 0.0983, 1.1674, 8.0259, dftd3_para);
+    valid = valid || set_para(functional, "mpw1b95", 1.000, 0.1955, 1.0508, 6.4177, dftd3_para);
+    valid = valid || set_para(functional, "mpwb1k", 1.000, 0.1474, 0.9499, 6.6223, dftd3_para);
+    valid = valid || set_para(functional, "mpwlyp", 1.000, 0.4831, 2.0077, 4.5323, dftd3_para);
+    valid = valid || set_para(functional, "n12sx", 1.000, 0.3283, 2.4900, 5.7898, dftd3_para);
+    valid = valid || set_para(functional, "olyp", 1.000, 0.5299, 2.6205, 2.8065, dftd3_para);
+    valid = valid || set_para(functional, "opbe", 1.000, 0.5512, 3.3816, 2.9444, dftd3_para);
+    valid = valid || set_para(functional, "otpss", 1.000, 0.4634, 2.7495, 4.3153, dftd3_para);
+    valid = valid || set_para(functional, "pbe", 1.000, 0.4289, 0.7875, 4.4407, dftd3_para);
+    valid = valid || set_para(functional, "pbe0", 1.000, 0.4145, 1.2177, 4.8593, dftd3_para);
+    valid = valid || set_para(functional, "pbe38", 1.000, 0.3995, 1.4623, 5.1405, dftd3_para);
+    valid = valid || set_para(functional, "pbesol", 1.000, 0.4466, 2.9491, 6.1742, dftd3_para);
+    valid = valid || set_para(functional, "ptpss", 0.750, 0.000, 0.2804, 6.5745, dftd3_para);
+    valid = valid || set_para(functional, "pw6b95", 1.000, 0.2076, 0.7257, 6.375, dftd3_para);
+    valid = valid || set_para(functional, "pwb6k", 1.000, 0.1805, 0.9383, 7.7627, dftd3_para);
+    valid = valid || set_para(functional, "pwpb95", 0.820, 0.0000, 0.2904, 7.3141, dftd3_para);
+    valid = valid || set_para(functional, "revpbe", 1.000, 0.5238, 2.3550, 3.5016, dftd3_para);
+    valid = valid || set_para(functional, "revpbe0", 1.000, 0.4679, 1.7588, 3.7619, dftd3_para);
+    valid = valid || set_para(functional, "revpbe38", 1.000, 0.4309, 1.4760, 3.9446, dftd3_para);
+    valid = valid || set_para(functional, "revssb", 1.000, 0.4720, 0.4389, 4.0986, dftd3_para);
+    valid = valid || set_para(functional, "rpbe", 1.000, 0.1820, 0.8318, 4.0094, dftd3_para);
+    valid = valid || set_para(functional, "rpw86pbe", 1.000, 0.4613, 1.3845, 4.5062, dftd3_para);
+    valid = valid || set_para(functional, "scan", 1.000, 0.5380, 0.0000, 5.42, dftd3_para);
+    valid = valid || set_para(functional, "sogga11x", 1.000, 0.1330, 1.1426, 5.7381, dftd3_para);
+    valid = valid || set_para(functional, "ssb", 1.000, -0.0952, -0.1744, 5.2170, dftd3_para);
+    valid = valid || set_para(functional, "tpss", 1.000, 0.4535, 1.9435, 4.4752, dftd3_para);
+    valid = valid || set_para(functional, "tpss0", 1.000, 0.3768, 1.2576, 4.5865, dftd3_para);
+    valid = valid || set_para(functional, "tpssh", 1.000, 0.4529, 2.2382, 4.6550, dftd3_para);
+    valid = valid || set_para(functional, "b2kplyp", 0.64, 0.0000, 0.1521, 7.1916, dftd3_para);
+    valid = valid || set_para(functional, "dsd-pbep86", 0.418, 0.0000, 0.0000, 5.6500, dftd3_para);
+    valid = valid || set_para(functional, "b97m", 1.0000, -0.0780, 0.1384, 5.5946, dftd3_para);
+    valid = valid || set_para(functional, "wb97x", 1.0000, 0.0000, 0.2641, 5.4959, dftd3_para);
+    valid = valid || set_para(functional, "wb97m", 1.0000, 0.5660, 0.3908, 3.1280, dftd3_para);
+  }
+
+  if (!valid) {
+    std::cout << "The " << functional << " functional is not supported for DFT-D3 with "
+              << (zero_damping ? "zero" : "BJ") << " damping.\n"
+              << std::endl;
+    exit(1);
+  }
+
+  std::cout << "    Add DFT-D3:" << std::endl;
+  std::cout << "        potential cutoff = " << rc_potential << " Angstrom" << std::endl;
+  std::cout << "        coordination number cutoff = " << rc_coordination_number << " Angstrom"
+            << std::endl;
+  std::cout << "        functional = " << functional << std::endl;
+  if (zero_damping) { // BJ output stays unchanged (ADR-0003 item 4)
+    std::cout << "        damping = zero (D3(0))" << std::endl;
+  }
+  std::cout << "            s6 = " << dftd3_para.s6 << std::endl;
+  std::cout << "            s8 = " << dftd3_para.s8 << std::endl;
+  if (zero_damping) {
+    std::cout << "            sr6 = " << dftd3_para.sr6 << std::endl;
+    std::cout << "            sr8 = " << dftd3_para.sr8 << std::endl;
+    std::cout << "            alpha6 = 14, alpha8 = 16" << std::endl;
+  } else {
+    std::cout << "            a1 = " << dftd3_para.a1 << std::endl;
+    std::cout << "            a2 = " << dftd3_para.a2 << " Angstrom" << std::endl;
+  }
+
+  c6_ref.resize(111625);
+  c6_ref.copy_from_host(c6_ref_cpu);
+
+  find_atomic_number(potential_file_name, dftd3_para.atomic_number);
+  elements_checked = false;
+}
+
+std::string DFTD3::parse_damping(const std::vector<std::string>& tokens)
+{
+  if (tokens.size() < 4) {
+    std::cout << "dftd3 must have 3 parameters (functional, potential cutoff, coordination number "
+                 "cutoff) and an optional damping (zero or bj)\n";
+    exit(1);
+  }
+  if (tokens.size() > 5) {
+    std::cout << "dftd3 has too many parameters; the syntax is dftd3 <functional> <rc_potential> "
+                 "<rc_cn> [zero|bj] (damping must be zero or bj, lower case)\n";
+    exit(1);
+  }
+  if (tokens.size() == 4) {
+    return "bj";
+  }
+  if (tokens[4] != "zero" && tokens[4] != "bj") {
+    std::cout << "dftd3 damping must be zero or bj (lower case), not " << tokens[4] << "\n";
+    exit(1);
+  }
+  return tokens[4];
+}
+
+// D3(0) is tabulated for Z <= 86 only (DR-003 D5); the atom types actually present are checked.
+void DFTD3::check_elements(const GPU_Vector<int>& type)
+{
+  const int N = type.size();
+  std::vector<int> h_type(N);
+  CHECK(gpuMemcpy(h_type.data(), type.data(), sizeof(int) * N, gpuMemcpyDeviceToHost));
+  std::vector<bool> bad(NUM_ELEMENTS, false);
+  bool any_bad = false;
+  for (int i = 0; i < N; ++i) {
+    const int z_index = dftd3_para.atomic_number[h_type[i]];
+    if (z_index >= 86) {
+      bad[z_index] = true;
+      any_bad = true;
+    }
+  }
+  if (any_bad) {
+    std::string msg = "dftd3 with zero damping has no parameters for element(s):";
+    for (int z = 86; z < NUM_ELEMENTS; ++z) {
+      if (bad[z]) {
+        msg += " " + ELEMENTS[z] + " (Z=" + std::to_string(z + 1) + ")";
+      }
+    }
+    msg += ". D3(0) is limited to Z <= 86 (H-Rn); use bj damping or remove these elements.";
+    PRINT_INPUT_ERROR(msg.c_str());
+  }
+  elements_checked = true;
+}
