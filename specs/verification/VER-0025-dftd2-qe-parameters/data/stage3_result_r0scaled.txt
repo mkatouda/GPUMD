@@ -1,0 +1,6 @@
+r0ab scale factor applied to the numpy reference: 1.000000004371
+rc = 50.202158 A, cell volume 719.8200 A^3
+printed DFT-D3 Dispersion -0.00257072 Ry = -0.03497643 eV (8 decimals in Ry only)
+E_D3 QE(7.6-dev, XML etot difference) -0.0349764035 eV   numpy -0.0349764035 eV   diff +1.216e-12 eV   rel 3.477e-11
+forces: max|F| numpy 3.184214e-02 eV/A, max|dF| 2.149e-14 eV/A  rel(max-norm) 6.750e-13
+stress (eV/A^3): max|S| numpy 9.566969e-05, max|dS| 3.767e-17 rel(max-norm) 3.937e-13; in kbar: max|dS| 0.00000 kbar, max|S| 0.153 kbar

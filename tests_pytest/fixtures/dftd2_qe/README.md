@@ -50,3 +50,15 @@ Sparse C/F cells (3 atoms triclinic, periodic; 6 atoms open) built deterministic
 (>= 0.3 A) of the pair-distance spectrum, so that no pair crosses a hard cutoff during the stencils (the energy of
 `trunc plain` is discontinuous at rc). s6 = 75, step 0.01 A (force) and 1e-3 (strain), 5-point stencils,
 tolerance 2e-4 of the largest D2 force / virial component (as in `test_dftd2_consistency.py`).
+
+## QE 7.2 parameter tables (added with the review fixes)
+| File | Content | Produced by |
+|---|---|---|
+| `qe72_c6_first_point_Eh_bohr6_Z86.csv` | 86 x 86 matrix of QE `c6ab(Zi, Zj, 1, 1, 1)` (first reference point of both atoms), Hartree bohr^6 | `specs/verification/VER-0025-dftd2-qe-parameters/scripts/extract_qe_d2_params.py` (copy of `.../data/`) |
+| `qe72_r0ab_angstrom_Z86.csv` | 86 x 86 matrix of QE `setr0ab` r0ab, Angstrom (decimal literals; `real(4)` in 7.2) | same |
+
+Source: Quantum ESPRESSO tag `qe-7.2` (commit b4c5e8deeb7d1863e7553a87b45f8d22c21926a5), `dft-d3/pars.f90`
+and `dft-d3/core.f90`. `dftd2_qe_oracle.py` (tests_pytest/) builds the numpy reference for any Z <= 86 from these
+CSVs with the CODATA2018 constants of QE 7.2; `test_dftd2_qe_extended.py` checks `src/force/dftd2qe_table.cuh` against
+them and, when the QE 7.2 sources are readable (env `DFTD2_QE72_SRC`: a directory holding `pars.f90` and `core.f90`,
+or the git checkout `/home/katouda/build/q-e` with tag `qe-7.2`), against an independent re-parse of the Fortran data statements.

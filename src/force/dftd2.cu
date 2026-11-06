@@ -20,9 +20,12 @@ DFT-D2:
 long-range dispersion correction, J. Comput. Chem. 27, 1787 (2006).
 
 E = - s6 sum_{i<j} C6_ij f(r_ij) / r_ij^6,  f = 1 / (1 + exp(-d (r / R0_ij - 1))),
-C6_ij = sqrt(C6_i C6_j), R0_ij = R0_i + R0_j, d = 20.
+C6_ij = sqrt(C6_i C6_j), R0_ij = R0_i + R0_j, d = 20 (table grimme2006, the default).
 The sum runs over all pairs and periodic images with r < rc, with the shifted-force
-truncation phi_sf(r) = phi(r) - phi(rc) - phi'(rc) (r - rc).
+truncation phi_sf(r) = phi(r) - phi(rc) - phi'(rc) (r - rc) (trunc sf, the default).
+Alternatives (ADR-0004): table qe takes C6_ij from the DFT-D3 table (first reference point of both
+atoms) and R0_ij = 1.1 r0ab_ij (Quantum ESPRESSO dftd3_version = 2, Z <= 86); trunc plain uses the
+hard cutoff phi(r) for r < rc without any shift.
 
 Pair search: one cell list (counting sort) in fractional coordinates; one thread per atom
 loops over the neighboring cells including periodic images (the same kernel handles cells
@@ -53,14 +56,18 @@ double vector once (about 6e-8 * r); e.g. r = 3 A and width = 12 A: about 5 time
 #include <string>
 #include <vector>
 
+static_assert(
+  DFTD2QE_MAX_Z == DFTD2_MAX_Z && DFTD2QE_NUM_PAIRS == DFTD2QE_MAX_Z * (DFTD2QE_MAX_Z + 1) / 2,
+  "the table qe arrays must cover Z <= DFTD2_MAX_Z as a packed lower triangle");
+
 namespace
 {
 constexpr double D_DAMP = 20.0;
-// Constants of the `table qe` pair parameters (Quantum ESPRESSO 7.2, dft-d3 with dftd3_version = 2).
-// Modules/constants.f90 (CODATA 2018): BOHR_RADIUS_SI, HARTREE_SI, ELECTRONVOLT_SI;
-// AUTOEV = HARTREE_SI / ELECTRONVOLT_SI = 27.211386245988. C6 [eV A^6] = C6 [Eh bohr^6] * AUTOEV *
-// BOHR^6 with BOHR in Angstrom. R0 = 1.1 * r0ab [A] (QE divides r0ab by autoang and multiplies it
-// back by the Bohr radius: the relative difference is 4.4e-9 and is neglected).
+// Constants of the `table qe` pair parameters (Quantum ESPRESSO 7.2, dft-d3 with dftd3_version =
+// 2). Modules/constants.f90 (CODATA 2018): BOHR_RADIUS_SI, HARTREE_SI, ELECTRONVOLT_SI; AUTOEV =
+// HARTREE_SI / ELECTRONVOLT_SI = 27.211386245988. C6 [eV A^6] = C6 [Eh bohr^6] * AUTOEV * BOHR^6
+// with BOHR in Angstrom. R0 = 1.1 * r0ab [A] (QE divides r0ab by autoang and multiplies it back by
+// the Bohr radius: the relative difference is 4.4e-9 and is neglected).
 constexpr double QE_BOHR_RADIUS_SI = 0.529177210903e-10;
 constexpr double QE_HARTREE_SI = 4.3597447222071e-18;
 constexpr double QE_ELECTRONVOLT_SI = 1.602176634e-19;
@@ -605,9 +612,8 @@ void DFTD2::parse_tokens(
   const std::vector<std::string>& tokens, double& s6, double& rc, Options& options)
 {
   if (tokens.size() < 2) {
-    PRINT_INPUT_ERROR(
-      "dftd2 requires at least 1 parameter: dftd2 <s6> [<cutoff in Angstrom>] "
-      "[table grimme2006|qe] [trunc sf|plain].");
+    PRINT_INPUT_ERROR("dftd2 requires at least 1 parameter: dftd2 <s6> [<cutoff in Angstrom>] "
+                      "[table grimme2006|qe] [trunc sf|plain].");
   }
   s6 = get_double_from_token(tokens[1], __FILE__, __LINE__);
   if (!(s6 > 0.0) || !std::isfinite(s6)) {
@@ -642,19 +648,17 @@ void DFTD2::parse_tokens(
       const std::string& value = tokens[next + 1];
       if (is_table) {
         if (value != "grimme2006" && value != "qe") {
-          PRINT_INPUT_ERROR(
-            ("dftd2: unknown table '" + value + "'; the valid values of 'table' are " + valid +
-             " (lower case).")
-              .c_str());
+          PRINT_INPUT_ERROR(("dftd2: unknown table '" + value +
+                             "'; the valid values of 'table' are " + valid + " (lower case).")
+                              .c_str());
         }
         options.table_qe = (value == "qe");
         has_table = true;
       } else {
         if (value != "sf" && value != "plain") {
-          PRINT_INPUT_ERROR(
-            ("dftd2: unknown truncation '" + value + "'; the valid values of 'trunc' are " + valid +
-             " (lower case).")
-              .c_str());
+          PRINT_INPUT_ERROR(("dftd2: unknown truncation '" + value +
+                             "'; the valid values of 'trunc' are " + valid + " (lower case).")
+                              .c_str());
         }
         options.trunc_plain = (value == "plain");
         has_trunc = true;
@@ -667,10 +671,9 @@ void DFTD2::parse_tokens(
          "'table' and 'trunc'.")
           .c_str());
     } else {
-      PRINT_INPUT_ERROR(
-        ("dftd2: unknown token '" + key +
-         "'; the valid options are 'table grimme2006|qe' and 'trunc sf|plain'.")
-          .c_str());
+      PRINT_INPUT_ERROR(("dftd2: unknown token '" + key +
+                         "'; the valid options are 'table grimme2006|qe' and 'trunc sf|plain'.")
+                          .c_str());
     }
   }
   if ((options.table_qe || options.trunc_plain) && !has_cutoff) {
@@ -681,8 +684,7 @@ void DFTD2::parse_tokens(
   }
 }
 
-bool DFTD2::find_in_run_input(
-  const RunInput& run_input, double& s6, double& rc, Options& options)
+bool DFTD2::find_in_run_input(const RunInput& run_input, double& s6, double& rc, Options& options)
 {
   bool found = false;
   for (const auto& line : run_input.lines()) {
