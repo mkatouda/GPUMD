@@ -36,7 +36,7 @@ $$
 
 となります（引力）。ここで $r_{ij}\,/\,r \cdot r^5 = r^4\,\mathbf{r}_{ij}$ を使いました。総和は $i$ を含む全ペア（原子 $i$ から見た全近傍、順序付きペア）についてです。
 
-コードは $f_2 = s_6 C_6\cdot 3 r^4 d_6^2 + s_8 C_8\cdot 4 r^6 d_8^2$ を作り、`f12 = r12 * f2`、力 `+= 2*f12` とします [D3:599-604]。$2 f_2 = 6 s_6 C_6 r^4 d_6^2 + 8 s_8 C_8 r^6 d_8^2$ なので、上式と一致します（係数 3, 4 に 2 を掛けるのは、微分の係数 6, 8 に等しい）。
+コードは $f_2 = s_6 C_6\cdot 3 r^4 d_6^2 + s_8 C_8\cdot 4 r^6 d_8^2$ を作り、`f12 = r12 * f2`、力 `+= 2*f12` とします [D3:236-237, 708-711（小箱）、1245-1248（大箱）]。$2 f_2 = 6 s_6 C_6 r^4 d_6^2 + 8 s_8 C_8 r^6 d_8^2$ なので、上式と一致します（係数 3, 4 に 2 を掛けるのは、微分の係数 6, 8 に等しい）。
 
 ## A1.3 配位数依存性による項
 
@@ -46,7 +46,7 @@ $$
 \frac{\partial E}{\partial \mathrm{CN}_k} = -\sum_{j}\frac{\partial C_6^{kj}}{\partial \mathrm{CN}_k}\,\big[\,s_6 d_6(r_{kj}) + s_8\kappa_{kj}\,d_8(r_{kj})\,\big] \equiv -D_k
 $$
 
-です。$E$ の中でペア $\{k, j\}$ は一度しか現れず、$C_6^{kj}$ は $\mathrm{CN}_k$ と $\mathrm{CN}_j$ の**両方**に依存します。原子 $k$ に関する和は、$k$ を含むペアについて、$k$ の側の偏微分 $\partial C_6^{kj}/\partial\mathrm{CN}_k$ だけを取ります。これが 2.5 節の $D_k$ で、コードの `dc6_sum + dc8_sum`（`dc6 * s6 * damp_6` と `dc6 * c8_over_c6 * s8 * damp_8` の和）です [D3:614-615]。
+です。$E$ の中でペア $\{k, j\}$ は一度しか現れず、$C_6^{kj}$ は $\mathrm{CN}_k$ と $\mathrm{CN}_j$ の**両方**に依存します。原子 $k$ に関する和は、$k$ を含むペアについて、$k$ の側の偏微分 $\partial C_6^{kj}/\partial\mathrm{CN}_k$ だけを取ります。これが 2.5 節の $D_k$ で、コードの `dc6_sum + dc8_sum`（`dc6 * s6 * damp_6` と `dc6 * c8_over_c6 * s8 * damp_8` の和）です [D3:721-722（小箱）、1258-1259（大箱）]。
 
 **ステップ 2：配位数の位置微分。** $c(r)$ の導関数は
 
@@ -54,7 +54,7 @@ $$
 c'(r) = -\frac{e'(r)}{(1+e)^2},\qquad e'(r) = e\cdot k_1\frac{R_{ij}}{r^2}\quad\Rightarrow\quad c'(r) = -\frac{k_1 R_{ij}\,e}{(1+e)^2 r^2}
 $$
 
-です。$k_{12} \equiv -c'(r)/r = k_1R_{ij}\,e/[(1+e)^2 r^3]$ と定義します。$k_1 = 16$ なので、コードの `k12 = e*16*(R1+R2)/((1+e)^2 d12^3)` です [D3:726-729]（コードのコメント `// not 8.0f` は係数が 16 であることを注記）。
+です。$k_{12} \equiv -c'(r)/r = k_1R_{ij}\,e/[(1+e)^2 r^3]$ と定義します。$k_1 = 16$ なので、コードの `k12 = e*16*(R1+R2)/((1+e)^2 d12^3)` です [D3:833-836（小箱）、1402-1404（大箱）]（コードのコメント `// not 8.0f` は係数が 16 であることを注記）。
 
 **ステップ 3：和を取る。** 力 $\mathbf{F}_i = -\partial E/\partial\mathbf{r}_i$ のうち CN を通る部分は
 
@@ -74,7 +74,7 @@ $$
 \boxed{\mathbf{F}_i^{\mathrm{extra}} = \sum_{j:\,r_{ij}<r_{c,\mathrm{cn}}} k_{12}\,\big(D_i + D_j\big)\,\mathbf{r}_{ij}}
 $$
 
-です。ペア $(i,j)$ ごとに $D_i$ と $D_j$ の両方が掛かるのは、$\mathrm{CN}_i$ と $\mathrm{CN}_j$ がともに $\mathbf{r}_i$ に依存するからです。総和は配位数の打ち切り半径 $r_{c,\mathrm{cn}}$ 以内のペア（配位数に寄与するペア）で、ポテンシャルの打ち切り半径 $r_{c,\mathrm{pot}}$ 以内のペアではありません。これが `extra` カーネルが `angular` リストで走り、$D_j$ が全近傍で確定した後に実行される理由です [D3:675-、1213-]。
+です。ペア $(i,j)$ ごとに $D_i$ と $D_j$ の両方が掛かるのは、$\mathrm{CN}_i$ と $\mathrm{CN}_j$ がともに $\mathbf{r}_i$ に依存するからです。総和は配位数の打ち切り半径 $r_{c,\mathrm{cn}}$ 以内のペア（配位数に寄与するペア）で、ポテンシャルの打ち切り半径 $r_{c,\mathrm{pot}}$ 以内のペアではありません。これが `extra` カーネルが `angular` リストで走り、$D_j$ が全近傍で確定した後に実行される理由です [`add_dftd3_force_extra_small_box` D3:783-、`find_dftd3_force_extra_large_box` D3:1321-]。
 
 **この項を省くと力が合いません。** スクリプトでは、直接項だけの力はエネルギーの有限差分と最大成分で約 100% ずれ（相対誤差 1.05 と 0.99）、直接項と間接項の和は一致します（A1.7 節）。
 
@@ -88,11 +88,11 @@ $$
 
 です。全体では、**各ペアについて $-\mathbf{r}_{ij}\otimes\mathbf{F}_i^{\mathrm{pair}}$ を足す**だけです。これはそのまま $\sum_i x_{ia}F_{ib}$ に等しい（力の総和が 0 であることによる）ので、2.1 節の規約と一致します。
 
-直接項：1 本のペアで $\mathbf{F}_i^{\mathrm{pair}} = 2 f_2\mathbf{r}_{ij}$（A1.2 節）。順序付きペア $(i,j)$ と $(j,i)$ の二つが各々 `s_sab -= r12_a * f12_b`（$f_{12} = f_2\mathbf{r}$）を加えるので、ペアの合計は $-2f_2\,\mathbf{r}\otimes\mathbf{r}$ で、ペアのビリアル $-\mathbf{r}\otimes(2f_2\mathbf{r})$ に等しくなります [D3:605-613]。
+直接項：1 本のペアで $\mathbf{F}_i^{\mathrm{pair}} = 2 f_2\mathbf{r}_{ij}$（A1.2 節）。順序付きペア $(i,j)$ と $(j,i)$ の二つが各々 $-r_{12,a}f_{12,b}$（コードは `+= r12 * f21` の等価な形）（$f_{12} = f_2\mathbf{r}$）を加えるので、ペアの合計は $-2f_2\,\mathbf{r}\otimes\mathbf{r}$ で、ペアのビリアル $-\mathbf{r}\otimes(2f_2\mathbf{r})$ に等しくなります [D3:712-720（小箱）、1249-1257（大箱）]。
 
 間接項：ペアの力は $k_{12}(D_i+D_j)\mathbf{r}_{ij}$ なので、ペアのビリアルは $-k_{12}(D_i+D_j)\,\mathbf{r}\otimes\mathbf{r}$ です。
 
-**原子ごとの割り当てが非対称な点**：コードは `s_sab -= r12_a * (r12_b * k12 * D_j)`（$D_j$ は近傍側）を、順序付きペア $(i,j)$ の結果として原子 $i$ に加えます [D3:730-745（小箱）、1294-1316（大箱）]。したがって原子 $i$ の間接項のビリアルは $-\sum_j k_{12}D_j\,\mathbf{r}\otimes\mathbf{r}$ で、自分の $D_i$ は含みません。$(j,i)$ の順序では原子 $j$ に $-k_{12}D_i\,\mathbf{r}\otimes\mathbf{r}$ が入ります（$\mathbf{r}\otimes\mathbf{r}$ は $\mathbf{r}\to-\mathbf{r}$ で不変）。
+**原子ごとの割り当てが非対称な点**：コードは（符号規約の異なる等価な形で）`s_sab -= r12_a * (r12_b * k12 * D_j)` に相当する量（$D_j$ は近傍側）を、順序付きペア $(i,j)$ の結果として原子 $i$ に加えます [D3:838-851（小箱）、1405-1421（大箱）]。したがって原子 $i$ の間接項のビリアルは $-\sum_j k_{12}D_j\,\mathbf{r}\otimes\mathbf{r}$ で、自分の $D_i$ は含みません。$(j,i)$ の順序では原子 $j$ に $-k_{12}D_i\,\mathbf{r}\otimes\mathbf{r}$ が入ります（$\mathbf{r}\otimes\mathbf{r}$ は $\mathbf{r}\to-\mathbf{r}$ で不変）。
 
 $$
 \sum_{\text{atoms}} W^{\mathrm{extra,code}} = -\sum_{\text{pairs}} k_{12}\,(D_j + D_i)\,\mathbf{r}\otimes\mathbf{r}
@@ -120,17 +120,17 @@ $$
 \sum_{a,b}L_{ab} = \sum_a w_i[a]\sum_b w_j[b] \equiv \mathcal{W}
 $$
 
-（二重和 = 和の積）で、分子は $\mathcal{Z} = \sum_a w_i[a]\,t_a$、$t_a = \sum_b C^{\mathrm{ref}}_{ab}w_j[b]$ です。最適化版のコードは、原子ごとの重み $w[a]$ を一度だけ計算して保持し [D3:61-73]、ペアのループでは $t_a$ と $\mathcal{Z}, \mathcal{W}$ を作ります [D3:107-163]。以前の実装のように、ペアごとに指数関数を $5\times5$ 個計算する必要がなくなります。二重和と分解形が数学的に等しいので、この変更は結果を変えません（浮動小数点の丸め以外）。スクリプトでは、200 個のランダムな組で、二重和の形と Z/W の形の最大相対差が 6.4e-16 でした。
+（二重和 = 和の積）で、分子は $\mathcal{Z} = \sum_a w_i[a]\,t_a$、$t_a = \sum_b C^{\mathrm{ref}}_{ab}w_j[b]$ です。最適化版のコードは、原子ごとの重み $w[a]$ を一度だけ計算して保持し [D3:62-75]、ペアのループでは $t_a$ と $\mathcal{Z}, \mathcal{W}$ を作ります [D3:109-165]。以前の実装のように、ペアごとに指数関数を $5\times5$ 個計算する必要がなくなります。二重和と分解形が数学的に等しいので、この変更は結果を変えません（浮動小数点の丸め以外）。スクリプトでは、200 個のランダムな組で、二重和の形と Z/W の形の最大相対差が 6.4e-16 でした。
 
-**$\mathrm{CN}_i$ による微分**：$w_i[a]$ の微分は $\partial w_i[a]/\partial\mathrm{CN}_i = -2k_3(\mathrm{CN}_i-\mathrm{ref}_a)w_i[a] = -8(\mathrm{CN}_i - \mathrm{ref}_a)\,w_i[a]$（$k_3=4$）で、コードの `dw = w * (-8.0f * diff)` [D3:97] です。商の微分から
+**$\mathrm{CN}_i$ による微分**：$w_i[a]$ の微分は $\partial w_i[a]/\partial\mathrm{CN}_i = -2k_3(\mathrm{CN}_i-\mathrm{ref}_a)w_i[a] = -8(\mathrm{CN}_i - \mathrm{ref}_a)\,w_i[a]$（$k_3=4$）で、コードの `dw = w * (-8.0f * diff)` [D3:99] です。商の微分から
 
 $$
 \frac{\partial C_6^{ij}}{\partial\mathrm{CN}_i} = \frac{\partial_i\mathcal{Z}}{\mathcal{W}} - \frac{\mathcal{Z}\,\partial_i\mathcal{W}}{\mathcal{W}^2} = \frac{\partial_i\mathcal{Z}}{\mathcal{W}} - C_6^{ij}\frac{\partial_i\mathcal{W}}{\mathcal{W}}
 $$
 
-で、$\partial_i\mathcal{Z} = \sum_a(\partial w_i[a])\,t_a$、$\partial_i\mathcal{W} = (\sum_a\partial w_i[a])\sum_b w_j[b]$ です。コードは `dc6 = dZ*W - c6*dW*W`（`W` は逆数に置き換え済み）です [D3:156-162]。スクリプトでは、中心差分との最大絶対誤差が、最大値に対して 1.7e-10 でした。
+で、$\partial_i\mathcal{Z} = \sum_a(\partial w_i[a])\,t_a$、$\partial_i\mathcal{W} = (\sum_a\partial w_i[a])\sum_b w_j[b]$ です。コードは `dc6 = dZ*W - c6*dW*W`（`W` は逆数に置き換え済み）です [D3:156-163]。スクリプトでは、中心差分との最大絶対誤差が、最大値に対して 1.7e-10 でした。
 
-**特別な場合**（コードの挙動で、式の導出ではありません）：$\mathcal{W}$ が `float` の $10^{-30}$ を下回ると、最後の参照同士の値を返し、微分は 0 にします [D3:156-158]。この場合は式の微分と一致しません（UPSTREAM-0001）。
+**特別な場合**（コードの挙動で、式の導出ではありません）：$\mathcal{W}$ が `float` の $10^{-30}$ を下回ると、最後の参照同士の値を返し、微分は 0 にします [D3:156-159]。この場合は式の微分と一致しません（UPSTREAM-0001）。
 
 ## A1.6 全体の流れ（コードの 2 段階）
 

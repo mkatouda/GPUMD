@@ -1,6 +1,6 @@
 # 第1章 使い方
 
-本章では `run.in` の `dftd3` と `dftd2` キーワードの書き方、全引数、制限、メッセージ、入力例、注意事項を説明します。出典の記号：`D3` = `src/force/dftd3/dftd3.cu`、`D2` = `src/force/dftd2.cu`、`run.cu` = `src/main_gpumd/run.cu`（行番号は `develop` ブランチ `8fe8ab99` 時点。コード読解で確認したもので、メッセージの文言は grep で確認済み）。
+本章では `run.in` の `dftd3` と `dftd2` キーワードの書き方、全引数、制限、メッセージ、入力例、注意事項を説明します。出典の記号：`D3` = `src/force/dftd3/dftd3.cu`、`D2` = `src/force/dftd2.cu`、`run.cu` = `src/main_gpumd/run.cu`（行番号は `develop` `7c15e99c` の内容を 2026-11-07 に読み直して再導出したもの。upstream の再構成（VER-0027）より前は、D3 のファイルは `src/force/` 直下にあった。コード読解で確認したもので、メッセージの文言は grep で確認済み）。
 
 ## 1.1 構文
 
@@ -29,7 +29,7 @@ dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 | 引数 | 意味 | 単位 | 既定値 | 検査 |
 |---|---|---|---|---|
 | `s6` | 大域的スケーリング係数 | なし | なし（必須） | 正の有限値でなければエラー |
-| `cutoff` | カットオフ半径 | Å | 30 Å（`DFTD2::DEFAULT_CUTOFF`）[`dftd2.cuh:30`] | 正の有限値でなければエラー。200 Å を超えると警告のみ |
+| `cutoff` | カットオフ半径 | Å | 30 Å（`DFTD2::DEFAULT_CUTOFF`）[`dftd2.cuh:38`] | 正の有限値でなければエラー。200 Å を超えると警告のみ |
 
 - 第 2 引数が数値ならカットオフとして読みます（カットオフは `s6` の直後にだけ置けます）。
 - 続けて任意のオプション `table`（`grimme2006` または `qe`）と `trunc`（`sf` または `plain`）を、キーワードと値の組として任意の順序で、それぞれ高々 1 回書けます。値は小文字だけです（大文字はエラー）。
@@ -45,7 +45,7 @@ dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 
 ## 1.2 対応する汎関数（`dftd3`）
 
-以下は BJ ダンピング（既定）の名前です。ゼロダンピングの対応汎関数は本節の末尾に示します。コード（`D3:1818-1871`、`set_para`）に登録されている 54 個の名前を次に示します（`lcwpbe` と `lc-wpbe08` は同一パラメータなので、パラメータセットとしては 53 種類）。綴りは**そのまま**入力してください。ハイフンやアンダースコアの正規化はありません（`hse-hjs`、`lc-wpbe08`、`dsd-pbep86` にはハイフンが含まれ、`b97d`、`camb3lyp`、`mn12sx` には含まれません）。
+以下は BJ ダンピング（既定）の名前です。ゼロダンピングの対応汎関数は本節の末尾に示します。コード（`D3:1945-1998`、`set_para`）に登録されている 54 個の名前を次に示します（`lcwpbe` と `lc-wpbe08` は同一パラメータなので、パラメータセットとしては 53 種類）。綴りは**そのまま**入力してください。ハイフンやアンダースコアの正規化はありません（`hse-hjs`、`lc-wpbe08`、`dsd-pbep86` にはハイフンが含まれ、`b97d`、`camb3lyp`、`mn12sx` には含まれません）。
 
 | | | | | | |
 |---|---|---|---|---|---|
@@ -59,7 +59,7 @@ dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 | rpw86pbe | scan | sogga11x | ssb | tpss | tpss0 |
 | tpssh | b2kplyp | dsd-pbep86 | b97m | wb97x | wb97m |
 
-- 各名前の（s6, a1, s8, a2）の値はコードの `set_para` 呼び出しにあります。起動時に、選ばれた値が標準出力に表示されます（1.5 節）。例えば `pbe` は s6 = 1、a1 = 0.4289、s8 = 0.7875、a2 = 4.4407 Bohr です [`D3:1818-1871`。この値は VER-0001 でも使われている]。
+- 各名前の（s6, a1, s8, a2）の値はコードの `set_para` 呼び出しにあります。起動時に、選ばれた値が標準出力に表示されます（1.5 節）。例えば `pbe` は s6 = 1、a1 = 0.4289、s8 = 0.7875、a2 = 4.4407 Bohr です [`D3:1974`。この値は VER-0001 でも使われている]。
 - **注意**：パラメータ表と C6 参照表（`dftd3para.cuh`）の出典（どの版の表か）は、コードにもフォーク内の仕様書にも記載がありません [UPSTREAM-0002 G]。`dftd3.rst` は Bonn 大学の BJ 汎関数一覧へのリンクのみを示し、名前を列挙していません。コードの 54 個の名前の一部がその一覧に無い可能性がありますが、確認していません。
 - 上記以外の名前を指定すると、次のメッセージで停止します（1.6 節）。
 
@@ -77,8 +77,8 @@ dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 
 | 制限 | 内容 | 出典 |
 |---|---|---|
-| 回数 | `dftd3` は 1 回だけ、`dftd2` も 1 回だけ | `run.cu:373-387` |
-| 排他 | `dftd3` と `dftd2` は同時に使えない（どちらの順でもエラー） | `run.cu:363-376`, `D2:763-765` |
+| 回数 | `dftd3` は 1 回だけ、`dftd2` も 1 回だけ | `run.cu:364-366`（`dftd3`）、`run.cu:372-374`（`dftd2`） |
+| 排他 | `dftd3` と `dftd2` は同時に使えない（どちらの順でもエラー） | `run.cu:367-369`、`run.cu:375-377`、`D2:763-765` |
 
 ### 対応ポテンシャル
 
@@ -90,7 +90,7 @@ dftd2 <s6> [<cutoff>] [table grimme2006|qe] [trunc sf|plain]
 | NEP を GPU 複数枚で使う場合（`NEP_MULTIGPU`） | エラー | エラー |
 | 上記以外（`tersoff`、`eam`、`lj`、`nep_ilp` など） | **黙って無視される**（エラーなし） | エラー |
 
-[出典: `src/force/force.cu:142-166`、`src/force/nep/nep.cu`、`src/force/nep_charge/nep_charge.cu`、`src/force/nep_charge_vdw/nep_charge_vdw.cu`、`src/force/nep/nep_multigpu.cu`、`src/main_gpumd/run.cu:501-507`]
+[出典: `src/force/force.cu:118-166`、`src/force/nep/nep.cu`、`src/force/nep_charge/nep_charge.cu`、`src/force/nep_charge_vdw/nep_charge_vdw.cu`、`src/force/nep/nep_multigpu.cu`、`src/main_gpumd/run.cu:501-507`]
 
 `dftd3` が NEP 以外で黙って無視される点は、`dftd3.rst` にも「他のポテンシャルでは効果がない」と記載されています。`dftd2` はエラーになる点と非対称です（1.10 節の注意 1）。
 
@@ -114,13 +114,13 @@ D2 の C6, R0 表は dftd3-lib（`prg/extras.f90`、`loadoldpar`、コミット 
 
 次の環境変数は、スレッド配分などを強制してテストするためのものです。コード中で「ユーザー向けには意図的に非公開」と記されており、**通常の計算では設定しないでください**（挙動の保証はありません）。
 
-`GPUMD_DFTD3_LARGE_BOX_NUM_SUB`、`GPUMD_DFTD3_SMALL_BOX_NUM_SUB`、`GPUMD_DFTD3_LARGE_BOX_LIST_CAPACITY`、`GPUMD_DFTD2_TARGET_THREADS`（pytest 専用で `gpumd` が読まないもの：`DFTD2_TEST_GPUMD`）[`D3:463-481, 818-846, 866-891`、`D2:633-646`]。設定すると起動時や各ステップにデバッグ行が出力されます。
+`GPUMD_DFTD3_LARGE_BOX_NUM_SUB`、`GPUMD_DFTD3_SMALL_BOX_NUM_SUB`、`GPUMD_DFTD3_LARGE_BOX_LIST_CAPACITY`、`GPUMD_DFTD2_TARGET_THREADS`（pytest 専用で `gpumd` が読まないもの：`DFTD2_TEST_GPUMD`）[`D3:577-596, 922-937, 971-985`、`D2:791-801`]。設定すると起動時や各ステップにデバッグ行が出力されます。
 
 ## 1.5 起動時に表示されるメッセージ
 
 標準出力に次が出ます（`potential` 行を読んでポテンシャルを構築する時点で表示されます。コード読解のみ、表示順は未確認）。
 
-D3（`D3:1880-1888`）：
+D3（`D3:2008-2025`）：
 
 ```
     Add DFT-D3:
@@ -135,7 +135,7 @@ D3（`D3:1880-1888`）：
 
 `a2` はコード内の表では Bohr 単位ですが、表示は Å に変換した値です。値はデフォルト書式の浮動小数（有効数字 6 桁）です。
 
-D2（`D2:674`）：
+D2（`D2:843-845`）：
 
 ```
 Use the DFT-D2 correction (s6 = <値>, shifted-force cutoff = <値> A).
@@ -164,7 +164,7 @@ Warning: the dftd2 cutoff (<値> A) is larger than 200 A; the cost grows as the 
 | `Cannot open potential file.` | 標準エラー | D3 側でポテンシャルファイルを開けない | パスを確認する |
 | `The first line of the NEP model file should have <n> atom symbols.` | 標準出力 | NEP ファイル 1 行目のトークン数が不正 | モデルファイルが壊れていないか確認する |
 | `DFTD3 only supports elements from H to Pu.` | 標準出力 | 原子番号が範囲外 | **注意**：未知の元素記号では確実には出ない（1.10 節の注意 4） |
-| `Error:` `    The box has` `        a thickness < 2.5 radial cutoffs in a periodic direction.` `        and a thickness > 10 radial cutoffs in another direction.` `    Please increase the periodic direction(s).`（実際は複数行） | 標準出力 | 小箱経路（周期方向のどれかの厚さが 2.5 `rc_pot` 以下）で、かつ三つの厚さのうちどれかが 10 `rc_pot` を超える | 薄い周期方向を広げる、または `rc_pot` を小さくする。コードは非周期方向も含めて判定する（`dftd3.rst` の記述より少し広い）[`D3:196-230`] |
+| `Error:` `    The box has` `        a thickness < 2.5 radial cutoffs in a periodic direction.` `        and a thickness > 10 radial cutoffs in another direction.` `    Please increase the periodic direction(s).`（実際は複数行） | 標準出力 | 小箱経路（周期方向のどれかの厚さが 2.5 `rc_pot` 以下）で、かつ三つの厚さのうちどれかが 10 `rc_pot` を超える | 薄い周期方向を広げる、または `rc_pot` を小さくする。コードは非周期方向も含めて判定する（`dftd3.rst` の記述より少し広い）[`D3:312-341`] |
 | `Invalid number of threads per atom in DFT-D3.` | 標準エラー | 内部エラー（大箱経路のスレッド配分が不正）。環境変数の誤設定は無視される設計だが、通常は出ない | 通常の入力では出ないはずです。出たら報告してください |
 | `dftd3 can only appear once.` | 標準エラー | `dftd3` が 2 回以上 | 1 行にする |
 | `dftd3 and dftd2 cannot be used together; use only one of them.` | 標準エラー | `dftd3` と `dftd2` を併用（`dftd3` が `dftd2` の後） | どちらか一つにする |
@@ -242,7 +242,7 @@ cp -r examples/gpumd_dftd3 /tmp/gpumd_dftd3 && cd /tmp/gpumd_dftd3
 ## 1.8 出力の見方
 
 - 補正のエネルギー・力・ビリアルは、NEP の値に**直接加算**されます。`thermo.out` のポテンシャルエネルギー、`dump_xyz` の力、ビリアルから求める圧力に反映されます。補正を単独で出力する機能はありません。
-- 原子ごとのエネルギー（`potential_per_atom`）には、各原子対のエネルギーの半分が両原子に配分されます [コード: `D3:598`、`D2:451`]。
+- 原子ごとのエネルギー（`potential_per_atom`）には、各原子対のエネルギーの半分が両原子に配分されます [コード: `D3:235, 707, 1244`、`D2:521, 550`]。
 - 例題の README によれば、81 原子の水の例では、構造が緩和されていないため 100 ステップで温度が約 600〜700 K に上がり、全エネルギー（運動＋ポテンシャル、`thermo.out` の 2 列目と 3 列目）は約 0.06 eV の範囲で一定です [examples/gpumd_dftd3/README.md]。これは入力の動作確認用であり、平衡化した計算ではありません。
 - D3 の起動時表示（1.5 節）で、実際に使われた s6、s8、a1、a2 を必ず確認してください。
 
@@ -271,7 +271,7 @@ cp -r examples/gpumd_dftd3 /tmp/gpumd_dftd3 && cd /tmp/gpumd_dftd3
 
 | 番号 | 内容 | 利用者への注意 |
 |---|---|---|
-| 注意 1 | `dftd3` は NEP 以外のポテンシャルでは黙って無視される（`dftd2` はエラー）[UPSTREAM-0002 G、`run.cu:373-380`] | NEP 以外で `dftd3` を書いても補正は入らない。起動メッセージ（1.5 節）が出ているかを確認する |
+| 注意 1 | `dftd3` は NEP 以外のポテンシャルでは黙って無視される（`dftd2` はエラー）[UPSTREAM-0002 G、`run.cu:363-370`（`dftd3` はキーワードの出現を数えるだけ）、`run.cu:501-507`（`dftd2` のエラー）] | NEP 以外で `dftd3` を書いても補正は入らない。起動メッセージ（1.5 節）が出ているかを確認する |
 | 注意 2 | 小箱経路のメモリは 1 原子あたり約 320 kB（`N × 10000 × 32 B`）。`N × 10000` の int 演算は N が約 35,800 を超えるとオーバーフローし得る [UPSTREAM-0002 C] | 薄い箱に多数の原子を置く設定は避ける。そもそもこの大きさでは小箱経路は実用的でない |
 | 注意 3 | `rc_pot`、`rc_cn` の範囲検査が無く、負値・0・`rc_cn` > `rc_pot` が受理される。小箱判定とセル幅は `rc_pot` だけで決まるため、`rc_cn` > `rc_pot` では配位数の数え落としが起こり得る（推論）[UPSTREAM-0002 E] | `0 < rc_cn ≤ rc_pot` を守る |
 | 注意 4 | 元素記号が一致しないとき `atomic_number` が未初期化のまま使われ、`DFTD3 only supports elements from H to Pu.` が確実には出ない [UPSTREAM-0002 A] | NEP ファイル 1 行目の元素記号の綴りを確認する |

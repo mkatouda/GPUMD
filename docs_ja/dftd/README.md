@@ -12,21 +12,21 @@
 | 未検証の環境 | HIP（AMD/ROCm）ビルド、sm_60 未満、RTX A6000 以外の GPU、CUDA 12.3 以外 [DR-001 AC-5 注記, VER-0019] |
 | 作成日 | 初版 2026-11-04、本改訂 2026-11-07 |
 | 本改訂で追加した検証記録 | VER-0023（D3(0) のパラメータの出典）、VER-0024（D3(0) の Phase 4 検証）、VER-0025（QE `dftd3_version = 2` のパラメータの出典）、VER-0026（`dftd2` の `table qe` / `trunc plain` の検証と R3 高速化）、VER-0027（upstream/master `aa63ffdd` のマージ：パス、ビルド、テスト） |
-| ソースのパス表記 | 全章のソースファイルのパスを、upstream の再構成（サブフォルダ化）**後**の現在の配置に揃えました。D3 は `src/force/dftd3/`（`dftd3.cu`、`dftd3.cuh`、`dftd3para.cuh`、`dftd3zero_table.cuh`）、NEP 系は `src/force/nep/nep.cu`、`src/force/nep_charge/nep_charge.cu`、`src/force/nep_charge_vdw/nep_charge_vdw.cu`、`src/force/nep/nep_multigpu.cu`、フォーク固有の D2 は `src/force/` 直下（`dftd2.cu`、`dftd2.cuh`、`dftd2para.cuh`、`dftd2qe_table.cuh`）。**04・05 章の行番号は `90bff065` で再導出済み**です。00〜03、06、A1〜A3 章の `D3:n`、`D2:n` 形式の**行番号の引用**は `aba6b28b` 時点（再構成前、D3(0)・R3 の直後）のまま再導出していないため、ずれている可能性があります（関数名で探してください）。履歴上の記述（VER 記録の引用、「当時のパス」と明記したもの）は当時のパスのままです |
+| ソースのパス表記 | 全章のソースファイルのパスを、upstream の再構成（サブフォルダ化）**後**の現在の配置に揃えました。D3 は `src/force/dftd3/`（`dftd3.cu`、`dftd3.cuh`、`dftd3para.cuh`、`dftd3zero_table.cuh`）、NEP 系は `src/force/nep/nep.cu`、`src/force/nep_charge/nep_charge.cu`、`src/force/nep_charge_vdw/nep_charge_vdw.cu`、`src/force/nep/nep_multigpu.cu`、フォーク固有の D2 は `src/force/` 直下（`dftd2.cu`、`dftd2.cuh`、`dftd2para.cuh`、`dftd2qe_table.cuh`）。**01・02・04・05 章と付録 A1・A2 の行番号の引用（`D3:n`、`D2:n`、`run.cu:n` など）は `develop` `7c15e99c`（ソースは `90bff065` と同一）で 2026-11-07 に再導出済み**です。00、03、06、A3 章には現行ソースの行番号の引用はありません（06 章の `nep.cu:908` は当時の行番号と明記した履歴上の記述）。ソースを変更すると行番号はずれるので、関数名でも探せるようにしてください。履歴上の記述（VER 記録の引用、「当時のパス」と明記したもの）は当時のパスのままです |
 
 ## 目次
 
 | 章 | ファイル | 内容 | 備考 |
 |---|---|---|---|
 | 0 | [00_introduction.md](00_introduction.md) | 位置づけ、D2/D3（BJ/ゼロ）の使い分け、環境、読み方 | 完成（D3(0)・QE 型 D2 を追記済み） |
-| 1 | [01_usage.md](01_usage.md) | 入力構文、全引数、制限、エラーメッセージ、入力例、注意事項 | 完成（D3(0)・`table`/`trunc` を追記済み） |
-| 2 | [02_theory.md](02_theory.md) | 理論（実装されている式） | 完成（D3(0) の式は 2.2 節に追記） |
+| 1 | [01_usage.md](01_usage.md) | 入力構文、全引数、制限、エラーメッセージ、入力例、注意事項 | 完成（D3(0)・`table`/`trunc` を追記済み。行番号は `7c15e99c` で再導出） |
+| 2 | [02_theory.md](02_theory.md) | 理論（実装されている式） | 完成（D3(0) の式は 2.2 節に追記。行番号は `7c15e99c` で再導出） |
 | 3 | [03_benchmark.md](03_benchmark.md) | 計算コスト・ベンチマーク | 完成（D3(0) のコストと R3 後の D2 を追記済み） |
 | 4 | [04_source_structure.md](04_source_structure.md) | ソースコード構成 | 完成（`90bff065`。サブフォルダ再構成後のパス、D3(0)・D2 QE のファイル、テスト、行番号を再導出） |
 | 5 | [05_implementation.md](05_implementation.md) | 実装技法（最適化の詳細） | 完成（`90bff065`。D3(0) の減衰ヘルパーと倍精度 CN（5.1.3〜5.1.6）、D2 の QE 互換の表と補償付き float 累算（5.6.5〜5.6.6）、精度の余裕の表、既知の限界を追記。行番号を再導出） |
 | 6 | [06_verification.md](06_verification.md) | 検証（精度、エネルギー保存、回帰、受入基準） | 完成（DR-003・DR-004 の節を追記済み） |
-| A1 | [A1_derivation_d3.md](A1_derivation_d3.md) | 付録：D3(BJ) と D3(0) の式の導出 | 完成（D3(0) の導出を A1.9 節に追記） |
-| A2 | [A2_derivation_d2.md](A2_derivation_d2.md) | 付録：D2（QE 型を含む）の式の導出 | 完成（QE 型 D2、単純打ち切り、補償付き累算を A2.8〜A2.9 節に追記） |
+| A1 | [A1_derivation_d3.md](A1_derivation_d3.md) | 付録：D3(BJ) と D3(0) の式の導出 | 完成（D3(0) の導出を A1.9 節に追記。行番号は `7c15e99c` で再導出） |
+| A2 | [A2_derivation_d2.md](A2_derivation_d2.md) | 付録：D2（QE 型を含む）の式の導出 | 完成（QE 型 D2、単純打ち切り、補償付き累算を A2.8〜A2.9 節に追記。行番号は `7c15e99c` で再導出） |
 | A3 | [A3_reproduce.md](A3_reproduce.md) | 付録：検証・測定の再現手順 | 完成（新規テスト、スクリプト、出典、履歴を追記済み） |
 
 ## 読者別の読み方
