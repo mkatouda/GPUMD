@@ -1,0 +1,5 @@
+structure,atoms,vol_per_atom_A3,qe_plain_E_meV_per_atom,qe_plain_maxF_eV_per_A,qe_plain_virial_trace_over3_eV,qe_sf_E_meV_per_atom,qe_sf_maxF_eV_per_A,qe_sf_virial_trace_over3_eV,grimme2006_plain_E_meV_per_atom,grimme2006_plain_maxF_eV_per_A,grimme2006_plain_virial_trace_over3_eV,grimme2006_sf_E_meV_per_atom,grimme2006_sf_maxF_eV_per_A,grimme2006_sf_virial_trace_over3_eV
+cryst157_vol000,45,12.268025,-65.572568,0.053662,-2.607442,-63.480914,0.053656,-2.549003,-70.686216,0.047807,-2.407063,-68.685266,0.047805,-2.351475
+cryst157_volm05,45,11.654624,-69.675970,0.056831,-2.841450,-67.475977,0.056836,-2.780441,-74.921529,0.050622,-2.593225,-72.816672,0.050626,-2.535098
+cryst157_volm10,45,11.041222,-74.290299,0.061020,-3.067794,-71.968432,0.061023,-3.003720,-79.533174,0.055966,-2.786276,-77.312115,0.055980,-2.725192
+cryst157_volm15,45,10.427821,-79.524825,0.066500,-3.395733,-77.066105,0.066517,-3.328086,-84.737951,0.062362,-3.123423,-82.387502,0.062373,-3.059006
