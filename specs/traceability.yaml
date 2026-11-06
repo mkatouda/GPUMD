@@ -30,7 +30,7 @@ requirements:
     title: dftd2 QE-compatible table, plain cutoff and speed-up
     source: specs/requirements/DR-004-dftd2-qe-compat.md
     design: specs/design/DES-0004-dftd2-qe-compat-plan.md
-    adrs: [specs/decisions/ADR-0004-dftd2-table-trunc-keyword.md]   # Proposed 2026-11-06
+    adrs: [specs/decisions/ADR-0004-dftd2-table-trunc-keyword.md]   # Accepted 2026-11-06
     verification: []
     tests: []   # waits for DR-003 to be merged into develop (human decision 2026-11-06)
     status: planned

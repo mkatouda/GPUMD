@@ -1,6 +1,6 @@
 # ADR-0004: `table` and `trunc` options for the `dftd2` keyword
 
-- Status: Proposed (drafted 2026-11-06; awaiting human approval)
+- Status: Accepted (approved by the human on 2026-11-06, including item 6: explicit cutoff required with `table qe` or `trunc plain`)
 - Requirement: `DR-004` (design `DES-0004`; decisions P1-P5 of DR-004 approved 2026-11-06)
 - Needed because: `AGENTS.md` treats changes to existing keywords as an upstream contract change
   (ADR-0003 handled the same question for `dftd3`).
@@ -37,8 +37,7 @@ without changing existing inputs or results.
    `<cutoff>` is an input error ("the cutoff must be given explicitly so that it matches the one
    used to generate the labels"). Rationale: the purpose of these options is to reproduce a
    specific label setting; the 30 A default belongs to the Grimme 2006 / shifted-force convergence
-   study of DR-002 and would silently differ from QE-based labels. (To be confirmed by the human,
-   see below.)
+   study of DR-002 and would silently differ from QE-based labels. (Approved by the human.)
 7. Header output: existing `dftd2` output lines keep their text and order. Lines for the new
    options (`table = qe`, `trunc = plain`) are printed only when the value is not the default, so
    the output of every existing input is byte-identical (same policy as ADR-0003 item 4).
@@ -49,10 +48,10 @@ without changing existing inputs or results.
 10. Numerical tolerances for the new modes follow DR-002 AC-1 (float-level); the numpy reference
     `d2_reference.py` of the request and QE-printed D2 values are the oracles (DR-004 AC-1).
 
-## Open point for the human
-Item 6 (explicit cutoff required with `table qe` or `trunc plain`) is a proposal, stricter than
-the request. Alternative: allow the default 30 A and document it (shorter inputs; risk of a
-silent mismatch with 12 A plain-cutoff labels). Recommended: item 6 as written.
+## Decision on the open point (2026-11-06)
+Item 6 (explicit cutoff required with `table qe` or `trunc plain`) is approved as written. It is
+stricter than the request; the alternative (default 30 A with documentation) was rejected because
+of the risk of a silent mismatch with 12 A plain-cutoff labels.
 
 ## Alternatives considered
 - `dftd2 <s6> <rc> table qe` with a mandatory cutoff for all forms (request wording): breaks
