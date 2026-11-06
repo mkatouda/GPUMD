@@ -247,7 +247,8 @@ static __device__ __forceinline__ void d3_damped_pair(
     d3_zero_term<6>(r, 1.0f / (p.sr6 * r0), g6, h6);
     d3_zero_term<8>(r, 1.0f / (p.sr8 * r0), g8, h8);
     pe = (p.s6 * c6 * g6 + p.s8 * c8 * g8) * 0.5f;
-    f2 = 0.5f * (p.s6 * c6 * g6 * h6 + p.s8 * c8 * g8 * h8) / d12_2;
+    // r = 0 (coincident atoms): finite zero force instead of 0/0
+    f2 = d12_2 > 0.0f ? 0.5f * (p.s6 * c6 * g6 * h6 + p.s8 * c8 * g8 * h8) / d12_2 : 0.0f;
   }
 }
 
@@ -2037,7 +2038,7 @@ std::string DFTD3::parse_damping(const std::vector<std::string>& tokens)
   }
   if (tokens.size() > 5) {
     std::cout << "dftd3 has too many parameters; the syntax is dftd3 <functional> <rc_potential> "
-                 "<rc_cn> [zero|bj]\n";
+                 "<rc_cn> [zero|bj] (damping must be zero or bj, lower case)\n";
     exit(1);
   }
   if (tokens.size() == 4) {
