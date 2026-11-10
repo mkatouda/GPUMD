@@ -2,7 +2,7 @@
 
 This file provides guidance to coding agents (Claude Code, etc.) when working with code in this repository.
 
-GPUMD is a CUDA/HIP molecular dynamics package. Executables: `gpumd` (MD/static calculations, input `run.in` + `model.xyz`), `nep` (NEP training/prediction, input `nep.in`), plus `gpumd_replica`, `tb` and optional `gnep`. Docs: `doc/` (Sphinx, user manual); `developer/README.md` is the developer guide — read it before adding keywords, potentials, ensembles, or actions.
+GPUMD is a CUDA/HIP molecular dynamics package (`gpumd`, `nep`, `gpumd_replica`, `tb`, optional `gnep`). `developer/README.md` is the developer guide — read it before adding keywords, potentials, ensembles, or actions. User manual: `doc/`.
 
 ## Scope of these rules
 
@@ -120,10 +120,8 @@ Keep generated files out of the tracked source tree. `run_regression.py` writes
 `tests_regression/.work/` and `tests_regression/reports/` (both git-ignored; `--keep-all`
 keeps them, so delete them when done). Run manual `gpumd`/`nep` jobs in a scratch
 directory, never in the repository root or `src/`. Binaries (`src/gpumd*`, `src/nep*`)
-are git-ignored. Running `gpumd` directly inside `examples/<name>/` overwrites or appends
-to tracked outputs there (e.g. `examples/gpumd_static/dump.xyz` and `neighbor.out`):
-copy the example to a scratch directory and run it there; if tracked files were
-modified, restore them with `git checkout -- <files>` and never commit them. Before reporting a task done, `git status`
+are git-ignored. Never run `gpumd` inside `examples/<name>/` (see `.claude/rules/examples.md`;
+copy to scratch). Before reporting a task done, `git status`
 must show no `*.out`, dumps, `nep.txt`, `*.h5`/`*.npy`, or run directories; the
 `PostToolUse` subagent audit hook flags them.
 
@@ -162,48 +160,21 @@ residual risks, and the next task. A task is incomplete while any acceptance
 criterion or BLOCKER/MAJOR review finding is open. Traceability `status` is one of
 `implemented`, `partial`, `planned`; never report `partial` as implemented.
 
-## Build
+## Build and tests
 
-Needs `nvcc` and a GPU; build from `src/` with GNU Make:
+Needs `nvcc` and a GPU. Build from `src/` (outputs `gpumd nep gpumd_replica tb`):
 
 ```bash
-cd src
-make CUDA_ARCH="-arch=sm_86" -j4   # default is sm_60, which fails on CUDA 13.x; run `make clean` after changing arch/flags
-make -f makefile.hip               # AMD / ROCm
-make gnep                          # optional target, not part of `all`
+cd src && make CUDA_ARCH="-arch=sm_86" -j4 2>&1 | tail -30
 ```
 
-`make` (target `all`) builds `gpumd nep gpumd_replica tb`, outputs in `src/`. A CMake build (`CMakeLists.txt`, `-DPKG_NNAP=yes` for NNAP) is also available. Both build systems glob sources by directory (`src/force/*.cu` and `src/force/*/*.cu` for gpumd; `src/main_nep/**` for nep), so new files in existing dirs need no build edits, but nested deeper dirs do. The Linux makefile enables many `-W` flags; keep code warning-clean. Formatting uses clang-format (`src/apply_clang_format.sh`).
+The default arch (sm_60) fails on CUDA 13.x; run `make clean` after changing arch/flags. Keep
+code warning-clean. HIP: `make -f makefile.hip`; optional `make gnep`; CMake is also available.
+Source-edit details (clang-format scope, CUDA/HIP and `main_replica/` sync) are in
+`.claude/rules/gpu-src.md`.
 
-**clang-format scope.** Run clang-format only on source code that the human or an agent
-changed in the current task, and never on unrelated files or on whole directories (do not run
-`src/apply_clang_format.sh` over the tree). Even in a changed file, do not accept reformatting
-of lines you did not edit: if the tool rewrites unrelated parts (a large diff in a file that
-needed a small edit), revert the formatting and keep only the intended edit. This keeps
-diffs reviewable and upstream merges clean. Tell subagents this in their prompts.
-
-## Tests
-
-All tests need a GPU and built binaries (`src/gpumd`, `src/nep`).
-
-- `tests_pytest/` — main pytest suite (needs `ase calorine numpy pytest hypothesis`). Run from that dir:
-  `pytest -q`, `pytest -m "not slow" -q`, `pytest -m fast -q`, single test: `pytest test_parsing.py::test_name -q`. `--update-golden` regenerates frozen references in `fixtures/golden/` (deliberate only).
-- `tests_regression/` — manifest-driven behavior contract suite comparing a baseline vs candidate binary. Acceptance is `--suite full`; focused suites (e.g. `parsing_validation`, `pppm`) are diagnostics only. See `CONTRACT_SUITES.md`:
-  `python3 run_regression.py --repo-root <repo> --baseline <gpumd_old> --candidate <gpumd_new> --suite <name> --keep-all`
-  Unit tests of the runner itself: `pytest tests_regression/test_runner.py` etc.
-- `tests_tb/` — tests for the `tb` executable.
-- CI (`.github/workflows/`) builds with CUDA containers; the integration workflow uses calorine + pytest.
-
-## Architecture (gpumd)
-
-`Run` (`src/main_gpumd/run.cu`) owns `Atom`, `Velocity`, `Box`, `Group[]`, `Force`, `Integrate`, `Measure`. `RunInput` tokenizes `run.in`, and each keyword is dispatched to the module that owns it — implement new keywords in that module, not in `Run`, unless they change overall execution flow.
-
-- `Force` (`src/force/`) holds `Potential` subclasses (NEP, qNEP/charge with PPPM/Ewald, Tersoff, EAM, LJ, ILP, DFT-D3, …). Keep per-model data and GPU workspaces in the potential object; avoid reallocating in `compute()`.
-- `Integrate` (`src/integrate/`) holds the active `Ensemble` (`compute1`/`compute2`).
-- `Measure` (`src/measure/`) holds `Action` objects (dumps, computes, observers) hooked into the MD loop: `pre_run, setup_force, post_integrate1, pre_force, post_force, end_of_step, post_run`. Use the matching hook rather than special-casing the loop.
-- Other dirs: `model/` (atoms/box/groups), `minimize/`, `phonon/`, `mc/`, `utilities/` (`GPU_Vector`, `gpu_macro.cuh` CUDA/HIP abstraction, `error.cuh`).
-- Polymorphic objects are owned via `std::unique_ptr`. Code shared between CUDA and HIP must go through `gpu_macro.cuh`.
-
-The `nep` executable (`src/main_nep/`) has its own training `Potential` interface, separate from the MD `Potential` in `src/force/`; spin training in `main_nep/nep_spin/` shares headers with `src/force/nep_spin/`. `main_replica/` has its own copies of force/integrate/model subsets (see its makefile). When changing a user-facing keyword, update the manual in `doc/` too.
-
-Other top-level dirs: `examples/`, `potentials/` (potential files), `tools/` (Python/format-conversion/analysis utilities), `scripts/`.
+Tests (all need a GPU and built binaries): `tests_pytest/` (main suite; `--update-golden` only
+deliberately), `tests_regression/` (baseline vs candidate; acceptance is `--suite full`, see
+`CONTRACT_SUITES.md` and the `/regression` skill), `tests_tb/` (`tb`). Run only the area you
+changed; the full regression once, before the final report. Architecture: read
+`developer/README.md`; implement keywords in the owning module, not in `Run`.
