@@ -52,6 +52,7 @@ struct NEP_Charge_Data {
   GPU_Vector<float> bec;               // BEC
   GPU_Vector<float> phi_parameters;    // charge_transfer phi coefficients (DR-005), may be empty
   GPU_Vector<float> ct_h;              // charge_transfer: network output h (q lives in `charge`)
+  GPU_Vector<float> ct_Dt;             // charge_transfer: Dt_a = dE/dh_a (force weight)
   GPU_Vector<float> ct_V;              // charge_transfer: V_a = sum_b phi_ab (r_a - r_b), 3 N
 };
 

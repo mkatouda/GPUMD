@@ -1,7 +1,7 @@
 """charge_transfer qNEP: neutrality and BEC vs finite differences (DR-005 stage 2b, VER-0032).
 
 Synthetic random-weight model (VER-0032 make_ct_model.py). gpumd `dump_xyz bec` / `charge` of static
-runs (time_step 0, test-only opt-in GPUMD_CHARGE_TRANSFER_BEC_ONLY=1) against central finite
+runs (time_step 0) against central finite
 differences (delta 0.02 A) of the single-valued pair-form dipole P = sum_a h_a V_a built on the host
 from the h of the same weights without the charge_transfer line (scripts/ct_bec_fd.py).
 Gates: RMS(BEC/sqrt(eps_inf) - Z_FD) <= 1e-3 e (A1), relative RMS <= 1e-2, max abs <= 1e-3 e.

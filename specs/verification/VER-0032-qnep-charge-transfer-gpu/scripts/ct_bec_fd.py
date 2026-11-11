@@ -96,8 +96,7 @@ def run_gpumd(gpumd, workdir, model_text, pos, types, box, tag):
         "potential nep.txt\nkspace ewald\nensemble nve\ntime_step 0\n"
         "dump_xyz 1 d.xyz precision double charge bec\nrun 1\n"
     )
-    env = dict(os.environ, GPUMD_CHARGE_TRANSFER_BEC_ONLY="1")  # test-only opt-in (stage 2c pending)
-    r = subprocess.run([gpumd], cwd=d, capture_output=True, text=True, env=env)
+    r = subprocess.run([gpumd], cwd=d, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError("gpumd failed in %s:\n%s" % (d, (r.stdout + r.stderr)[-600:]))
     L = open(os.path.join(d, "d.xyz")).read().split("\n")

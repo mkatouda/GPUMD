@@ -516,20 +516,9 @@ NEP_Charge::NEP_Charge(
   initialize_dftd2(run_input);
 
   if (paramb.charge_transfer) {
-    // forces/virial are not implemented for charge_transfer yet: refuse to run dynamics unless
-    // the test-only opt-in is set (BEC/charge verification, VER-0032)
-    const char* bec_only = std::getenv("GPUMD_CHARGE_TRANSFER_BEC_ONLY");
-    if (bec_only == nullptr || std::strcmp(bec_only, "1") != 0) {
-      PRINT_INPUT_ERROR(
-        "charge_transfer models are not usable yet: DR-005 stage 2c (forces/virial not "
-        "implemented).");
-    }
     nep_data.ct_h.resize(num_atoms);
     nep_data.ct_V.resize(num_atoms * 3);
-    std::cout << "***** WARNING *****\n"
-              << "charge_transfer: forces/virial/energy-derivative terms are NOT valid in this "
-                 "build (DR-005 stage 2b; BEC and charges only)\n"
-              << "*******************" << std::endl;
+    nep_data.ct_Dt.resize(num_atoms);
   }
 }
 
@@ -1716,9 +1705,36 @@ void NEP_Charge::compute_large_box(
     GPU_CHECK_KERNEL
   }
 
-  // Chain rule correction: D_real -= mean(D_real)
-  zero_mean_D_real<<<1, 1024>>>(N, nep_data.D_real.data());
-  GPU_CHECK_KERNEL
+  const float* D_weight = nep_data.D_real.data();
+  if (paramb.charge_transfer) {
+    // Dt = dE/dh and the explicit phi' pair force/virial (VER-0033); no zero_mean_D_real
+    ct_find_Dt_and_pair_force_large_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      box,
+      nep_data.NN_radial.data(),
+      nep_data.NL_radial.data(),
+      type.data(),
+      position_per_atom.data(),
+      position_per_atom.data() + N,
+      position_per_atom.data() + N * 2,
+      nep_data.ct_h.data(),
+      nep_data.D_real.data(),
+      nep_data.ct_Dt.data(),
+      force_per_atom.data(),
+      force_per_atom.data() + N,
+      force_per_atom.data() + N * 2,
+      virial_per_atom.data());
+    GPU_CHECK_KERNEL
+    D_weight = nep_data.ct_Dt.data();
+  } else {
+    // Chain rule correction: D_real -= mean(D_real)
+    zero_mean_D_real<<<1, 1024>>>(N, nep_data.D_real.data());
+    GPU_CHECK_KERNEL
+  }
 
   find_force_radial<<<grid_size, BLOCK_SIZE>>>(
     paramb,
@@ -1735,7 +1751,7 @@ void NEP_Charge::compute_large_box(
     position_per_atom.data() + N * 2,
     nep_data.Fp.data(),
     nep_data.charge_derivative.data(),
-    nep_data.D_real.data(),
+    D_weight,
     force_per_atom.data(),
     force_per_atom.data() + N,
     force_per_atom.data() + N * 2,
@@ -1757,7 +1773,7 @@ void NEP_Charge::compute_large_box(
     position_per_atom.data() + N * 2,
     nep_data.Fp.data(),
     nep_data.charge_derivative.data(),
-    nep_data.D_real.data(),
+    D_weight,
     nep_data.sum_fxyz.data(),
     nep_data.f12x.data(),
     nep_data.f12y.data(),
@@ -2077,9 +2093,35 @@ void NEP_Charge::compute_small_box(
     GPU_CHECK_KERNEL
   }
 
-  // Chain rule correction: D_real -= mean(D_real)
-  zero_mean_D_real<<<1, 1024>>>(N, nep_data.D_real.data());
-  GPU_CHECK_KERNEL
+  const float* D_weight = nep_data.D_real.data();
+  if (paramb.charge_transfer) {
+    // Dt = dE/dh and the explicit phi' pair force/virial (VER-0033); no zero_mean_D_real
+    ct_find_Dt_and_pair_force_small_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      small_box_data.NN_radial.data(),
+      small_box_data.NL_radial.data(),
+      type.data(),
+      small_box_data.r12.data(),
+      small_box_data.r12.data() + size_x12,
+      small_box_data.r12.data() + size_x12 * 2,
+      nep_data.ct_h.data(),
+      nep_data.D_real.data(),
+      nep_data.ct_Dt.data(),
+      force_per_atom.data(),
+      force_per_atom.data() + N,
+      force_per_atom.data() + N * 2,
+      virial_per_atom.data());
+    GPU_CHECK_KERNEL
+    D_weight = nep_data.ct_Dt.data();
+  } else {
+    // Chain rule correction: D_real -= mean(D_real)
+    zero_mean_D_real<<<1, 1024>>>(N, nep_data.D_real.data());
+    GPU_CHECK_KERNEL
+  }
 
   find_force_radial_small_box<<<grid_size, BLOCK_SIZE>>>(
     paramb,
@@ -2095,7 +2137,7 @@ void NEP_Charge::compute_small_box(
     small_box_data.r12.data() + size_x12 * 2,
     nep_data.Fp.data(),
     nep_data.charge_derivative.data(),
-    nep_data.D_real.data(),
+    D_weight,
     force_per_atom.data(),
     force_per_atom.data() + N,
     force_per_atom.data() + N * 2,
@@ -2116,7 +2158,7 @@ void NEP_Charge::compute_small_box(
     small_box_data.r12.data() + size_x12 * 5,
     nep_data.Fp.data(),
     nep_data.charge_derivative.data(),
-    nep_data.D_real.data(),
+    D_weight,
     nep_data.sum_fxyz.data(),
     force_per_atom.data(),
     force_per_atom.data() + N,

@@ -508,3 +508,165 @@ static __global__ void ct_find_bec_A_angular_small_box(
     }
   }
 }
+
+// Forces and virial of the charge_transfer energy (DR-005 stage 2c, VER-0033).
+// Per atom k (own radial list within rc_phi), with v = r_b - r_k, G = phi'(d) (h_k - h_b) (D_k -
+// D_b):
+//   Dt_k = sum_b phi_kb (D_k - D_b), stored in g_Dt: the weight of the descriptor force kernels
+//   F_k += sum_b G v / d
+//   W   -= 0.5 sum_b G v (x) v / d
+// (virial_per_atom index map 0 3 4 / 6 1 5 / 7 8 2). D = dE/dq must be final; sums are in double.
+static __device__ __forceinline__ void ct_pair_force(
+  const float phi,
+  const float dphi,
+  const float r12[3],
+  const float d12,
+  const double dh,
+  const double dD,
+  double& Dt,
+  double f[3],
+  double w[9])
+{
+  Dt += double(phi) * dD;
+  const double g = double(dphi) * dh * dD / double(d12);
+  const double v[3] = {double(r12[0]), double(r12[1]), double(r12[2])};
+  for (int a = 0; a < 3; ++a) {
+    f[a] += g * v[a];
+  }
+  w[0] -= 0.5 * g * v[0] * v[0];
+  w[1] -= 0.5 * g * v[1] * v[1];
+  w[2] -= 0.5 * g * v[2] * v[2];
+  w[3] -= 0.5 * g * v[0] * v[1];
+  w[4] -= 0.5 * g * v[0] * v[2];
+  w[5] -= 0.5 * g * v[1] * v[2];
+  w[6] -= 0.5 * g * v[1] * v[0];
+  w[7] -= 0.5 * g * v[2] * v[0];
+  w[8] -= 0.5 * g * v[2] * v[1];
+}
+
+static __device__ __forceinline__ void ct_store_force(
+  const int N,
+  const int n1,
+  const double Dt,
+  const double f[3],
+  const double w[9],
+  float* g_Dt,
+  double* g_fx,
+  double* g_fy,
+  double* g_fz,
+  double* g_virial)
+{
+  g_Dt[n1] = float(Dt);
+  g_fx[n1] += f[0];
+  g_fy[n1] += f[1];
+  g_fz[n1] += f[2];
+  for (int c = 0; c < 9; ++c) {
+    g_virial[n1 + N * c] += w[c];
+  }
+}
+
+static __global__ void ct_find_Dt_and_pair_force_large_box(
+  const NEP_Charge::ParaMB paramb,
+  const NEP_Charge::ANN annmb,
+  const int N,
+  const int N1,
+  const int N2,
+  const Box box,
+  const int* g_NN,
+  const int* g_NL,
+  const int* g_type,
+  const double* g_x,
+  const double* g_y,
+  const double* g_z,
+  const float* g_h,
+  const float* g_D,
+  float* g_Dt,
+  double* g_fx,
+  double* g_fy,
+  double* g_fz,
+  double* g_virial)
+{
+  int n1 = blockIdx.x * blockDim.x + threadIdx.x + N1;
+  if (n1 < N2) {
+    const int t1 = g_type[n1];
+    double Dt = 0.0;
+    double f[3] = {0.0, 0.0, 0.0};
+    double w[9] = {0.0};
+    for (int i1 = 0; i1 < g_NN[n1]; ++i1) {
+      const int n2 = g_NL[n1 + N * i1];
+      float x12 = g_x[n2] - g_x[n1];
+      float y12 = g_y[n2] - g_y[n1];
+      float z12 = g_z[n2] - g_z[n1];
+      apply_mic(box, x12, y12, z12);
+      const float r12[3] = {x12, y12, z12};
+      const float d12 = sqrt(x12 * x12 + y12 * y12 + z12 * z12);
+      float phi, dphi;
+      ct_find_phi(paramb, annmb, t1, g_type[n2], d12, phi, dphi);
+      if (phi == 0.0f && dphi == 0.0f) {
+        continue;
+      }
+      ct_pair_force(
+        phi,
+        dphi,
+        r12,
+        d12,
+        double(g_h[n1]) - double(g_h[n2]),
+        double(g_D[n1]) - double(g_D[n2]),
+        Dt,
+        f,
+        w);
+    }
+    ct_store_force(N, n1, Dt, f, w, g_Dt, g_fx, g_fy, g_fz, g_virial);
+  }
+}
+
+static __global__ void ct_find_Dt_and_pair_force_small_box(
+  const NEP_Charge::ParaMB paramb,
+  const NEP_Charge::ANN annmb,
+  const int N,
+  const int N1,
+  const int N2,
+  const int* g_NN,
+  const int* g_NL,
+  const int* g_type,
+  const float* g_x12,
+  const float* g_y12,
+  const float* g_z12,
+  const float* g_h,
+  const float* g_D,
+  float* g_Dt,
+  double* g_fx,
+  double* g_fy,
+  double* g_fz,
+  double* g_virial)
+{
+  int n1 = blockIdx.x * blockDim.x + threadIdx.x + N1;
+  if (n1 < N2) {
+    const int t1 = g_type[n1];
+    double Dt = 0.0;
+    double f[3] = {0.0, 0.0, 0.0};
+    double w[9] = {0.0};
+    for (int i1 = 0; i1 < g_NN[n1]; ++i1) {
+      const int index = i1 * N + n1;
+      const int n2 = g_NL[index];
+      const float r12[3] = {g_x12[index], g_y12[index], g_z12[index]};
+      const float d12 = sqrt(r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2]);
+      float phi, dphi;
+      ct_find_phi(paramb, annmb, t1, g_type[n2], d12, phi, dphi);
+      if (phi == 0.0f && dphi == 0.0f) {
+        continue;
+      }
+      ct_pair_force(
+        phi,
+        dphi,
+        r12,
+        d12,
+        double(g_h[n1]) - double(g_h[n2]),
+        double(g_D[n1]) - double(g_D[n2]),
+        Dt,
+        f,
+        w);
+    }
+    ct_store_force(N, n1, Dt, f, w, g_Dt, g_fx, g_fy, g_fz, g_virial);
+  }
+}

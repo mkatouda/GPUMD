@@ -1,6 +1,6 @@
 # VER-0032: charge_transfer qNEP on the GPU (DR-005 stage 2b)
 
-- Status: steps 0-5 of stage 2b done (generator, parser, charge/BEC kernels in the large-box and small-box paths). Forces/virial/D-weight for charge_transfer models are NOT done (stage 2c): the model prints a warning at start-up and its forces are known wrong. Data tier: synthetic (random weights); no external model or data.
+- Status: steps 0-5 of stage 2b done (generator, parser, charge/BEC kernels in the large-box and small-box paths). Forces/virial/D-weight were added in stage 2c (VER-0034); the stage-2b refusal and its start-up warning described below no longer exist (updated 2026-11-11). Data tier: synthetic (random weights); no external model or data.
 - Requirement DR-005; design DES-0005; ADR-0006; CPU reference VER-0029.
 
 ## Step 0: `scripts/make_ct_model.py OUTDIR [--seed N] [--rc-radial 4] [--rc-phi 4] [--no-ct]`
@@ -69,6 +69,7 @@ $PY -m pytest -q tests_pytest/test_qnep_charge_transfer_parse.py tests_pytest/te
 Forces, virial, energy derivative (D-weight) and NVE conservation for charge_transfer models (stage 2c); float vs double; realistic trained weights; training-side (`nep`) and `main_replica` kernels (stage 3); non-cubic cells.
 
 ## Review fixes (MAJOR 1/2 and minor items)
+- SUPERSEDED by stage 2c (VER-0034): the refusal and the environment variable `GPUMD_CHARGE_TRANSFER_BEC_ONLY` were removed; charge_transfer models run without any opt-in and the "forces NOT valid" banner is gone. The text below is the stage-2b history.
 - Test-only opt-in: a charge_transfer model refuses to start (`PRINT_INPUT_ERROR`, message names "DR-005 stage 2c (forces/virial not implemented)") unless the environment variable
   `GPUMD_CHARGE_TRANSFER_BEC_ONLY=1` is set. It exists only to verify charges and BEC (VER-0032 scripts and tests set it); it is NOT a user feature and has no `doc/` page. With it the start-up banner
   ("forces/virial/energy-derivative terms are NOT valid in this build") is printed and forces remain invalid. Models without the line do not read the variable.

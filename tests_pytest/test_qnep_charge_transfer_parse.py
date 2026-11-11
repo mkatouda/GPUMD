@@ -24,11 +24,9 @@ _spec = importlib.util.spec_from_file_location('make_ct_model', SCRIPT)
 mk = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mk)
 
-WARNING = 'charge_transfer: forces/virial/energy-derivative terms are NOT valid in this build'
-
 
 def _run(
-    tmp_path, model_text, structure=('thick_n8_L13', 8, 13.0), opt_in=True, run_lines=None
+    tmp_path, model_text, structure=('thick_n8_L13', 8, 13.0), run_lines=None
 ):
     name, natoms, box = structure
     pos, types = mk.make_structure(natoms, box, 7)
@@ -37,12 +35,8 @@ def _run(
     (tmp_path / 'run.in').write_text(
         run_lines or 'potential nep.txt\nensemble nve\ntime_step 1\nrun 1\n'
     )
-    env = dict(os.environ)
-    env.pop('GPUMD_CHARGE_TRANSFER_BEC_ONLY', None)
-    if opt_in:
-        env['GPUMD_CHARGE_TRANSFER_BEC_ONLY'] = '1'  # test-only opt-in (stage 2c pending)
     return subprocess.run(
-        [str(GPUMD_EXECUTABLE)], cwd=tmp_path, capture_output=True, text=True, check=False, env=env
+        [str(GPUMD_EXECUTABLE)], cwd=tmp_path, capture_output=True, text=True, check=False
     )
 
 
@@ -55,43 +49,41 @@ def _out(r):
     return r.stdout + r.stderr
 
 
-def test_nve_without_opt_in_is_refused(tmp_path):
-    run = 'potential nep.txt\nensemble nve\ntime_step 1\nrun 5\n'
-    r = _run(tmp_path, _model(), opt_in=False, run_lines=run)
-    assert r.returncode != 0
-    assert 'stage 2c' in _out(r)
-    assert not (tmp_path / 'thermo.out').exists() or (tmp_path / 'thermo.out').stat().st_size == 0
+def test_nve_run_works_without_any_opt_in(tmp_path):
+    # stage 2c: forces/virial implemented, the stage-2b refusal and its environment variable are gone
+    run = 'potential nep.txt\nensemble nve\ntime_step 0.5\ndump_thermo 1\nrun 5\n'
+    r = _run(tmp_path, _model(), run_lines=run)
+    assert r.returncode == 0, _out(r)[-500:]
+    assert 'NOT valid' not in _out(r)
+    assert (tmp_path / 'thermo.out').stat().st_size > 0
 
 
-def test_static_run_with_opt_in_works(tmp_path):
+def test_static_run_works(tmp_path):
     run = 'potential nep.txt\nensemble nve\ntime_step 0\nrun 1\n'
-    r = _run(tmp_path, _model(), opt_in=True, run_lines=run)
-    assert r.returncode == 0, _out(r)[-500:]
-    assert WARNING in _out(r)
-
-
-def test_model_without_line_unaffected_by_opt_in_absence(tmp_path):
-    r = _run(tmp_path, _model(with_ct=False), opt_in=False)
+    r = _run(tmp_path, _model(), run_lines=run)
     assert r.returncode == 0, _out(r)[-500:]
 
 
-def test_valid_model_parses_warns_and_runs(tmp_path):
+def test_model_without_line_runs(tmp_path):
+    r = _run(tmp_path, _model(with_ct=False))
+    assert r.returncode == 0, _out(r)[-500:]
+
+
+def test_valid_model_parses_and_runs(tmp_path):
     r = _run(tmp_path, _model())
     assert r.returncode == 0, _out(r)[-500:]
     assert 'charge_transfer: rc_phi = 4 A, 3 symmetric type pairs x 5 phi coefficients' in _out(r)
-    assert WARNING in _out(r)
 
 
 def test_rc_phi_smaller_than_radial_is_accepted(tmp_path):
     r = _run(tmp_path, _model(rc_phi=3.0))
-    assert r.returncode == 0 and 'rc_phi = 3 A' in _out(r) and WARNING in _out(r)
+    assert r.returncode == 0 and 'rc_phi = 3 A' in _out(r)
 
 
 def test_rc_phi_larger_than_radial_is_error(tmp_path):
     r = _run(tmp_path, _model(rc_phi=4.5))
     assert r.returncode != 0
     assert 'rc_phi must not exceed the radial cutoff' in _out(r)
-    assert WARNING not in _out(r)
 
 
 @pytest.mark.parametrize('value', ['0', '-1'])

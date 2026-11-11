@@ -54,7 +54,7 @@ def pair_index(t1, t2, nt=NUM_TYPES):
     return t1 * nt - t1 * (t1 - 1) // 2 + (t2 - t1)
 
 
-def make_model_text(seed, rc_radial, rc_angular, rc_phi, with_ct=True, nt=NUM_TYPES):
+def make_model_text(seed, rc_radial, rc_angular, rc_phi, with_ct=True, nt=NUM_TYPES, charge_mode=2):
     rng = np.random.default_rng(seed)
     num_L = L_MAX + HAS_Q_222 + HAS_Q_1111
     dim = (N_MAX_RADIAL + 1) + (N_MAX_ANGULAR + 1) * num_L
@@ -72,7 +72,7 @@ def make_model_text(seed, rc_radial, rc_angular, rc_phi, with_ct=True, nt=NUM_TY
     if with_ct:
         values += list(rng.uniform(0.0, PHI_MAX, num_pairs * (BASIS_RADIAL + 1)))  # phi block
     lines = [
-        "nep4_charge2 %d %s" % (nt, " ".join(SYMBOLS[:nt])),
+        "nep4_charge%d %d %s" % (charge_mode, nt, " ".join(SYMBOLS[:nt])),
         "cutoff %g %g 100 50" % (rc_radial, rc_angular),
     ]
     if with_ct:
