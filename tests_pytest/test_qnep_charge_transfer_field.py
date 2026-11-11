@@ -5,7 +5,6 @@ grad_r (sqrt(eps_inf) E.P_direct), so K + U - sqrt(eps_inf) E.P_direct(r_t) is c
 (the thermo energy itself does not contain -E.P), and the work of the BEC over a closed loop vanishes.
 P_direct and h come from the host / from gpumd's charge dump of the twin model without the charge_transfer line.
 """
-import subprocess
 import sys
 
 import numpy as np
@@ -91,20 +90,3 @@ def test_large_system_neutrality_and_bec_statistics(tmp_path):
     assert res['max_abs_sum_k_Z'] <= 1e-4, res  # translation invariance of P
     assert res['rms_Z'] > 0.05, res
 
-
-def test_gpumd_replica_rejects_charge_transfer(tmp_path):
-    replica = REPO_ROOT / 'src' / 'gpumd_replica'
-    if not replica.exists():
-        pytest.skip('gpumd_replica not built')
-    name, natoms, box = mk.STRUCTURES[3]
-    pos, types = mk.make_structure(natoms, box, 100 + 3)
-    mk.write_extxyz(tmp_path / 'model.xyz', pos, types, box)
-    (tmp_path / 'nep.txt').write_text(mk.make_model_text(1, 4.0, 3.5, 4.0, True))
-    (tmp_path / 'run.in').write_text(
-        'potential nep.txt\ntime_step 1\nensemble nvt_bdp 300 400 100\n'
-        'multi_replica remd replicas 2 exchange 5 temp 300 400 equilibrate 0\nkspace ewald\nrun 10\n'
-    )
-    r = subprocess.run([str(replica)], cwd=tmp_path, capture_output=True, text=True, timeout=120)
-    out = r.stdout + r.stderr
-    assert r.returncode != 0
-    assert 'charge_transfer is not supported by gpumd_replica' in out, out[-500:]
