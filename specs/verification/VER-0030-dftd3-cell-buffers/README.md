@@ -26,3 +26,10 @@ Independent numerical-gpu-reviewer (static): no BLOCKER/MAJOR; two MINOR (thresh
 ## Limitations
 - HIP build NOT verified (no hipcc on this machine); the file is shared by both builds and the change uses no API-specific code.
 - AC-3 is shown by the 5 dftd cases and the test files above, not by a dedicated no-transition comparison of forces/virial.
+
+## Addendum (2026-11-11): AC-3 against a control build, from the first regression agent's report
+- Control binary: scratch full rebuild with `dftd3.cu` of `b90c2920^` (before the fix), everything else as the candidate.
+- water27 (9.3 A, `dftd3 pbe 12 6`, small-box path) and water_large (27.9 A, large-box path), NVE 100 steps, `velocity 300 seed 7`, dump_thermo 10, forces in double; models: all-zero NEP and NEP89. Candidate vs control: `thermo.out` and `f.xyz` byte-identical in all 4 configurations.
+- The `dftd3_single_late` / `dftd3_kspace_one_each` regression cases: candidate vs control byte-identical in `restart.xyz` and `thermo.out` (first output); candidate and master-base 3b2c8db8 are each reproducible run to run (3/3) but differ from each other by ~1e-10 (other develop changes since 3b2c8db8, e.g. the source restructuring; the cause was not pinned down further).
+- Candidate vs master-base direct comparison is therefore not byte-identical and is not evidence about the fix (all-zero NEP step-0 PE: water27 -2.7082682 vs -2.7082678 eV).
+- Still open: `--suite full` against an unpatched HEAD baseline (to be started by the human), HIP build.
