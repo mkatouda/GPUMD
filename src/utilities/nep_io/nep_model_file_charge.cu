@@ -31,9 +31,29 @@ bool NEP_Model_File::read_charge(
     return fail(error, name + " supports only uniform cutoffs.", document.find_field("cutoff")->line);
   }
   calculate_layout(0, 1, 2, 1);
-  return read_reference(document, fields, error) &&
-         read_zbl(document, fields, blocks, error) &&
-         read_parameters(document, blocks, error);
+  if (
+    !read_reference(document, fields, error) || !read_zbl(document, fields, blocks, error) ||
+    !read_parameters(document, blocks, error)) {
+    return false;
+  }
+  // optional charge_transfer (DR-005 / ADR-0006): field with rc_phi and a block of phi coefficients
+  const NEP_File::Field* ct = document.find_field("charge_transfer");
+  if (ct == nullptr) {
+    return true;
+  }
+  if (name == "qnep1") {
+    return fail(error, "charge_transfer requires qnep2 or qnep3.", ct->line);
+  }
+  ct = require_field(document, "charge_transfer", 1, 1, fields, error);
+  if (ct == nullptr || !read_float(*ct, 0, rc_phi, error)) {
+    return false;
+  }
+  if (rc_phi <= 0.0f || rc_phi > rc_radial[0]) {
+    return fail(error, "charge_transfer requires 0 < rc_phi <= the radial cutoff.", ct->line);
+  }
+  const int num_pairs = num_types * (num_types + 1) / 2;
+  return read_block(
+    document, "phi_parameters", num_pairs * (basis_size_radial + 1), phi_parameters, blocks, error);
 }
 
 bool NEP_Model_File::get_charge_md_input(std::string& input, std::string& error) const

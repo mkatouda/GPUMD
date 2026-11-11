@@ -107,4 +107,4 @@ def test_gpumd_replica_rejects_charge_transfer(tmp_path):
     r = subprocess.run([str(replica)], cwd=tmp_path, capture_output=True, text=True, timeout=120)
     out = r.stdout + r.stderr
     assert r.returncode != 0
-    assert 'charge_transfer is not supported by gpumd_replica yet (DR-005 stage 3)' in out, out[-500:]
+    assert 'charge_transfer is not supported by gpumd_replica' in out, out[-500:]

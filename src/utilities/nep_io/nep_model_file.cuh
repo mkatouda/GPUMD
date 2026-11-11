@@ -66,6 +66,8 @@ public:
   std::vector<float> parameters;
   std::vector<float> q_scaler;
   std::vector<float> zbl_parameters;
+  float rc_phi = 0.0f;               // charge_transfer cutoff (qnep2/qnep3); 0 = not used
+  std::vector<float> phi_parameters; // charge_transfer coefficients, pair-major (DR-005)
 
   bool read(std::istream& input, std::string& error);
   bool get_md_input(std::string& input, std::string& error) const;

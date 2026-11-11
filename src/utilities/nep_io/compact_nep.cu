@@ -257,6 +257,12 @@ static std::string make_compact_file(
   }
 
   std::vector<std::string> cutoff = get_tokens(lines[line_index++]);
+  // optional charge_transfer line (DR-005) immediately after cutoff; its phi block is at the end
+  std::vector<std::string> ct_line = get_tokens(lines[line_index]);
+  const bool has_ct = is_charge && ct_line.size() == 2 && ct_line[0] == "charge_transfer";
+  if (has_ct) {
+    ++line_index;
+  }
   std::vector<std::string> n_max = get_tokens(lines[line_index++]);
   std::vector<std::string> basis_size = get_tokens(lines[line_index++]);
   std::vector<std::string> l_max = get_tokens(lines[line_index++]);
@@ -332,6 +338,9 @@ static std::string make_compact_file(
   } else {
     write_line(output, cutoff);
   }
+  if (has_ct) {
+    write_line(output, ct_line);
+  }
   write_line(output, n_max);
   write_line(output, basis_size);
   write_line(output, l_max);
@@ -395,6 +404,27 @@ static std::string make_compact_file(
       }
     }
     line_index += zbl_count_full;
+  }
+
+  if (has_ct) {
+    // phi block: pairs (t1 <= t2) of the full model, basis_size_radial + 1 values each
+    const int per_pair = basis_size_radial + 1;
+    const int phi_count_full = num_types_full * (num_types_full + 1) / 2 * per_pair;
+    if (line_index + phi_count_full > static_cast<int>(lines.size())) {
+      output.close();
+      std::remove(compact_filename.c_str());
+      PRINT_INPUT_ERROR("Unexpected number of charge_transfer phi parameters.");
+    }
+    for (int t1 = 0; t1 < num_types; ++t1) {
+      for (int t2 = t1; t2 < num_types; ++t2) {
+        const int pair =
+          triangular_pair_index(active_to_full[t1], active_to_full[t2], num_types_full);
+        for (int n = 0; n < per_pair; ++n) {
+          output << lines[line_index + pair * per_pair + n] << "\n";
+        }
+      }
+    }
+    line_index += phi_count_full;
   }
 
   for (; line_index < static_cast<int>(lines.size()); ++line_index) {

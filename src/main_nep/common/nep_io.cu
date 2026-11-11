@@ -94,10 +94,18 @@ static void read_nep_parameters(
     model.layout.number_of_variables_ann != para.number_of_variables_ann ||
     model.layout.number_of_variables_ann_1 != para.number_of_variables_ann_1 ||
     model.layout.global_parameters != para.global_parameters ||
-    parsed.size() != static_cast<std::size_t>(para.number_of_variables)) {
+    parsed.size() + para.number_of_variables_phi !=
+      static_cast<std::size_t>(para.number_of_variables)) {
     PRINT_INPUT_ERROR("The NEP model parameter layout does not match nep.in.");
   }
+  // charge_transfer (DR-005): phi coefficients are the tail of the optimised parameter vector
+  if (
+    (model.rc_phi > 0.0f) != (para.rc_phi > 0.0f) ||
+    model.phi_parameters.size() != static_cast<std::size_t>(para.number_of_variables_phi)) {
+    PRINT_INPUT_ERROR("The charge_transfer setting of nep.in does not match the NEP model.");
+  }
   std::copy(parsed.begin(), parsed.end(), parameters);
+  std::copy(model.phi_parameters.begin(), model.phi_parameters.end(), parameters + parsed.size());
 }
 
 void read_nep_model(
@@ -163,8 +171,10 @@ static void read_nep_restart_file(
     (num_types * para.number_of_variables_ann_1 + para.global_parameters) * para.ann_count;
   const int num_radial_basis = (para.n_max_radial + 1) * (para.basis_size_radial + 1);
   const int num_angular_basis = (para.n_max_angular + 1) * (para.basis_size_angular + 1);
-  const int num_parameters = expected_count ? expected_count :
-    ann_size + (num_radial_basis + num_angular_basis) * num_types * num_types;
+  const int num_parameters =
+    expected_count ? expected_count
+                   : ann_size + (num_radial_basis + num_angular_basis) * num_types * num_types +
+                       para.number_of_variables_phi;
   if (!(input >> token >> count) || token != "parameters" || count != num_parameters) {
     PRINT_INPUT_ERROR((filename + ": invalid parameter count.").c_str());
   }
@@ -271,6 +281,9 @@ void write_nep_header(
     fprintf(file, " %.9g %.9g", para.rc_radial[t], para.rc_angular[t]);
   }
   fprintf(file, " %d %d\n", max_radial, max_angular);
+  if (para.rc_phi > 0.0f) {
+    fprintf(file, "charge_transfer %.9g\n", para.rc_phi);
+  }
   fprintf(file, "n_max %d %d\n", para.n_max_radial, para.n_max_angular);
   fprintf(file, "basis_size %d %d\n", para.basis_size_radial, para.basis_size_angular);
   fprintf(
@@ -370,8 +383,14 @@ void write_nep_model(
 void write_nep_model_parameters(FILE* file, const NEP_Parameters& para, const float* parameters)
 {
   const std::vector<float> values = get_nep_file_parameters(para, parameters);
-  write_nep_block(file, "parameters", values.data(), values.size());
+  const int num_phi = para.number_of_variables_phi;
+  write_nep_block(file, "parameters", values.data(), int(values.size()) - num_phi);
   write_nep_block(file, "q_scaler", para.q_scaler_cpu.data(), para.dim);
+  // block order here: parameters, q_scaler, phi_parameters, zbl_parameters; flexible ZBL (model nep
+  // only) and phi (qnep2/qnep3 only) never coexist, and the MD converter refuses the combination
+  if (num_phi > 0) {
+    write_nep_block(file, "phi_parameters", values.data() + values.size() - num_phi, num_phi);
+  }
   if (para.flexible_zbl) {
     write_nep_block(file, "zbl_parameters", para.zbl_para.data(),
       5 * para.num_types * (para.num_types + 1));
@@ -601,6 +620,15 @@ static void compare_with_nep_txt(
   if (header.name != expected_model) {
     mismatches.push_back("model: nep.in implies " + expected_model + ", " + filename +
       " holds " + header.name + ".");
+  }
+  if ((para.rc_phi > 0.0f) != (header.rc_phi > 0.0f)) {
+    mismatches.push_back(
+      std::string("charge_transfer: nep.in has it ") +
+      (para.rc_phi > 0.0f ? "enabled" : "disabled") + ", " + filename + " has it " +
+      (header.rc_phi > 0.0f ? "enabled" : "disabled") + ".");
+  } else if (para.rc_phi > 0.0f) {
+    compare_float(
+      "charge_transfer (rc_phi)", para.rc_phi, true, header.rc_phi, filename, mismatches);
   }
   compare_int(
     "type (number of types)", para.num_types, para.is_type_set, header.num_types, filename, mismatches);

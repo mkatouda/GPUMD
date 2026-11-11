@@ -32,4 +32,5 @@ protected:
 private:
   void parse_lambda_q(const char** param, int num_param);
   void parse_lambda_z(const char** param, int num_param);
+  void parse_charge_transfer(const char** param, int num_param);
 };

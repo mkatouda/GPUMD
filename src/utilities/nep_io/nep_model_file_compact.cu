@@ -128,6 +128,17 @@ void NEP_Model_File::compact_parameters(
         start += pairs * basis_count;
       }
       block.values.swap(values);
+    } else if (block.name == "phi_parameters") {
+      const int per_pair = basis_size_radial + 1;
+      for (int t1 = 0; t1 < static_cast<int>(active_to_full.size()); ++t1) {
+        for (int t2 = t1; t2 < static_cast<int>(active_to_full.size()); ++t2) {
+          const int offset =
+            per_pair * triangular_pair_index(active_to_full[t1], active_to_full[t2], num_types);
+          values.insert(
+            values.end(), block.values.begin() + offset, block.values.begin() + offset + per_pair);
+        }
+      }
+      block.values.swap(values);
     } else if (block.name == "zbl_parameters") {
       for (int t1 = 0; t1 < static_cast<int>(active_to_full.size()); ++t1) {
         for (int t2 = t1; t2 < static_cast<int>(active_to_full.size()); ++t2) {

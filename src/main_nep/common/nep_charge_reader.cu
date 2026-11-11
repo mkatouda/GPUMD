@@ -15,6 +15,7 @@
 
 #include "nep_charge_reader.cuh"
 #include "nep_charge_parameters.cuh"
+#include <cmath>
 #include "main_nep/xyz_reader.cuh"
 #include "utilities/error.cuh"
 
@@ -34,6 +35,12 @@ void NEP_Charge_Reader::read_structure(const XYZ_Record& record, Structure& stru
       label.charge = get_double_from_token(
         token.substr(charge_string.length(), token.length()), xyz_filename.c_str(), line_number);
     }
+  }
+  if (charge_parameters.rc_phi > 0.0f && std::abs(label.charge) > 1.0e-6) {
+    // a charge_transfer model is neutral by construction: the charge loss would be a constant
+    PRINT_INPUT_ERROR(
+      "charge_transfer models are neutral by construction, but a structure has a non-zero "
+      "charge= label.");
   }
 
   int bec_offset = record.get_property_offset("bec");

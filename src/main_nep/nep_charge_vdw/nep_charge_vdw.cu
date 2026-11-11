@@ -1541,6 +1541,9 @@ NEP_Charge_VDW::NEP_Charge_VDW(const ParameterInput& input)
   para.charge_mode = input.charge_mode;
   para.flip_charge = input.flip_charge;
   para.read(input);
+  if (para.rc_phi > 0.0f) {
+    PRINT_INPUT_ERROR("charge_transfer cannot be combined with charge_vdw (qnep3_vdw).");
+  }
   if (para.num_hidden_layers == 2) {
     PRINT_INPUT_ERROR("Can only use one hidden layer.");
   }

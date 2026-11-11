@@ -42,6 +42,13 @@ bool NEP_Model_File::get_md_input(
     error = "Native MD supports only one hidden layer.";
     return false;
   }
+  // legacy order below: parameters, q_scaler, zbl_parameters, phi. Flexible ZBL exists only for
+  // model nep, charge_transfer only for qnep2/qnep3, so the two never coexist; refuse rather than
+  // let the order of the two trailing blocks be ambiguous if that ever changes.
+  if (rc_phi > 0.0f && !zbl_parameters.empty()) {
+    error = "charge_transfer cannot be combined with flexible ZBL parameters.";
+    return false;
+  }
   if (zbl_parameters.size() > 550) {
     error = "Native MD supports flexible ZBL for at most 10 active elements.";
     return false;
@@ -79,6 +86,9 @@ bool NEP_Model_File::get_md_input(
     output << ' ' << rc_radial[t] << ' ' << rc_angular[t];
   }
   output << ' ' << max_radial << ' ' << max_angular << '\n';
+  if (rc_phi > 0.0f) {
+    output << "charge_transfer " << rc_phi << '\n';
+  }
   output << "n_max " << n_max_radial << ' ' << n_max_angular << '\n';
   output << "basis_size " << basis_size_radial << ' ' << basis_size_angular << '\n';
   output << "l_max " << L_max << ' ' << 2 * has_q_222 << ' ' << has_q_1111;
@@ -99,6 +109,9 @@ bool NEP_Model_File::get_md_input(
     output << value << '\n';
   }
   for (const float value : zbl_parameters) {
+    output << value << '\n';
+  }
+  for (const float value : phi_parameters) {
     output << value << '\n';
   }
   input = output.str();

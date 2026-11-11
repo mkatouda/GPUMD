@@ -16,6 +16,7 @@
 #include "nep_charge_parameters.cuh"
 #include "utilities/error.cuh"
 #include "utilities/read_file.cuh"
+#include <cmath>
 #include <cstring>
 
 bool NEP_Charge_Parameters::parse_keyword(const char** param, int num_param)
@@ -24,6 +25,8 @@ bool NEP_Charge_Parameters::parse_keyword(const char** param, int num_param)
     parse_lambda_q(param, num_param);
   } else if (strcmp(param[0], "lambda_z") == 0) {
     parse_lambda_z(param, num_param);
+  } else if (strcmp(param[0], "charge_transfer") == 0) {
+    parse_charge_transfer(param, num_param);
   } else {
     return NEP_Energy_Parameters::parse_keyword(param, num_param);
   }
@@ -64,9 +67,32 @@ void NEP_Charge_Parameters::parse_lambda_z(const char** param, int num_param)
   }
 }
 
+void NEP_Charge_Parameters::parse_charge_transfer(const char** param, int num_param)
+{
+  if (rc_phi > 0.0f) {
+    PRINT_INPUT_ERROR("Specify charge_transfer only once.");
+  }
+  if (num_param != 2) {
+    PRINT_INPUT_ERROR("charge_transfer should have 1 parameter (rc_phi, in Angstrom).\n");
+  }
+  double rc_phi_tmp = 0.0;
+  if (!is_valid_real(param[1], &rc_phi_tmp)) {
+    PRINT_INPUT_ERROR("charge_transfer rc_phi should be a number.\n");
+  }
+  if (
+    !std::isfinite(rc_phi_tmp) || !(rc_phi_tmp > 0.0) || !(float(rc_phi_tmp) > 0.0f) ||
+    rc_phi_tmp > 100.0) {
+    PRINT_INPUT_ERROR("charge_transfer rc_phi should be > 0 and <= 100 Angstrom.");
+  }
+  rc_phi = rc_phi_tmp;
+}
+
 void NEP_Charge_Parameters::report_model_inputs() const
 {
   NEP_Energy_Parameters::report_model_inputs();
+  if (rc_phi > 0.0f) {
+    printf("    (input)   charge_transfer rc_phi = %g A.\n", rc_phi);
+  }
   printf("        lambda_q = %g.\n", lambda_q);
   printf("        lambda_z = %g.\n", lambda_z);
 }

@@ -194,7 +194,7 @@ NEP_Charge::NEP_Charge(
   // n_max 10 8
   tokens = get_tokens(input);
   if (!tokens.empty() && tokens[0] == "charge_transfer") {
-    PRINT_INPUT_ERROR("charge_transfer is not supported by gpumd_replica yet (DR-005 stage 3).");
+    PRINT_INPUT_ERROR("charge_transfer is not supported by gpumd_replica.");
   }
   if (tokens.size() != 3) {
     std::cout << "This line should be n_max n_max_radial n_max_angular." << std::endl;

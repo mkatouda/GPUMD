@@ -22,6 +22,7 @@ heat transport, Phys. Rev. B. 104, 104309 (2021).
 
 #include "main_nep/dataset.cuh"
 #include "nep_charge.cuh"
+#include "nep_charge_transfer.cuh"
 #include "main_nep/common/nep_output.cuh"
 #include "main_nep/common/nep_charge_reader.cuh"
 #include "main_nep/common/nep_model.cuh"
@@ -184,6 +185,9 @@ void NEP_Charge::initialize_model(const NEP_Charge_Parameters& para)
   paramb.num_types_sq = para.num_types * para.num_types;
   paramb.num_c_radial =
     paramb.num_types_sq * (para.n_max_radial + 1) * (para.basis_size_radial + 1);
+  paramb.charge_transfer = para.rc_phi > 0.0f ? 1 : 0;
+  paramb.rc_phi = para.rc_phi;
+  paramb.num_phi_per_pair = para.basis_size_radial + 1;
 
   initialize_nep_zbl(para, zbl);
 
@@ -206,6 +210,11 @@ void NEP_Charge::initialize_device(const NEP_Charge_Parameters& para, int N, int
     N * (paramb.n_max_angular + 1) * ((paramb.L_max + 1) * (paramb.L_max + 1) - 1));
   nep_data[device_id].parameters.resize(annmb[device_id].num_para);
   nep_data[device_id].D_real.resize(N);
+  if (paramb.charge_transfer) {
+    nep_data[device_id].ct_h.resize(N);
+    nep_data[device_id].ct_V.resize(N * 3);
+    nep_data[device_id].ct_Dt.resize(N);
+  }
   nep_data[device_id].kpoint_offset.resize(Nc + 1);
 }
 
@@ -295,7 +304,8 @@ void NEP_Charge::Compiled_Kernel::launch_force_charge_angular(
 
 void NEP_Charge::initialize_compiled_kernel(const NEP_Charge_Parameters& para)
 {
-  if (para.nep_compile && para.prediction == 0) {
+  // charge_transfer models always use the generic kernels (no specialised compiled kernels)
+  if (para.nep_compile && para.prediction == 0 && para.rc_phi <= 0.0f) {
     CHECK(gpuSetDevice(0));
     compiled_kernel_.reset(new Compiled_Kernel(
       make_compile_config(para)));
@@ -322,6 +332,12 @@ void NEP_Charge::bind_parameters(const float* parameters, ANN& ann)
   ann.b1 = pointer;
   pointer += 1;
   ann.c = pointer;
+  if (paramb.charge_transfer) {
+    // phi coefficients: the tail of the parameter vector, after the descriptor coefficients
+    pointer += paramb.num_c_radial +
+               paramb.num_types_sq * (paramb.n_max_angular + 1) * (paramb.basis_size_angular + 1);
+    ann.phi_coeff = pointer;
+  }
 }
 
 static __global__ void apply_ann(
@@ -1203,6 +1219,58 @@ void NEP_Charge::compute_bec(
   const int block_size = 32;
   const int grid_size = (data.N - 1) / block_size + 1;
 
+  if (paramb.charge_transfer) {
+    // exact BEC of P = sum_a h_a V_a: Term B (writes all nine components) + Term A (adds);
+    // the 0.5/0.5 kernels below do not run for these models
+    ct_find_bec_B<<<grid_size, block_size>>>(
+      paramb,
+      ann,
+      data.N,
+      data.NN_radial_sum.data(),
+      data.NN_radial.data(),
+      neighbors.NL_radial.data(),
+      data.type.data(),
+      neighbors.x12_radial.data(),
+      neighbors.y12_radial.data(),
+      neighbors.z12_radial.data(),
+      storage.ct_h.data(),
+      charge_dataset.bec.data());
+    GPU_CHECK_KERNEL
+    ct_find_bec_A_radial<<<grid_size, block_size>>>(
+      paramb,
+      ann,
+      data.N,
+      data.NN_radial_sum.data(),
+      data.NN_radial.data(),
+      neighbors.NL_radial.data(),
+      data.type.data(),
+      neighbors.x12_radial.data(),
+      neighbors.y12_radial.data(),
+      neighbors.z12_radial.data(),
+      storage.charge_derivative.data(),
+      storage.ct_V.data(),
+      charge_dataset.bec.data());
+    GPU_CHECK_KERNEL
+    ct_find_bec_A_angular<<<grid_size, block_size>>>(
+      paramb,
+      ann,
+      data.N,
+      data.NN_angular_sum.data(),
+      data.NN_angular.data(),
+      neighbors.NL_angular.data(),
+      data.type.data(),
+      neighbors.x12_angular.data(),
+      neighbors.y12_angular.data(),
+      neighbors.z12_angular.data(),
+      storage.charge_derivative.data(),
+      storage.sum_fxyz.data(),
+      storage.ct_V.data(),
+      charge_dataset.bec.data());
+    GPU_CHECK_KERNEL
+    scale_nep_bec(data, charge_dataset, ann.sqrt_epsilon_inf);
+    return;
+  }
+
   // get BEC (the diagonal part)
   initialize_nep_bec(data, charge_dataset);
 
@@ -1340,6 +1408,8 @@ void NEP_Charge::compute_forces(
 {
   const int block_size = 32;
   const int grid_size = (data.N - 1) / block_size + 1;
+  // charge_transfer: the weight is Dt (Laplacian-transposed D), not the mean-subtracted D
+  const float* D_weight = paramb.charge_transfer ? storage.ct_Dt.data() : storage.D_real.data();
 
   if (compiled_kernel_) {
     compiled_kernel_->launch_force_charge_radial(
@@ -1354,7 +1424,7 @@ void NEP_Charge::compute_forces(
       storage.parameters.data(),
       storage.Fp.data(),
       storage.charge_derivative.data(),
-      storage.D_real.data(),
+      D_weight,
       data.force.data(),
       data.force.data() + data.N,
       data.force.data() + data.N * 2,
@@ -1373,7 +1443,7 @@ void NEP_Charge::compute_forces(
       neighbors.z12_radial.data(),
       storage.Fp.data(),
       storage.charge_derivative.data(),
-      storage.D_real.data(),
+      D_weight,
       data.force.data(),
       data.force.data() + data.N,
       data.force.data() + data.N * 2,
@@ -1394,7 +1464,7 @@ void NEP_Charge::compute_forces(
       storage.parameters.data(),
       storage.Fp.data(),
       storage.charge_derivative.data(),
-      storage.D_real.data(),
+      D_weight,
       storage.sum_fxyz.data(),
       data.force.data(),
       data.force.data() + data.N,
@@ -1414,7 +1484,7 @@ void NEP_Charge::compute_forces(
       neighbors.z12_angular.data(),
       storage.Fp.data(),
       storage.charge_derivative.data(),
-      storage.D_real.data(),
+      D_weight,
       storage.sum_fxyz.data(),
       data.force.data(),
       data.force.data() + data.N,
@@ -1467,8 +1537,34 @@ void NEP_Charge::find_force(
 
     evaluate_ann(ann, data, storage, para.q_scaler_gpu[device_id].data());
 
-    // enforce total charge is the target
-    enforce_nep_total_charge(data, charge_dataset);
+    if (paramb.charge_transfer) {
+      // charge_transfer: h = network charge output; q_a = sum_b phi_ab (h_a - h_b) replaces
+      // the charge (loss, output, long range). No total-charge shift (sum q = 0 exactly).
+      CHECK(gpuMemcpy(
+        storage.ct_h.data(),
+        charge_dataset.charge.data(),
+        sizeof(float) * data.N,
+        gpuMemcpyDeviceToDevice));
+      ct_find_charge<<<(data.N - 1) / 32 + 1, 32>>>(
+        paramb,
+        ann,
+        data.N,
+        data.NN_radial_sum.data(),
+        data.NN_radial.data(),
+        neighbors.NL_radial.data(),
+        data.type.data(),
+        neighbors.x12_radial.data(),
+        neighbors.y12_radial.data(),
+        neighbors.z12_radial.data(),
+        storage.ct_h.data(),
+        charge_dataset.charge.data(),
+        charge_dataset.charge_shifted.data(),
+        storage.ct_V.data());
+      GPU_CHECK_KERNEL
+    } else {
+      // enforce total charge is the target
+      enforce_nep_total_charge(data, charge_dataset);
+    }
 
     if (para.has_bec) {
       compute_bec(ann, data, neighbors, storage);
@@ -1497,8 +1593,32 @@ void NEP_Charge::find_force(
       GPU_CHECK_KERNEL
     }
 
-    // Chain rule correction: D_real -= mean(D_real) per structure
-    subtract_nep_charge_derivative_mean(data, storage.D_real.data());
+    if (paramb.charge_transfer) {
+      // Dt = sum_b phi_cb (D_c - D_b) replaces the mean-subtracted D as the descriptor-force
+      // weight; explicit pair force and virial (VER-0033)
+      ct_find_Dt_and_pair_force<<<(data.N - 1) / 32 + 1, 32>>>(
+        paramb,
+        ann,
+        data.N,
+        data.NN_radial_sum.data(),
+        data.NN_radial.data(),
+        neighbors.NL_radial.data(),
+        data.type.data(),
+        neighbors.x12_radial.data(),
+        neighbors.y12_radial.data(),
+        neighbors.z12_radial.data(),
+        storage.ct_h.data(),
+        storage.D_real.data(),
+        storage.ct_Dt.data(),
+        data.force.data(),
+        data.force.data() + data.N,
+        data.force.data() + data.N * 2,
+        data.virial.data());
+      GPU_CHECK_KERNEL
+    } else {
+      // Chain rule correction: D_real -= mean(D_real) per structure
+      subtract_nep_charge_derivative_mean(data, storage.D_real.data());
+    }
 
     compute_forces(ann, data, neighbors, storage);
 
@@ -1518,6 +1638,12 @@ void NEP_Charge::configure(NEP_Charge_Parameters& para)
     para.model_name = "qnep3";
   }
   calculate_nep_model_parameters(para, 0, 1, 2, 1);
+  if (para.rc_phi > 0.0f) {
+    // charge_transfer: one phi per symmetric type pair, appended to the parameter vector
+    para.number_of_variables_phi =
+      para.num_types * (para.num_types + 1) / 2 * (para.basis_size_radial + 1);
+    para.number_of_variables += para.number_of_variables_phi;
+  }
 }
 
 void NEP_Charge::initialize_parameters(
@@ -1537,6 +1663,16 @@ void NEP_Charge::initialize_parameters(
       }
     }
     mu[para.number_of_variables_ann_1 * para.num_types] = 2.0f; // initial sqrt(epsilon_inf)
+    if (para.rc_phi > 0.0f) {
+      // phi coefficients: uniform in [0, 0.1] (no range limit afterwards); drawn after all other
+      // variables so that the random numbers of the other parameters are unchanged
+      std::uniform_real_distribution<float> r_phi(0.0f, 0.1f);
+      for (int n = para.number_of_variables - para.number_of_variables_phi;
+           n < para.number_of_variables;
+           ++n) {
+        mu[n] = r_phi(rng);
+      }
+    }
   } else if (initialization == NEP_Initialization::RESTART && para.flip_charge) {
     for (int t = 0; t < para.num_types; ++t) {
       int charge_begin =
@@ -1559,6 +1695,18 @@ void NEP_Charge::parameter_groups(std::vector<int>& groups)
 {
   NEP_Charge_Parameters& para = *model_parameters;
   find_nep_type_of_variable(para, groups, 2, 1);
+  if (para.rc_phi > 0.0f) {
+    // phi coefficients of the pair (ta <= tb) belong to the group of ta, like the descriptor
+    // coefficients, so that they enter the per-type L1/L2 regularisation
+    int n = para.number_of_variables - para.number_of_variables_phi;
+    for (int ta = 0; ta < para.num_types; ++ta) {
+      for (int tb = ta; tb < para.num_types; ++tb) {
+        for (int k = 0; k <= para.basis_size_radial; ++k) {
+          groups[n++] = ta;
+        }
+      }
+    }
+  }
 }
 
 void NEP_Charge::read_model(float* parameters)
@@ -1584,6 +1732,20 @@ NEP_Charge::NEP_Charge(const ParameterInput& input)
   }
   if (para.has_multiple_cutoffs) {
     PRINT_INPUT_ERROR("Can only use uniform cutoff for qNEP.");
+  }
+  if (para.rc_phi > 0.0f) {
+    if (para.charge_mode != 2 && para.charge_mode != 3) {
+      PRINT_INPUT_ERROR("charge_transfer requires charge_mode 2 or 3 (qnep2/qnep3).");
+    }
+    if (para.rc_phi > para.rc_radial[0]) {
+      PRINT_INPUT_ERROR("charge_transfer rc_phi should be <= the radial cutoff.");
+    }
+    if (para.fine_tune) {
+      PRINT_INPUT_ERROR("charge_transfer cannot be combined with fine_tune.");
+    }
+#ifdef USE_CJ
+    PRINT_INPUT_ERROR("charge_transfer is not supported in the USE_CJ build.");
+#endif
   }
   configure(para);
   const char* model_description = "use NEP-Charge and include k-space only.";

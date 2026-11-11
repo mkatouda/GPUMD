@@ -90,6 +90,9 @@ void NEP_Parameters::read(const ParameterInput& input)
       param[n] = tokens[n].c_str();
     }
     if (!parse_keyword(param.data(), param.size())) {
+      if (tokens[0] == "charge_transfer") {
+        PRINT_INPUT_ERROR("charge_transfer requires charge_mode 2 or 3 (qnep2/qnep3).");
+      }
       PRINT_INPUT_ERROR((tokens[0] + " is not supported by this model.").c_str());
     }
   }

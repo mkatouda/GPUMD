@@ -94,6 +94,10 @@ public:
   int number_of_variables_ann;        // number of parameters in the ANN only
   int number_of_variables_ann_1;      // number of parameters in the ANN for one element
   int number_of_variables_descriptor; // number of parameters in the descriptor only
+  // charge_transfer (DR-005): rc_phi > 0 enables it; the phi coefficients are the LAST
+  // number_of_variables_phi entries of the parameter vector (included in number_of_variables)
+  float rc_phi = 0.0f;
+  int number_of_variables_phi = 0;
 
   // some arrays
 

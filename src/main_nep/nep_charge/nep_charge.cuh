@@ -51,6 +51,9 @@ public:
     int num_types_sq = 0;
     int num_c_radial = 0;
     int version = 4;
+    int charge_transfer = 0;  // DR-005: q_a = sum_b phi_ab (h_a - h_b)
+    float rc_phi = 0.0f;      // cutoff of phi
+    int num_phi_per_pair = 0; // basis_size_radial + 1
   };
 
   struct ANN {
@@ -63,6 +66,8 @@ public:
     const float* sqrt_epsilon_inf; // sqrt(epsilon_inf) related to BEC
     const float* b1;               // bias for the output layer
     const float* c;                // for elements in descriptor
+    // charge_transfer coefficients (pairs x (basis_size_radial + 1))
+    const float* phi_coeff = nullptr;
   };
 
   struct NEP_Charge_Data {
@@ -78,6 +83,9 @@ public:
     GPU_Vector<float> S_real;
     GPU_Vector<float> S_imag;
     GPU_Vector<float> D_real;
+    GPU_Vector<float> ct_h;  // charge_transfer: network charge output h
+    GPU_Vector<float> ct_V;  // charge_transfer: V_a = sum_b phi_ab (r_a - r_b), 3 N
+    GPU_Vector<float> ct_Dt; // charge_transfer: Dt, weight of the descriptor force kernels
     GPU_Vector<int> kpoint_offset;
     const Dataset* kpoint_dataset = nullptr;
   };
