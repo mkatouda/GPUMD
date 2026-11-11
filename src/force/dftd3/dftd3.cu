@@ -1704,6 +1704,8 @@ void DFTD3::compute_large_box(
     cn_weight.resize(N * max_cn);
     dc6_sum.resize(N);
     dc8_sum.resize(N);
+  }
+  if (cell_count_radial.size() == 0) {
     cell_count_radial.resize(N);
     cell_count_sum_radial.resize(N);
     cell_contents_radial.resize(N);
