@@ -23,6 +23,7 @@ heat transport, Phys. Rev. B. 104, 104309 (2021).
 #include "force/neighbor.cuh"
 #include "nep_charge.cuh"
 #include "nep_charge_small_box.cuh"
+#include "nep_charge_transfer.cuh"
 #include "utilities/common.cuh"
 #include "utilities/nep_io/compact_nep.cuh"
 #include "utilities/error.cuh"
@@ -33,6 +34,7 @@ heat transport, Phys. Rev. B. 104, 104309 (2021).
 #include "utilities/run_input.cuh"
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -291,8 +293,30 @@ NEP_Charge::NEP_Charge(
   printf("    enlarged MN_radial = %d.\n", paramb.MN_radial);
   printf("    enlarged MN_angular = %d.\n", paramb.MN_angular);
 
-  // n_max 10 8
+  // optional charge_transfer rc_phi (DR-005 / ADR-0006); must follow the cutoff line so that
+  // binaries without this feature fail at the n_max line instead of ignoring it
   tokens = input.get_tokens();
+  if (!tokens.empty() && tokens[0] == "charge_transfer") {
+    if (tokens.size() != 2) {
+      PRINT_INPUT_ERROR("This line should be charge_transfer rc_phi.");
+    }
+    if (paramb.charge_mode != 2 && paramb.charge_mode != 3) {
+      PRINT_INPUT_ERROR(
+        "charge_transfer is supported only for charge_mode 2 and 3 (nep4_charge2/3).");
+    }
+    paramb.charge_transfer = true;
+    paramb.rc_phi = get_double_from_token(tokens[1], __FILE__, __LINE__);
+    if (!(paramb.rc_phi > 0.0f)) {
+      PRINT_INPUT_ERROR("charge_transfer: rc_phi must be positive.");
+    }
+    if (paramb.rc_phi > paramb.rc_radial) {
+      PRINT_INPUT_ERROR(
+        "charge_transfer: rc_phi must not exceed the radial cutoff (DR-005 stage 2b).");
+    }
+    tokens = input.get_tokens();
+  }
+
+  // n_max 10 8
   if (tokens.size() != 3) {
     std::cout << "This line should be n_max n_max_radial n_max_angular." << std::endl;
     exit(1);
@@ -401,6 +425,38 @@ NEP_Charge::NEP_Charge(
     tokens = input.get_tokens();
     parameters[n] = get_double_from_token(tokens[0], __FILE__, __LINE__);
   }
+  if (paramb.charge_transfer) {
+    // phi coefficients follow the q_scaler block: one radial function per symmetric type pair
+    // (upper triangle, row-major, t1 <= t2), basis_size_radial + 1 coefficients each.
+    paramb.num_phi_pairs = paramb.num_types * (paramb.num_types + 1) / 2;
+    paramb.num_phi_per_pair = paramb.basis_size_radial + 1;
+    const int num_phi = paramb.num_phi_pairs * paramb.num_phi_per_pair;
+    phi_coeff_host.resize(num_phi);
+    for (int n = 0; n < num_phi; ++n) {
+      tokens = input.get_tokens();
+      if (tokens.size() != 1) {
+        std::cout << "charge_transfer: expected " << num_phi
+                  << " phi coefficients (one per line) after the parameter block; the file ends or"
+                  << " has a malformed line at phi coefficient " << n << "." << std::endl;
+        exit(1);
+      }
+      phi_coeff_host[n] = get_double_from_token(tokens[0], __FILE__, __LINE__);
+    }
+    tokens = input.get_tokens();
+    if (!tokens.empty()) {
+      std::cout << "charge_transfer: more than " << num_phi
+                << " numbers after the parameter block (parameter-count mismatch)." << std::endl;
+      exit(1);
+    }
+    nep_data.phi_parameters.resize(num_phi);
+    nep_data.phi_parameters.copy_from_host(phi_coeff_host.data());
+    annmb.phi_coeff = nep_data.phi_parameters.data();
+    printf(
+      "    charge_transfer: rc_phi = %g A, %d symmetric type pairs x %d phi coefficients.\n",
+      paramb.rc_phi,
+      paramb.num_phi_pairs,
+      paramb.num_phi_per_pair);
+  }
   std::vector<float> descriptor_parameters = input.get_descriptor_parameters_type_pair(
     parameters,
     annmb.num_para_ann,
@@ -458,6 +514,23 @@ NEP_Charge::NEP_Charge(
 
   initialize_dftd3(run_input);
   initialize_dftd2(run_input);
+
+  if (paramb.charge_transfer) {
+    // forces/virial are not implemented for charge_transfer yet: refuse to run dynamics unless
+    // the test-only opt-in is set (BEC/charge verification, VER-0032)
+    const char* bec_only = std::getenv("GPUMD_CHARGE_TRANSFER_BEC_ONLY");
+    if (bec_only == nullptr || std::strcmp(bec_only, "1") != 0) {
+      PRINT_INPUT_ERROR(
+        "charge_transfer models are not usable yet: DR-005 stage 2c (forces/virial not "
+        "implemented).");
+    }
+    nep_data.ct_h.resize(num_atoms);
+    nep_data.ct_V.resize(num_atoms * 3);
+    std::cout << "***** WARNING *****\n"
+              << "charge_transfer: forces/virial/energy-derivative terms are NOT valid in this "
+                 "build (DR-005 stage 2b; BEC and charges only)\n"
+              << "*******************" << std::endl;
+  }
 }
 
 NEP_Charge::~NEP_Charge(void)
@@ -1447,11 +1520,93 @@ void NEP_Charge::compute_large_box(
     nep_data.sum_fxyz.data());
   GPU_CHECK_KERNEL
 
-  // enforce charge neutrality
-  zero_total_charge<<<1, 1024>>>(N, nep_data.charge.data());
-  GPU_CHECK_KERNEL
+  if (paramb.charge_transfer) {
+    // h = network output; q_a = sum_b phi_ab (h_a - h_b) replaces zero_total_charge
+    nep_data.ct_h.copy_from_device(nep_data.charge.data(), N);
+    ct_find_charge_large_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      box,
+      nep_data.NN_radial.data(),
+      nep_data.NL_radial.data(),
+      type.data(),
+      position_per_atom.data(),
+      position_per_atom.data() + N,
+      position_per_atom.data() + N * 2,
+      nep_data.ct_h.data(),
+      nep_data.charge.data(),
+      nep_data.ct_V.data());
+    GPU_CHECK_KERNEL
+  } else {
+    // enforce charge neutrality
+    zero_total_charge<<<1, 1024>>>(N, nep_data.charge.data());
+    GPU_CHECK_KERNEL
+  }
 
-  if (need_bec) {
+  if (need_bec && paramb.charge_transfer) {
+    // Term B (includes the diagonal q 1); writes all nine components
+    ct_find_bec_B_large_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      box,
+      nep_data.NN_radial.data(),
+      nep_data.NL_radial.data(),
+      type.data(),
+      position_per_atom.data(),
+      position_per_atom.data() + N,
+      position_per_atom.data() + N * 2,
+      nep_data.ct_h.data(),
+      nep_data.bec.data());
+    GPU_CHECK_KERNEL
+
+    // Term A (radial and angular descriptor parts), weight V_a
+    ct_find_bec_A_radial_large_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      box,
+      nep_data.NN_radial.data(),
+      nep_data.NL_radial.data(),
+      type.data(),
+      position_per_atom.data(),
+      position_per_atom.data() + N,
+      position_per_atom.data() + N * 2,
+      nep_data.charge_derivative.data(),
+      nep_data.ct_V.data(),
+      nep_data.bec.data());
+    GPU_CHECK_KERNEL
+
+    ct_find_bec_A_angular_large_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      box,
+      nep_data.NN_angular.data(),
+      nep_data.NL_angular.data(),
+      type.data(),
+      position_per_atom.data(),
+      position_per_atom.data() + N,
+      position_per_atom.data() + N * 2,
+      nep_data.charge_derivative.data(),
+      nep_data.sum_fxyz.data(),
+      nep_data.ct_V.data(),
+      nep_data.bec.data());
+    GPU_CHECK_KERNEL
+
+    // scale q to q * sqrt(epsilon_inf)
+    scale_bec<<<grid_size, BLOCK_SIZE>>>(N, annmb.sqrt_epsilon_inf, nep_data.bec.data());
+    GPU_CHECK_KERNEL
+  } else if (need_bec) {
     // get BEC (the diagonal part)
     find_bec_diagonal<<<grid_size, BLOCK_SIZE>>>(
       N,
@@ -1732,11 +1887,89 @@ void NEP_Charge::compute_small_box(
     nep_data.sum_fxyz.data());
   GPU_CHECK_KERNEL
 
-  // enforce charge neutrality
-  zero_total_charge<<<1, 1024>>>(N, nep_data.charge.data());
-  GPU_CHECK_KERNEL
+  if (paramb.charge_transfer) {
+    // h = network output; q_a = sum_b phi_ab (h_a - h_b) replaces zero_total_charge
+    nep_data.ct_h.copy_from_device(nep_data.charge.data(), N);
+    ct_find_charge_small_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      small_box_data.NN_radial.data(),
+      small_box_data.NL_radial.data(),
+      type.data(),
+      small_box_data.r12.data(),
+      small_box_data.r12.data() + size_x12,
+      small_box_data.r12.data() + size_x12 * 2,
+      nep_data.ct_h.data(),
+      nep_data.charge.data(),
+      nep_data.ct_V.data());
+    GPU_CHECK_KERNEL
+  } else {
+    // enforce charge neutrality
+    zero_total_charge<<<1, 1024>>>(N, nep_data.charge.data());
+    GPU_CHECK_KERNEL
+  }
 
-  if (need_bec) {
+  if (need_bec && paramb.charge_transfer) {
+    // Term B (includes the diagonal q 1); writes all nine components
+    ct_find_bec_B_small_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      small_box_data.NN_radial.data(),
+      small_box_data.NL_radial.data(),
+      type.data(),
+      small_box_data.r12.data(),
+      small_box_data.r12.data() + size_x12,
+      small_box_data.r12.data() + size_x12 * 2,
+      nep_data.ct_h.data(),
+      nep_data.bec.data());
+    GPU_CHECK_KERNEL
+
+    // Term A (radial and angular descriptor parts), weight V_a
+    ct_find_bec_A_radial_small_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      small_box_data.NN_radial.data(),
+      small_box_data.NL_radial.data(),
+      type.data(),
+      small_box_data.r12.data(),
+      small_box_data.r12.data() + size_x12,
+      small_box_data.r12.data() + size_x12 * 2,
+      nep_data.charge_derivative.data(),
+      nep_data.ct_V.data(),
+      nep_data.bec.data());
+    GPU_CHECK_KERNEL
+
+    ct_find_bec_A_angular_small_box<<<grid_size, BLOCK_SIZE>>>(
+      paramb,
+      annmb,
+      N,
+      N1,
+      N2,
+      small_box_data.NN_angular.data(),
+      small_box_data.NL_angular.data(),
+      type.data(),
+      small_box_data.r12.data() + size_x12 * 3,
+      small_box_data.r12.data() + size_x12 * 4,
+      small_box_data.r12.data() + size_x12 * 5,
+      nep_data.charge_derivative.data(),
+      nep_data.sum_fxyz.data(),
+      nep_data.ct_V.data(),
+      nep_data.bec.data());
+    GPU_CHECK_KERNEL
+
+    // scale q to q * sqrt(epsilon_inf)
+    scale_bec<<<grid_size, BLOCK_SIZE>>>(N, annmb.sqrt_epsilon_inf, nep_data.bec.data());
+    GPU_CHECK_KERNEL
+  } else if (need_bec) {
     // get BEC (the diagonal part)
     find_bec_diagonal<<<grid_size, BLOCK_SIZE>>>(
       N,

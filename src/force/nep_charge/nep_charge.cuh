@@ -50,6 +50,9 @@ struct NEP_Charge_Data {
   GPU_Vector<float> charge;
   GPU_Vector<float> charge_derivative;
   GPU_Vector<float> bec;               // BEC
+  GPU_Vector<float> phi_parameters;    // charge_transfer phi coefficients (DR-005), may be empty
+  GPU_Vector<float> ct_h;              // charge_transfer: network output h (q lives in `charge`)
+  GPU_Vector<float> ct_V;              // charge_transfer: V_a = sum_b phi_ab (r_a - r_b), 3 N
 };
 
 class NEP_Charge : public Potential
@@ -85,6 +88,11 @@ public:
     int num_types_sq = 0;
     int num_c_radial = 0;
     int num_types = 0;
+    // charge_transfer (DR-005 / ADR-0006); off unless nep.txt has the charge_transfer line
+    bool charge_transfer = false;
+    float rc_phi = 0.0f;      // cutoff of phi
+    int num_phi_pairs = 0;    // num_types * (num_types + 1) / 2 symmetric type pairs
+    int num_phi_per_pair = 0; // basis_size_radial + 1 coefficients per pair
   };
 
   struct ANN {
@@ -101,6 +109,7 @@ public:
     const float* c_type_pair;
     const float* q_scaler;
     const double* energy_reference = nullptr;
+    const float* phi_coeff = nullptr; // [pair * num_phi_per_pair + k], pair = upper-triangle index
   };
 
   struct ZBL {
@@ -160,6 +169,7 @@ private:
   Ewald ewald;
   PPPM pppm;
   NeighborManager neighbor_manager;
+  std::vector<float> phi_coeff_host; // host copy of the phi coefficients (charge_transfer only)
 
   void update_potential(float* parameters, ANN& ann);
 
