@@ -39,9 +39,8 @@ requirements:
     source: specs/requirements/DR-005-qnep-bec-gradient-consistency.md
     design: specs/design/DES-0005-qnep-charge-conserving-bec.md
     adrs: [specs/decisions/ADR-0006-qnep-charge-transfer.md]
-    verification: [specs/verification/VER-0028-qnep-bec-gradient, specs/verification/VER-0029-qnep-charge-transfer-reference, specs/verification/VER-0031-bec-nonconservative-decomposition, specs/verification/VER-0032-qnep-charge-transfer-gpu]
-    tests: [tests_pytest/test_qnep_charge_transfer_parse.py, tests_pytest/test_qnep_charge_transfer_bec.py]   # stages 1, 2a, 2b done (q and BEC kernels vs FD, 4 mutants caught; independent review: no BLOCKER, 2 MAJOR fixed); forces/virial/D weights (2c), direct-P output, training side and replica (3), regression (4), retraining (5) NOT done; charge_transfer models refuse to run without the test-only env var GPUMD_CHARGE_TRANSFER_BEC_ONLY
-    status: partial
+    verification: [specs/verification/VER-0028-qnep-bec-gradient, specs/verification/VER-0029-qnep-charge-transfer-reference, specs/verification/VER-0031-bec-nonconservative-decomposition, specs/verification/VER-0032-qnep-charge-transfer-gpu, specs/verification/VER-0033-qnep-charge-transfer-forces-reference, specs/verification/VER-0034-qnep-charge-transfer-forces-gpu]
+    tests: [tests_pytest/test_qnep_charge_transfer_parse.py, tests_pytest/test_qnep_charge_transfer_bec.py, tests_pytest/test_qnep_charge_transfer_forces.py, tests_pytest/test_qnep_charge_transfer_field.py]   # stages 1, 2a, 2b, 2c done (charges, BEC, forces, virial, add_efield force vs FD, mode 2/3, triclinic; virial gate approved by the human 2026-11-11; two independent reviews: no BLOCKER, MAJOR items fixed); NOT done: training side nep and main_replica kernels (stage 3), docs/doc pages, full regression (stage 4), expressiveness check and retraining (stage 5), direct-P diagnostic output (DES-0005 3b)
   - id: DR-006
     title: dftd3 must not abort when the box crosses the small/large-box threshold
     source: specs/requirements/DR-006-dftd3-cell-buffers.md
