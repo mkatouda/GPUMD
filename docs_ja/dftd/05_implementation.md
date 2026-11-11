@@ -69,7 +69,7 @@ BJ とゼロダンピングの違いは、ペアごとの**減衰した二体項
 | BJ の枝（`damping == 0`、`D3:225-239`） | 従来のコードと**演算の順序を変えていません**（DR-003 AC-3）。`g6 = damp_6`、`g8 = damp_8` を返すだけ |
 | ゼロの枝（`damping == 1`、`D3:240-252`） | R0 を表から引き（下記）、`d3_zero_term<6>`、`d3_zero_term<8>` を呼ぶ |
 
-パラメータ構造体 `DFTD3_Para`（`D3h:25-34`）は、減衰の種類 `damping`（0 = BJ、1 = ゼロ）、共通の `s6`、`s8`、BJ だけの `a1`、`a2`、ゼロだけの `sr6`、`sr8` を持ちます。ゼロダンピングの汎関数は `D3ZERO_PARAMS[48]`（`DZ:439-440`）から名前で選び（`DFTD3::initialize`、`D3:1933-1943`）、BJ の表とは別です。名前の綴りは BJ の表と同じ（`blyp`、`b3lyp` など。ADR-0003 項目 8）で、どちらかの減衰に無い汎関数は、減衰の名前を含むエラーになります（`D3:2001-2006`。フォールバックなし、ADR-0003 項目 3）。
+パラメータ構造体 `DFTD3_Para`（`D3h:25-34`）は、減衰の種類 `damping`（0 = BJ、1 = ゼロ）、共通の `s6`、`s8`、BJ だけの `a1`、`a2`、ゼロだけの `sr6`、`sr8` を持ちます。ゼロダンピングの汎関数は `D3ZERO_PARAMS[48]`（`DZ:439-440`）から名前で選び（`DFTD3::initialize`、`D3:1935-1945`）、BJ の表とは別です。名前の綴りは BJ の表と同じ（`blyp`、`b3lyp` など。ADR-0003 項目 8）で、どちらかの減衰に無い汎関数は、減衰の名前を含むエラーになります（`D3:2003-2008`。フォールバックなし、ADR-0003 項目 3）。
 
 **`d3_zero_term<n>`（`D3:172-205`）**：べき n（6 または 8）、α = n + 8（14 または 16）について、
 
@@ -93,7 +93,7 @@ g = f(r) / r^n,    h = n − α (1 − f),    dg/dr = −g·h / r
 
 **R0 の表（`d3zero_r0ab`）**：`__constant__ float d3zero_r0ab[4465]`（`DZ:24`、17,860 B）。添字は `zl·(zl+1)/2 + zs`（0 始まりの原子番号 `zl ≥ zs`、`D3:242-244`）の下三角で、4465 = 94·95/2 です（Z = 1〜94 の分）。**使うのは Z ≤ 86 の分（3741 個）だけ**です。生成元は dftd3-lib（コミット `3c99ee98`）の `lib/core.f90`（ヘッダのコメント、VER-0023）。Z = 87〜94 は dftd3-lib（と QE）と simple-dftd3 で r0ab、C6 が異なり、どちらが正しいか決めていないため、D3(0) は Z ≤ 86 に限ります（DR-003 D5、06 章 6.10.1 節）。
 
-**元素検査（`DFTD3::check_elements`、`D3:2056-2082`）**：`compute` の冒頭で、`damping == 1` かつ未検査のときだけ呼びます（`D3:1901-1903`）。`type` をホストへ複写し、構造に**実際にある**原子種について、NEP ファイルの 1 行目の元素記号から決めた添字（`atomic_number`）が 86 以上なら、元素名つきでエラーにします（`... D3(0) is limited to Z <= 86 (H-Rn); use bj damping or remove these elements.`）。`type` が要るので、`initialize` ではなく**最初の力の評価**で検査します。`elements_checked` は `initialize` で偽に戻ります（`D3:2031`）。BJ には適用しません（Z ≤ 94 まで使える。`test_bj_damping_still_accepts_z_above_86`）。NEP89 には Ac〜Pu が載っていますが、構造にある原子種だけを検査します。
+**元素検査（`DFTD3::check_elements`、`D3:2058-2084`）**：`compute` の冒頭で、`damping == 1` かつ未検査のときだけ呼びます（`D3:1903-1905`）。`type` をホストへ複写し、構造に**実際にある**原子種について、NEP ファイルの 1 行目の元素記号から決めた添字（`atomic_number`）が 86 以上なら、元素名つきでエラーにします（`... D3(0) is limited to Z <= 86 (H-Rn); use bj damping or remove these elements.`）。`type` が要るので、`initialize` ではなく**最初の力の評価**で検査します。`elements_checked` は `initialize` で偽に戻ります（`D3:2033`）。BJ には適用しません（Z ≤ 94 まで使える。`test_bj_damping_still_accepts_z_above_86`）。NEP89 には Ac〜Pu が載っていますが、構造にある原子種だけを検査します。
 
 ### 5.1.4 ゼロダンピングの小箱の CN を倍精度にする理由と範囲（VER-0024）
 
@@ -121,7 +121,7 @@ g = f(r) / r^n,    h = n − α (1 − f),    dg/dr = −g·h / r
 
 ### 5.1.5 ゼロダンピングの `damping` 引数とキーワード構文
 
-`dftd3 <functional> <rc_pot> <rc_cn> [zero|bj]`。構文検査は `DFTD3::parse_damping`（`D3:2034-2054`）で、`NEP::initialize_dftd3` と `NEP_Charge::initialize_dftd3` が呼びます（04 章 4.2 節）。4 トークンなら `bj`、5 番目が `zero` / `bj` 以外ならエラーです。`DFTD3::initialize` は `damping` 引数（既定 `"bj"`）で `dftd3_para.damping` を決め（`D3:1929-1930`）、ゼロダンピングのときだけ起動メッセージに `damping = zero (D3(0))`、`sr6`、`sr8`、`alpha6 = 14, alpha8 = 16` を出します（`D3:2008-2025`）。BJ の出力は従来と同一です（ADR-0003 項目 4 の改訂後）。
+`dftd3 <functional> <rc_pot> <rc_cn> [zero|bj]`。構文検査は `DFTD3::parse_damping`（`D3:2036-2056`）で、`NEP::initialize_dftd3` と `NEP_Charge::initialize_dftd3` が呼びます（04 章 4.2 節）。4 トークンなら `bj`、5 番目が `zero` / `bj` 以外ならエラーです。`DFTD3::initialize` は `damping` 引数（既定 `"bj"`）で `dftd3_para.damping` を決め（`D3:1931-1932`）、ゼロダンピングのときだけ起動メッセージに `damping = zero (D3(0))`、`sr6`、`sr8`、`alpha6 = 14, alpha8 = 16` を出します（`D3:2010-2027`）。BJ の出力は従来と同一です（ADR-0003 項目 4 の改訂後）。
 
 ### 5.1.6 BJ のビット同一（DR-003 AC-3）で確認したこと
 
@@ -379,7 +379,7 @@ extra カーネルは、スロットの個数を読み、**全員が収まった
 | 同一のペア順序 | リストは CN カーネルの走査順に作られ、extra カーネルのセル走査も同じ順序（`c = sub, sub+num_sub, …` のセル、各セル内は `cell_contents` の順）です。同じステップで同じ angular セルリストを使うので、セルリストの原子順序が実行ごとに変わっても、**同一ステップ内では、リスト経由でも走査でも同じペアが同じ順序で処理されます**（`D3:1381-1383` のコメント）。したがって float 累積順序も同じです（容量 {既定, 0, 1, 4} がビット一致することをテスト、`test_dftd3_large_box_neighbor_list_is_exact_and_reproducible`） |
 | 保存するもの | 相手の番号（int）だけ。float の `r12` も保存する変形は、メモリ転送が増えて遅く（0.85 倍）、却下 [VER-0015 `cachef`] |
 | メモリ | `N × num_sub × capacity × 4 B` + `N × num_sub × 4 B`。水 41,472 で 31.6 MB + 1.3 MB（capacity 25）、水 5,184 で 4.0 MB、Cu 4,000 で 3.7 MB、クラスター 972 で 0.5 MB [VER-0015] |
-| 確保 | 増える方向にだけ再確保し、25% の余裕を持たせる（上限 256 MB の範囲内）。NPT で体積が変わると容量が変わるためで、`resize()` が解放と確保を伴うからです（`D3:1714-1727`） |
+| 確保 | 増える方向にだけ再確保し、25% の余裕を持たせる（上限 256 MB の範囲内）。NPT で体積が変わると容量が変わるためで、`resize()` が解放と確保を伴うからです（`D3:1716-1729`） |
 | レジスタ | CN カーネル 50 → 55、extra カーネル 63 → 72（スピルなし）[VER-0015] |
 
 効果：extra カーネル 0.760 → 0.200 ms（水 41,472、3.8 倍）、D3 合計は水 5,184 で 1.04 倍、Cu 4,000 で 1.07 倍、クラスター 972 で 1.28 倍でした。小箱経路のコードは変更していません [VER-0015]。
@@ -593,7 +593,7 @@ cost          = N * cells_visited / num_cells  +  3.0 * cells_visited
 | 3 | **`N × MN` の int オーバーフロー**：`const int size_x12 = N * MN;`（`D3:1525`）、`r12.resize(size_x12 * 6)`（`D3:1536`）。`size_x12 * 6` は N > 約 35,800 で int を超える（符号付きオーバーフロー）。実際には 1 原子 320 kB のメモリが必要なので、その前に実用にならない（35,800 原子で約 11 GB） | コード読解。未実行 | UPSTREAM-0002 C |
 | 4 | **未初期化の `atomic_number`**：`find_atomic_number`（`D3:521-531`）は元素記号が一致したときだけ `atomic_number[n] = m` を設定し、直後の `if (atomic_number[n] >= max_elem)` は一致しなかった場合も読む。`DFTD3_Para::atomic_number` は初期化子がない（`D3h:33`）。「DFTD3 only supports elements from H to Pu.」が、綴りの誤りでは確実には出ない | コード読解。未再現（NEP ファイル 1 行目に不正な記号がある場合の挙動は未確認） | UPSTREAM-0002 A |
 | 5 | **カットオフの範囲検査がない**：`rc_pot`、`rc_cn` に負値、0、`rc_cn > rc_pot` が通る。小箱判定とセル幅は `rc_pot` だけで決まるため、`rc_cn > rc_pot` で CN の数え落としが起こり得る（推論） | コード読解。未再現 | UPSTREAM-0002 E |
-| 6 | **NPT で小箱 → 大箱に遷移したとき、セルリスト配列が未確保になる可能性**：`compute_small_box` は初回に `cn` を確保し（`D3:1527`）、`compute_large_box` は `cn.size() == 0` のときだけ `cell_*` を確保します（`D3:1702-1712`）。小箱から始めて途中で大箱に変わると、`cn` が既に確保済みなので `cell_*` の確保が行われません。`find_cell_list` は `cell_count`、`cell_count_sum` をセル数に合わせて拡張しますが（`neighbor.cu:186-189`）、`cell_contents` は拡張しません（N 要素の `gpuMemset` が範囲外になり得る）。この拡張の有無は本マニュアル作成者のコード読解で、偽陽性かもしれません | コード読解。**未再現** | UPSTREAM-0002 F |
+| 6 | **（修正済み、DR-006）NPT や `deform` で小箱 → 大箱に遷移したとき、セルリスト配列が未確保になり異常終了した**：修正前は、`compute_small_box` が初回に `cn` を確保し（`D3:1527`）、`compute_large_box` は `cn.size() == 0` のときだけ `cell_*` も確保していたため、小箱から始めて途中で大箱に変わると `cell_*` が空のまま `find_cell_list` に渡り、`cell_contents` の `gpuMemset` が `neighbor.cu:193` で `invalid argument` になりました（UPSTREAM-0002 F の疑いの通り。依頼元の報告 2026-11-09 で確認、本フォークで再現）。現在は `cell_*` を `cell_count_radial.size() == 0` の別の条件で確保します（`D3:1708-1715`、2 行の挿入）。大箱から始まる実行は、修正前も正常でした | 再現して修正。試験 `test_dftd3_cell_buffers.py` の 4 経路（修正前は小箱開始の 2 本が失敗）。遷移のない実行は修正前の制御ビルドと出力がバイト一致。HIP ビルドと、HEAD を基準にした `--suite full` は未実施（06 章 6.13 節） | UPSTREAM-0002 F、UPSTREAM-0003、VER-0030 |
 | 7 | **`HartreeBohr6` の出典と系統的なずれ**：5.8 節 | 数値で確認（相対 +8.7×10⁻⁷）。変更すると結果が 1e-6 レベルで変わるため、このフォークでは ADR と回帰結果が必要 | UPSTREAM-0002 B |
 | 8 | **極端な CN での C6 誤差**：5.4 節。float の重みと `W < 1e-30f` の fallback | 実測で確認（H70 密集クラスターでエネルギー 8.1 eV のずれ）。通常の系では許容値内 | UPSTREAM-0001、VER-0017 |
 | 9 | **per-atom ビリアルの配分が非対称**（CN 項は相手の `D_j` のみ）。全ビリアルは正しい | 設計。原子ごとのビリアルを使う解析で注意 | UPSTREAM-0002 G |

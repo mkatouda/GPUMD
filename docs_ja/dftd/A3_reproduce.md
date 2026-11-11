@@ -21,6 +21,7 @@
 | ファイル | 内容 | 備考 |
 |---|---|---|
 | `test_dftd3_reference.py` | D3 の GPU 結果を simple-dftd3 の参照値（`fixtures/dftd3/reference.json`、7 ケース）と比較。`num_sub`（スレッド数）の全値での一致と再現性、近傍リストの正確性など | マーカー `fast`。NEP89 モデルが必要。許容値の規則は 06 章 6.2 節 |
+| `test_dftd3_cell_buffers.py` | D3 の小箱 ↔ 大箱の経路遷移（DR-006）。水 27 分子（9.3 Å を拡縮）、`dftd3 pbe 4 2`（閾値 10 Å）、`time_step 0` と `deform` 0.005 Å/step × 200 で閾値をまたぐ 4 経路。区間末の D3 エネルギー（D3 あり・なしの 2 本の差）を、ダンプしたフレームの単一経路の静的計算と比較（相対 2×10⁻⁶、DR-001 AC-1 と同じで緩和しない）。修正前のバイナリでは、小箱開始の 2 本が `neighbor.cu:193` で失敗する | 4 件、約 62 秒/回（10 回繰り返して 10/10 合格）[VER-0030] |
 | `test_dftd2_reference.py` | 内蔵表と dftd3-lib の一致、NumPy 参照実装と dftd3-lib の比較（打ち切りなしの極限）、有限差分による自己無矛盾性、不変性、カットオフでの連続性、GPU と NumPy 参照の比較、入力エラー、ビット単位の再現性 | 参照実装は `tests_pytest/dftd2_reference.py`（ASE 近傍リスト）。表の検査の一部は dftd3-lib のソースを必要とし、`prg/extras.f90` のパスを環境変数 `DFTD3_LIB_EXTRAS_F90` で指定する（`test_dftd2_reference.py:44-45`。既定値は開発機の `dftd3-lib/prg/extras.f90`） |
 | `test_dftd2_consistency.py` | GPU の力と $-\partial E/\partial x$（5 点中心差分、刻み 0.01 Å）、ビリアルとひずみ微分の比較 | 環境変数 `DFTD2_TEST_GPUMD` で `gpumd` 実行ファイルを差し替える |
 | `test_dftd2_src_table.py` | `src/force/dftd2para.cuh` が生成スクリプトの出力とバイト単位で同一であること | |
@@ -146,6 +147,7 @@ CPU のみ（Python、NumPy）、数秒で終わります。いずれも `python
 |---|---|
 | 2026-11-04 | 初版（README の版情報を参照） |
 | 2026-11-07 | DR-003（D3(0)）と DR-004（`dftd2` の QE 互換テーブル、単純打ち切り、高速化）を 00・01・02・03・06 章と付録 A1〜A3 に反映（`develop` `aba6b28b` 時点）。04・05 章は upstream の再構成後の構成に更新済み。01・02・04・05・A1・A2 の行番号引用は `7c15e99c` で再導出済み |
+| 2026-11-11 | DR-006（小箱 ↔ 大箱の経路遷移での異常終了の修正、`b90c2920`）を 01・04・05・06 章、A3、README に追補。`dftd3.cu` の 1708 行以降の行番号の引用を +2 ずらした |
 
 ### 実装の履歴（`git log` の抜粋、`develop` ブランチ）
 
@@ -185,6 +187,7 @@ CPU のみ（Python、NumPy）、数秒で終わります。いずれも `python
 | 2026-11-06 | `6e5d0fc2`, `44ae8461` | DR-004：ADR-0005、VER-0026、`wt-d2-qe` のマージ（R1/R2） |
 | 2026-11-07 | `e1036a4e` | DR-004 R3：`dftd2` のペアカーネルを補償付き float 累算（4 セルごとに double へフラッシュ）に。凍結出力は ADR-0005 に基づき一度だけ再生成 |
 | 2026-11-07 | `9068fa61`, `ee6e24af` | docs_ja の D2 累算の記述更新、VER-0026 の R3 の記録、traceability を「実装済み」に |
-| 2026-11-07 | `aba6b28b` | `wt-d2-qe` のマージ（R3）。本改訂の対象 HEAD |
+| 2026-11-07 | `aba6b28b` | `wt-d2-qe` のマージ（R3） |
+| 2026-11-11 | `b90c2920` | DR-006：`compute_large_box` のセルリスト配列の確保を `cn` と独立にし、小箱 → 大箱の遷移での異常終了（`neighbor.cu:193`）を修正。試験 `test_dftd3_cell_buffers.py`、UPSTREAM-0003（upstream へは未報告）、VER-0030 |
 
 上の履歴は `git log -- src/force/dftd3/dftd3.cu src/force/dftd2.cu src/force/dftd2para.cuh specs/verification` の件名から抜粋したもので、コミットの内容は未再確認です。詳細は各 VER 記録と `specs/traceability.yaml` を参照してください。

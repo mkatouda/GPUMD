@@ -27,7 +27,7 @@ D3 のファイルは upstream の再構成でサブフォルダ `src/force/dftd
 
 | ファイル | 内容 | 行数 |
 |---|---|---|
-| `src/force/dftd3/dftd3.cu` | クラス `DFTD3` の実装。全 D3 カーネル、減衰の共通ヘルパー（`d3_damped_pair`、`d3_zero_term`）、BJ の汎関数パラメータ表（`initialize`）、キーワードの構文解析（`DFTD3::parse_damping`）、元素検査（`DFTD3::check_elements`）、ホスト側の制御（`compute`、`compute_small_box`、`compute_large_box`） | 2082 |
+| `src/force/dftd3/dftd3.cu` | クラス `DFTD3` の実装。全 D3 カーネル、減衰の共通ヘルパー（`d3_damped_pair`、`d3_zero_term`）、BJ の汎関数パラメータ表（`initialize`）、キーワードの構文解析（`DFTD3::parse_damping`）、元素検査（`DFTD3::check_elements`）、ホスト側の制御（`compute`、`compute_small_box`、`compute_large_box`） | 2084 |
 | `src/force/dftd3/dftd3.cuh` | クラス `DFTD3` の宣言（パラメータ構造体、メンバー、GPU バッファ） | 106 |
 | `src/force/dftd3/dftd3para.cuh` | 定数 `Bohr`、`Bohr2`、`HartreeBohr6`、`max_elem=94`、`max_cn=5`、`max_cn2=25`、`__constant__` の `num_cn`、`cn_ref`、`r2r4`、`covalent_radius`、ホスト側の `c6_ref_cpu[111625]`（`P3:22-24, 26-28, 29, 34, 76, 90, 104`）。値の出典はコードに書かれていません（UPSTREAM-0002 G） | 12507 |
 | `src/force/dftd3/dftd3zero_table.cuh` | **生成ファイル（DR-003）**。`__constant__ float d3zero_r0ab[4465]`（D3(0) のペア半径 R0、Å、下三角の詰め込み、`DZ:24`）と、ゼロダンピングの汎関数表 `D3ZERO_PARAMS[48]`（名前、`s6`、`sr6`、`s8`、`sr8`、`DZ:433-440`）。ヘッダに生成元（dftd3-lib のコミット `3c99ee98`、`lib/core.f90`、VER-0023）が書かれている。`dftd3.cu` からだけ include される | 489 |
@@ -71,14 +71,14 @@ upstream/master（`aa63ffdd`）との差分（`git diff aa63ffdd --stat -- src`�
 | 処理 | `NEP`（`src/force/nep/nep.cu`） | `NEP_Charge`（`src/force/nep_charge/nep_charge.cu`） |
 |---|---|---|
 | `dftd3` の探索 | `run_input.lines()` を全行走査し、最初に見つかった `dftd3` 行を使う（`nep.cu:48-68`） | 同（`nep_charge.cu:146-166`） |
-| 構文検査 | `DFTD3::parse_damping(tokens)`（`D3:2034-2054`）。トークン数が 4 未満なら `dftd3 must have 3 parameters ...`、6 以上なら `dftd3 has too many parameters ...`、5 番目が `zero` / `bj` 以外ならエラー（いずれも `exit(1)`）。4 トークンなら `bj`（`nep.cu:55`、`nep_charge.cu:153`） | 同 |
+| 構文検査 | `DFTD3::parse_damping(tokens)`（`D3:2036-2056`）。トークン数が 4 未満なら `dftd3 must have 3 parameters ...`、6 以上なら `dftd3 has too many parameters ...`、5 番目が `zero` / `bj` 以外ならエラー（いずれも `exit(1)`）。4 トークンなら `bj`（`nep.cu:55`、`nep_charge.cu:153`） | 同 |
 | 引数の取得 | 汎関数名、`rc_potential`、`rc_coordination_number`（`get_double_from_token` の戻りを `float` に変換、`nep.cu:56-58`） | 同 |
 | ポテンシャルファイルと減衰 | `get_first_potential_filename(run_input)`（**最初の** `potential` 行のファイル）と減衰の種類を `DFTD3::initialize` に渡す（`nep.cu:59-64`、`nep_charge.cu:157-162`） | 同 |
 | `dftd2` | `DFTD2::find_in_run_input`（`D2:751-767`）で全行走査し、トークンは `DFTD2::parse_tokens`（`D2:675-749`）で解析する。原子番号配列は `zbl.atomic_numbers`（型ごと）から作り、`DFTD2::initialize(s6, rc, options, atomic_numbers)` に渡す（`nep.cu:70-83`） | 同（`nep_charge.cu:168-181`） |
 
 `run.in` の全行を走査するため、`dftd3` / `dftd2` は `run` の後に書いても有効です（回帰ケース `dftd3_single_late`、4.6 節）。
 
-D3 が元素情報を **NEP ファイルの 1 行目の元素記号**から取る（`find_atomic_number`、`D3:500-535`。`DFTD3::initialize` の末尾から呼ばれる、`D3:2030`）のに対し、D2 は NEP が持つ原子番号（`zbl.atomic_numbers`）を使います。複数の `potential` を指定した場合も、D3 の元素表は最初のファイルのものです（そのとき型の対応がどうなるかは、コードからは確認できず、未検証です）。
+D3 が元素情報を **NEP ファイルの 1 行目の元素記号**から取る（`find_atomic_number`、`D3:500-535`。`DFTD3::initialize` の末尾から呼ばれる、`D3:2032`）のに対し、D2 は NEP が持つ原子番号（`zbl.atomic_numbers`）を使います。複数の `potential` を指定した場合も、D3 の元素表は最初のファイルのものです（そのとき型の対応がどうなるかは、コードからは確認できず、未検証です）。
 
 ### compute() での呼び出し位置
 
@@ -124,12 +124,12 @@ NEP の力・エネルギー・ビリアルの計算が終わった**後**に、
 
 | メンバー | 型 | 内容・サイズ |
 |---|---|---|
-| `dftd3_para` | `DFTD3_Para { float s6, s8, a1, a2; int damping; float sr6, sr8; int atomic_number[94]; }`（`D3h:25-34`） | カーネルに値渡しされる。`damping` は 0 = BJ、1 = ゼロダンピング。`a1`、`a2` は BJ のみ使う。`sr6`（既定 0）、`sr8`（既定 1）はゼロダンピングのみ使う（R0 のスケール、α6 = 14、α8 = 16 は定数）。`atomic_number` は 0 始まり（H = 0）。BJ の `a2` は Å に換算済み（`D3:1508`）。ゼロダンピングでは `s6`、`sr6`、`s8`、`sr8` を `D3ZERO_PARAMS` からそのまま入れる（`D3:1933-1943`） |
-| `enabled`、`rc_radial`、`rc_angular` | bool、float、float | `rc_radial` = `rc_pot`、`rc_angular` = `rc_cn`（`D3:1922-1923`）。既定値 15、10 は `initialize` で上書きされる |
-| `elements_checked` | bool | ゼロダンピングのとき、最初の `compute` で原子種を検査したかどうか（`D3h:43`、4.4 節 `check_elements`）。`initialize` で偽に戻る（`D3:2031`） |
+| `dftd3_para` | `DFTD3_Para { float s6, s8, a1, a2; int damping; float sr6, sr8; int atomic_number[94]; }`（`D3h:25-34`） | カーネルに値渡しされる。`damping` は 0 = BJ、1 = ゼロダンピング。`a1`、`a2` は BJ のみ使う。`sr6`（既定 0）、`sr8`（既定 1）はゼロダンピングのみ使う（R0 のスケール、α6 = 14、α8 = 16 は定数）。`atomic_number` は 0 始まり（H = 0）。BJ の `a2` は Å に換算済み（`D3:1508`）。ゼロダンピングでは `s6`、`sr6`、`s8`、`sr8` を `D3ZERO_PARAMS` からそのまま入れる（`D3:1935-1945`） |
+| `enabled`、`rc_radial`、`rc_angular` | bool、float、float | `rc_radial` = `rc_pot`、`rc_angular` = `rc_cn`（`D3:1924-1925`）。既定値 15、10 は `initialize` で上書きされる |
+| `elements_checked` | bool | ゼロダンピングのとき、最初の `compute` で原子種を検査したかどうか（`D3h:43`、4.4 節 `check_elements`）。`initialize` で偽に戻る（`D3:2033`） |
 | `cn` | `GPU_Vector<float>` | N 個。配位数（ゼロダンピングの小箱でも float で保持、5.4 節） |
 | `cn_weight` | `GPU_Vector<float>` | **N × `max_cn` = 5N 個**（1 原子あたり 20 B）。C6 補間のガウス重み（5.4 節） |
-| `c6_ref` | `GPU_Vector<float>` | 111625 個 = 4465 元素対 × 25。`initialize` で `c6_ref_cpu` から転送（`D3:2027-2028`） |
+| `c6_ref` | `GPU_Vector<float>` | 111625 個 = 4465 元素対 × 25。`initialize` で `c6_ref_cpu` から転送（`D3:2029-2030`） |
 | `dc6_sum`、`dc8_sum` | `GPU_Vector<float>` | 各 N 個。力カーネルが `=` で書き、extra カーネルが読む |
 | `cn_list` | `GPU_Vector<int>` | 大箱のみ。容量 × N × `num_sub` 個 |
 | `cn_list_count` | `GPU_Vector<int>` | 大箱のみ。N × `num_sub` 個 |
@@ -157,10 +157,10 @@ D3(0) の R0 表 `d3zero_r0ab` は、クラスのメンバーではなく、`dft
 
 導出例：N = 8,748 では約 2.8 GB（8748 × 320,000 B）。VER-0012 には N = 34,992 で約 11 GB とあります [VER-0012 (c)]。`MN` を超える近傍数に対する検査はありません（5.9 節）。
 
-**大箱経路**（`D3:1702-1727`）：
+**大箱経路**（`D3:1702-1729`）：
 
-- `cn.size() == 0`（初回）のとき、`cn`、`cn_weight`、`dc6_sum`、`dc8_sum`、6 本の `cell_*` を N に合わせて確保します（`D3:1702-1712`）。
-- CN リスト `cn_list`、`cn_list_count` は、容量 `list_capacity > 0` のとき、**必要量が現在のサイズを超えた場合だけ**確保し直します。確保量は `max(必要量, min(必要量 × 1.25, 256 MB / 4 B))` です。箱の体積が変わる NPT で、容量が体積に追従して変動するための余裕です（`D3:1714-1727`）。
+- `cn.size() == 0`（初回）のとき、`cn`、`cn_weight`、`dc6_sum`、`dc8_sum` を N に合わせて確保します（`D3:1702-1707`）。6 本の `cell_*` は**別の条件** `cell_count_radial.size() == 0` で確保します（`D3:1708-1715`）。小箱経路は `cn` だけを確保するため、小箱から始まって途中で大箱経路に変わる実行でも、`cell_*` が未確保のままになりません（DR-006、VER-0030。修正前は両方が `cn.size() == 0` の一つの条件の中にあり、この遷移で `neighbor.cu:193` の `invalid argument` で異常終了していました）。
+- CN リスト `cn_list`、`cn_list_count` は、容量 `list_capacity > 0` のとき、**必要量が現在のサイズを超えた場合だけ**確保し直します。確保量は `max(必要量, min(必要量 × 1.25, 256 MB / 4 B))` です。箱の体積が変わる NPT で、容量が体積に追従して変動するための余裕です（`D3:1716-1729`）。
 - CN リストの容量規則（`get_cn_list_capacity`、`D3:973-1004`）：
 
 ```text
@@ -184,7 +184,7 @@ N * num_sub * capacity * 4 B > 256 MB  なら capacity = 0（リスト不使用�
 - `d3_damped_pair`（`D3:212-253`）、`d3_zero_term<n>`（`D3:172-205`）：小箱と大箱の力カーネルが共有する、BJ とゼロダンピングの減衰ペア項（5.1.3）。
 - `cn_sum_small_box<T>`（`D3:256-281`）：小箱の CN の和（5.1.4）。
 - `find_neighbor_cell`（`D3:537-564`）：セル番号の周期的な折り返し。
-- `DFTD3::check_elements`（`D3:2056-2082`）：ゼロダンピングの元素検査（最初の `compute` で一度だけ、`D3:1901-1903`）。
+- `DFTD3::check_elements`（`D3:2058-2084`）：ゼロダンピングの元素検査（最初の `compute` で一度だけ、`D3:1903-1905`）。
 
 ### D3 小箱経路（`DFTD3::compute_small_box`、`D3:1516-1684`）
 
@@ -205,7 +205,7 @@ flowchart TD
 
 小箱経路では、`num_sub_force` と `num_sub_extra` を別々に決めます（4.5 節、`D3:1580-1584`）。環境変数 `GPUMD_DFTD3_SMALL_BOX_NUM_SUB` で強制した場合は同じ値が両方に使われます（`D3:941-950`）。
 
-### D3 大箱経路（`DFTD3::compute_large_box`、`D3:1686-1891`）
+### D3 大箱経路（`DFTD3::compute_large_box`、`D3:1686-1893`）
 
 ```mermaid
 flowchart TD
@@ -218,8 +218,8 @@ flowchart TD
 
 | カーネル | テンプレート引数 | グリッド / ブロック | 計算内容 |
 |---|---|---|---|
-| `find_cell_list`（`neighbor.cu:167-218`、2 回、`D3:1734-1749`） | － | 共有コード | セル幅 ≧ `0.5·rc`（周期方向は `floor(厚さ / (0.5 rc))` 個、非周期は 1 個。`box.cu:80-109`）。`find_cell_counts`（`atomicAdd`、`neighbor.cu:58`）、`thrust::exclusive_scan`、`find_cell_contents`（`atomicAdd`、`neighbor.cu:80`）。セル内の原子順序はスケジューリング依存（5.3 節） |
-| `find_dftd3_coordination_number_large_box<num_sub>`（`D3:1006-1110`） | `num_sub` ∈ {1, 2, 4, 8, 16}。それ以外は `PRINT_INPUT_ERROR("Invalid number of threads per atom in DFT-D3.")`（`D3:1788-1789`） | ブロック = `num_sub == 1` なら 64、それ以外は 128（`D3:1698-1701`）。グリッド = `ceil(N·num_sub / ブロック)`。共有メモリ `s_red[1][128]`（`D3:1036`） | 各スレッド（原子 n1、`sub`）は、周期方向ごとに ±2 セル（周期 3 方向で 5³ = 125 セル、非周期方向は 1）のうち `c = sub, sub+num_sub, …` 番目のセルを訪れ（`D3:1060`）、`r < rc_cn` の相手について CN を **float** で累積します（`D3:1085`。**ゼロダンピングでも float**。5.1.4）。受理した相手を `g_list[num_accepted*num_slots + slot]`（`num_accepted < list_capacity` のとき）に書き、個数を `g_list_count[slot]` に書きます（`D3:1086-1096`）。部分和は固定順序の木で縮約し、`cn`、`cn_weight` を書く（`D3:1108-1109`） |
+| `find_cell_list`（`neighbor.cu:167-218`、2 回、`D3:1736-1751`） | － | 共有コード | セル幅 ≧ `0.5·rc`（周期方向は `floor(厚さ / (0.5 rc))` 個、非周期は 1 個。`box.cu:80-109`）。`find_cell_counts`（`atomicAdd`、`neighbor.cu:58`）、`thrust::exclusive_scan`、`find_cell_contents`（`atomicAdd`、`neighbor.cu:80`）。セル内の原子順序はスケジューリング依存（5.3 節） |
+| `find_dftd3_coordination_number_large_box<num_sub>`（`D3:1006-1110`） | `num_sub` ∈ {1, 2, 4, 8, 16}。それ以外は `PRINT_INPUT_ERROR("Invalid number of threads per atom in DFT-D3.")`（`D3:1790-1791`） | ブロック = `num_sub == 1` なら 64、それ以外は 128（`D3:1698-1701`）。グリッド = `ceil(N·num_sub / ブロック)`。共有メモリ `s_red[1][128]`（`D3:1036`） | 各スレッド（原子 n1、`sub`）は、周期方向ごとに ±2 セル（周期 3 方向で 5³ = 125 セル、非周期方向は 1）のうち `c = sub, sub+num_sub, …` 番目のセルを訪れ（`D3:1060`）、`r < rc_cn` の相手について CN を **float** で累積します（`D3:1085`。**ゼロダンピングでも float**。5.1.4）。受理した相手を `g_list[num_accepted*num_slots + slot]`（`num_accepted < list_capacity` のとき）に書き、個数を `g_list_count[slot]` に書きます（`D3:1086-1096`）。部分和は固定順序の木で縮約し、`cn`、`cn_weight` を書く（`D3:1108-1109`） |
 | `find_dftd3_force_large_box<num_sub>`（`D3:1112-1318`） | 同上 | 同上。共有メモリ `s_red[15][128]`（`D3:1150`） | セルリスト（radial）を直接走査し、受理したペアについて小箱の力カーネルと同じペア計算（C6、C8、`d3_damped_pair`、エネルギー、力、ビリアル、`dc6_sum`、`dc8_sum`、`D3:1233`）を行う |
 | `find_dftd3_force_extra_large_box<num_sub>`（`D3:1320-1493`） | 同上 | 同上。共有メモリ `s_red[12][128]` | `0 <= g_list_count[slot] <= list_capacity`（全員がリストに収まった）なら保存済みリストを回し、そうでなければセル走査を繰り返す（`D3:1386`、`D3:1425-1429`）。どちらも同じペアを同じ順序で処理する。CN 微分の力とビリアル |
 
@@ -255,7 +255,7 @@ D3 と違い、D2 は近傍リストを持たず、セルリストを直接走�
 
 ### 小箱 / 大箱の選択（`get_expanded_box`、`D3:312-371`）
 
-`DFTD3::compute` は**毎ステップ** `get_expanded_box(rc_radial, box, ebox)` を呼び、結果で経路を選びます（`D3:1893-1913`、`D3:1904`）。
+`DFTD3::compute` は**毎ステップ** `get_expanded_box(rc_radial, box, ebox)` を呼び、結果で経路を選びます（`D3:1895-1915`、`D3:1906`）。
 
 ```text
 thickness_d = V / area_d                          （d = x, y, z）
@@ -347,6 +347,7 @@ static int get_num_sub_small_box(const int N, const double expected_pairs, const
 |---|---|---|
 | `tests_pytest/test_dftd3_reference.py` | 315 | D3（BJ）。マーカー `fast`。NEP89（`potentials/nep/nep89_20250409/nep89_20250409.txt`）が必要で、無ければ skip |
 | `tests_pytest/test_dftd3_zero.py` | 508 | D3(0)（DR-003）。simple-dftd3 の参照値との一致、構文とエラー（ADR-0003）、**BJ の凍結出力とのビット一致**（AC-3）、力・ビリアルの有限差分（AC-2）、小箱と大箱の一致（AC-5）、r ≪ R0 での有限性、Z ≥ 87 の拒否（DR-003 D5） |
+| `tests_pytest/test_dftd3_cell_buffers.py` | 107 | D3 の小箱 ↔ 大箱の経路遷移（DR-006）。水 27、`dftd3 pbe 4 2`（閾値 10 Å）、`deform` で閾値をまたぐ 4 経路（小 → 大、大 → 小、小 → 大 → 小、大 → 小 → 大）。区間末の D3 エネルギーを単一経路の静的計算と比較（相対 2e-6）。マーカー `fast`。NEP89 が無ければ skip（06 章 6.13 節） |
 | `tests_pytest/test_dftd2_reference.py` | 728 | D2（Grimme 2006、既定の形）。CPU のみのテスト（係数表、参照実装 vs dftd3-lib オラクル、有限差分、不変性、カットオフでの連続性）と GPU テスト（NumPy 参照実装との一致、入力エラー、ビット再現性、threads-per-atom 全値） |
 | `tests_pytest/test_dftd2_consistency.py` | 133 | D2 の力 vs `−dE/dx`（5 点中心差分、刻み 0.01 Å、許容 `2e-4·max|F|`）、ビリアル vs ひずみ微分（刻み 1e-3、許容 `2e-4·max|W|`） |
 | `tests_pytest/test_dftd2_src_table.py` | 42 | `dftd2para.cuh` が生成スクリプトの出力とバイト一致すること、値が CSV と一致すること |
@@ -441,7 +442,7 @@ DR-001 AC-2 の `dftd3_*` の許容値は、master 基準に対し rtol 1e-5、a
 | 項目 | 差分 |
 |---|---|
 | `dftd2` | upstream に存在しない。フォークで新規に追加（`dftd2.cu/.cuh`、`dftd2para.cuh`、`dftd2qe_table.cuh`、各 `NEP*` クラスのフック、`run.cu` の検査） |
-| `dftd3.cu` | upstream は 1169 行、本フォークは 2082 行（`git diff aa63ffdd --shortstat`：1437 行追加・524 行削除）。小箱の近傍リスト（ブロック／原子＋スキャン）、小箱・大箱の複数スレッド／原子、C6 因数分解、CN リスト共有を追加し、`atomicAdd` を削除。DR-003 でゼロダンピング（`d3_damped_pair`、`d3_zero_term`、小箱の倍精度 CN、`parse_damping`、`check_elements`）を追加 |
+| `dftd3.cu` | upstream は 1169 行、本フォークは 2084 行（`git diff aa63ffdd --shortstat`：1437 行追加・524 行削除）。小箱の近傍リスト（ブロック／原子＋スキャン）、小箱・大箱の複数スレッド／原子、C6 因数分解、CN リスト共有を追加し、`atomicAdd` を削除。DR-003 でゼロダンピング（`d3_damped_pair`、`d3_zero_term`、小箱の倍精度 CN、`parse_damping`、`check_elements`）を追加 |
 | `dftd3.cuh` | upstream は 92 行、本フォークは 106 行（+15 行・−1 行）。`cn_weight`、`cn_list`、`cn_list_count`、`damping`、`sr6`、`sr8`、`elements_checked`、`parse_damping`、`check_elements`、`initialize` の `damping` 引数 |
 | `dftd3zero_table.cuh` | 新規（生成ファイル） |
 | `gpu_macro.cuh` | `gpuGetDevice`（+2 行） |
@@ -455,12 +456,12 @@ upstream への PR を作る場合は、コード、テスト、例、`doc/` の
 
 | 知りたいこと | 読む場所 |
 |---|---|
-| 経路の判定と箱の拡張 | `get_expanded_box`（`D3:312-371`）、`DFTD3::compute`（`D3:1893-1913`） |
+| 経路の判定と箱の拡張 | `get_expanded_box`（`D3:312-371`）、`DFTD3::compute`（`D3:1895-1915`） |
 | 小箱の近傍リスト | `find_neighbor_list_small_box`（`D3:390-498`） |
 | 力カーネルのペア計算 | `add_dftd3_force_small_box`（`D3:634-777`）。式は 02 章 |
 | BJ とゼロダンピングの減衰 | `d3_damped_pair`（`D3:212-253`）、`d3_zero_term`（`D3:172-205`）。5.1 節 |
-| ゼロダンピングの R0 表と汎関数表 | `dftd3zero_table.cuh`（`DZ:24`、`DZ:433-440`）、`DFTD3::initialize`（`D3:1915-2032`） |
-| `dftd3` の構文と元素検査 | `DFTD3::parse_damping`（`D3:2034-2054`）、`DFTD3::check_elements`（`D3:2056-2082`） |
+| ゼロダンピングの R0 表と汎関数表 | `dftd3zero_table.cuh`（`DZ:24`、`DZ:433-440`）、`DFTD3::initialize`（`D3:1917-2034`） |
+| `dftd3` の構文と元素検査 | `DFTD3::parse_damping`（`D3:2036-2056`）、`DFTD3::check_elements`（`D3:2058-2084`） |
 | 縮約 | `reduce_sub_large_box`（`D3:613-625`）、`SubReduce`（`D2:336-414`）。5.3 節 |
 | C6 因数分解 | `store_cn_weights`、`load_cn_weights`、`get_c6_factorized`（`D3:62-165`）。5.4 節 |
 | CN リスト | `D3:1086-1096`（書き込み）、`D3:1425-1429`（利用）、`D3:973-1004`（容量）。5.5 節 |
