@@ -34,6 +34,22 @@ requirements:
     verification: [specs/verification/VER-0025-dftd2-qe-parameters, specs/verification/VER-0026-dftd2-qe-compat]
     tests: [tests_pytest/test_dftd2_qe.py, tests_pytest/test_dftd2_qe_extended.py]   # R1, R2, R3, R4 implemented and verified (VER-0026): AC-1, 2 (bit identity for R1/R2; AC-1-level comparison for R3 per ADR-0005), 3, 4, 5, 6, 8 met; AC-7 (informative): D2 extra now below the D3 extra at N >= 40,000 on sm_86 (kernel -78%). pytest 1085 passed; full regression = 37 known + 4 unrelated (VER-0026). Open, not acceptance criteria: manifest cases for the regression suite (runner design conflict, human decision pending); A100 timing by the requester; QE 7.2 binary never run (verification against the requester's QE 7.2 data and QE 7.6-dev only, not validation); the PTFE 40,500 force error is 33% of the AC-1 cap (per-pair float arithmetic, pre-existing, grows with N)
     status: implemented
+  - id: DR-005
+    title: qNEP BEC consistent with the gradient of P = sum q r (charge-conserving model)
+    source: specs/requirements/DR-005-qnep-bec-gradient-consistency.md
+    design: specs/design/DES-0005-qnep-charge-conserving-bec.md
+    adrs: [specs/decisions/ADR-0006-qnep-charge-transfer.md]
+    verification: [specs/verification/VER-0028-qnep-bec-gradient, specs/verification/VER-0029-qnep-charge-transfer-reference, specs/verification/VER-0031-bec-nonconservative-decomposition, specs/verification/VER-0032-qnep-charge-transfer-gpu]
+    tests: [tests_pytest/test_qnep_charge_transfer_parse.py, tests_pytest/test_qnep_charge_transfer_bec.py]   # stages 1, 2a, 2b done (q and BEC kernels vs FD, 4 mutants caught; independent review: no BLOCKER, 2 MAJOR fixed); forces/virial/D weights (2c), direct-P output, training side and replica (3), regression (4), retraining (5) NOT done; charge_transfer models refuse to run without the test-only env var GPUMD_CHARGE_TRANSFER_BEC_ONLY
+    status: partial
+  - id: DR-006
+    title: dftd3 must not abort when the box crosses the small/large-box threshold
+    source: specs/requirements/DR-006-dftd3-cell-buffers.md
+    design: ""
+    adrs: []
+    verification: [specs/verification/VER-0030-dftd3-cell-buffers]
+    tests: [tests_pytest/test_dftd3_cell_buffers.py]   # AC-1, AC-2, AC-5 met; AC-3 shown by 5 dftd cases; AC-4 partly: full suite vs stale master-base shows 4 extra failures explained (dftd2 keyword absent in baseline; dftd3 bit-identical to unpatched HEAD), full suite vs HEAD baseline and HIP build not done
+    status: partial
 # Example entry:
 # - id: DR-001
 #   title: Short requirement title
