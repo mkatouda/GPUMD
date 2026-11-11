@@ -44,6 +44,9 @@ The optional partition direction applies only to the multi-GPU implementation
 of standard NEP, temperature-dependent NEP, and ``nep_spin`` models. Charge NEP models
 currently use the single-GPU implementation in ``gpumd``.
 
+qNEP models trained with the :ref:`charge_transfer <kw_charge_transfer>` option are read from ``nep.txt`` with ``potential`` as usual (see :ref:`nep_txt` for the extra line and block in the file).
+They are not supported by ``gpumd_replica``.
+
 Example
 -------
 

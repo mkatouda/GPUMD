@@ -72,6 +72,7 @@ Caveats
 * For qNEP models, the charge values dumped out are predicted by the qNEP models.
   For other models, the charge values are those specified in :attr:`model.xyz` via :attr:`charge:R:1`.
 * The Born effective charge (:term:`BEC`) is only meaningful for a qNEP model trained with target :term:`BEC`.
+  For a qNEP model trained with :ref:`charge_transfer <kw_charge_transfer>`, the BEC is the gradient of the polarization-like quantity :math:`\mathbf{P}` of the model (see :ref:`qnep_charge_transfer_theory`), and the nine components per atom are not symmetric: component ``3*beta+alpha`` is :math:`\partial P_\beta/\partial r_\alpha` (up to the factor :math:`\sqrt{\epsilon_\infty}` of the model).
 * ``spin`` and ``mforce`` are three-component vectors that require both a
   NEP-spin model and ``spin:R:3`` in ``model.xyz``. The XYZ property alone
   does not enable these outputs for other potential models.

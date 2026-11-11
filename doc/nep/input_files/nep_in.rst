@@ -52,6 +52,8 @@ Keywords
      - legacy charge-model selection (deprecated)
    * - :ref:`flip_charge <kw_flip_charge>`
      - reverse charge-output weights when restarting charge-model training
+   * - :ref:`charge_transfer <kw_charge_transfer>`
+     - charge-conserving charge definition for ``qnep2`` and ``qnep3`` (cutoff of the transfer functions)
    * - :ref:`prediction <kw_prediction>`
      - select between training and prediction (inference)
    * - :ref:`zbl <kw_zbl>`

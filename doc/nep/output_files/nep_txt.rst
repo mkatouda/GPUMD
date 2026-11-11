@@ -12,3 +12,36 @@ Spin models are identified by ``model nep_spin`` and ``spin_version 1``.
 See the `NEP model format specification
 <https://github.com/brucefan1983/GPUMD/blob/master/potentials/nep/nep_model_format.md#51-spin-dependent-models-model-nep_spin>`_
 for fields, reference energies, parameter ordering, and scalers.
+
+Charge-transfer qNEP models
+---------------------------
+
+A qNEP model trained with the :ref:`charge_transfer <kw_charge_transfer>` keyword carries one extra line with the cutoff :math:`r_\mathrm{c}^\phi` of the pair functions and one extra block of :math:`N_\mathrm{pair} (N_\mathrm{basis}+1)` coefficients, where :math:`N_\mathrm{pair}=N_\mathrm{type}(N_\mathrm{type}+1)/2` and :math:`N_\mathrm{basis}` is the first value of :ref:`basis_size <kw_basis_size>`.
+Files without the extra line and block are read exactly as before.
+
+**Pair order.**
+The pairs are the upper triangle of the type-pair matrix in row-major order, :math:`t_1 \leq t_2`; the pair index is :math:`p = t_1 N_\mathrm{type} - t_1(t_1-1)/2 + (t_2-t_1)`.
+For two types the order is (0,0), (0,1), (1,1).
+Coefficient :math:`k = 0,\dots,N_\mathrm{basis}` of pair :math:`p` is the value number :math:`p(N_\mathrm{basis}+1)+k` (counted from zero) of the block.
+The pair function is :math:`\phi(r)=\sum_k c_k f_k(r)` with the radial basis functions :math:`f_k` of the model, including the cutoff function for :math:`r_\mathrm{c}^\phi`.
+
+**Layout with** ``format_version 1``.
+The header contains the field ``charge_transfer`` with one value, directly after the ``cutoff`` field, and the coefficients are stored in the block ``phi_parameters``::
+
+  cutoff 6 5 100 100
+  charge_transfer 6
+  n_max 4 4
+  ...
+  @ parameters <N>
+  ...
+  @ q_scaler <N_des>
+  ...
+  @ phi_parameters <N_pair*(N_basis+1)>
+  ...
+
+The block ``phi_parameters`` follows ``q_scaler``.
+The field requires ``qnep2`` or ``qnep3`` and :math:`0<r_\mathrm{c}^\phi\leq` the radial cutoff, and the block must have exactly the size given above; otherwise the file is rejected.
+
+**Legacy layout.**
+For files with a header such as ``nep4_charge2`` or ``nep4_charge3``, the line ``charge_transfer <rc_phi>`` is placed on the line after ``cutoff``, before ``n_max``.
+The phi coefficients are the last values of the file, after the network parameters, the ``q_scaler`` values, and the ZBL parameters (if present); there is no block header.

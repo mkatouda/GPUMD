@@ -10,6 +10,14 @@ This keyword is used to add force due to electric field on atoms in a selected g
 For qNEP models, the force equals to the dot product of the electric field and the Born effective charge (:term:`BEC`). 
 This is only meaningful when the qNEP model was trained with target :term:`BEC`.
 
+.. note::
+
+   For qNEP models trained with :ref:`charge_transfer <kw_charge_transfer>`, the BEC is the exact gradient of the polarization-like quantity :math:`\mathbf{P}` of the model (see :ref:`qnep_charge_transfer_theory`) and the total charge is zero by construction.
+   The BEC array of each atom has nine components and is NOT symmetric: component ``3*beta+alpha`` is :math:`\partial P_\beta/\partial r_\alpha` (up to the factor :math:`\sqrt{\epsilon_\infty}` of the model).
+
+   The force on atom component :math:`\alpha` is :math:`F_\alpha=\sum_\beta Z_{\alpha\beta} E_\beta`, that is, the gradient of :math:`\mathbf{E}\cdot\mathbf{P}` with respect to the positions.
+   Only forces are added: the energy in ``thermo.out`` does not contain :math:`-\mathbf{E}\cdot\mathbf{P}`, so the sum of kinetic and potential energy is not conserved in a field by itself (this sum minus :math:`\mathbf{E}\cdot\mathbf{P}` is).
+
 For other models, the force equals to the product of the electric field and the charge of the atom as specified in :attr:`model.xyz` via :attr:`charge:R:1`.
 
 Syntax
