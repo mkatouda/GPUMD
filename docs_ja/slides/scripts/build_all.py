@@ -1,4 +1,4 @@
-"""Main deck (build_slides.py, 26 slides) + appendix/reference slides + internal links.
+"""Main deck (build_slides.py, 27 slides) + appendix/reference slides + internal links.
 Appendix content is transcribed from docs_ja/dftd and docs_ja/qnep; nothing is newly measured.
 Usage: [RIST_TEMPLATE=/path/RIST-template.pptx] python build_all.py <figures_dir> <out.pptx>"""
 import sys
@@ -600,11 +600,11 @@ app('C-2', 'C-2 用語・略語', [
 ], 'docs_ja/dftd 06 章 6.1 節、docs_ja/dftd 03 章、docs_ja/workreport')
 
 # ---------- internal links from the main slides ----------
-LINKS = {4: ['A-1', 'A-2', 'A-3', 'A-5'], 5: ['A-8', 'A-9', 'A-10', 'A-11', 'A-14'], 6: ['A-14', 'A-16', 'A-22'],
-         7: ['A-12', 'A-13', 'A-15'], 8: ['A-13', 'A-15'], 9: ['A-15', 'A-18', 'A-20'], 10: ['A-22'],
-         11: ['A-13', 'A-16', 'A-21'], 12: ['B-7'], 13: ['B-2'], 14: ['B-2', 'B-3'], 15: ['B-4'],
-         16: ['B-1', 'B-5', 'B-6'], 17: ['B-8', 'B-10'], 18: ['B-7'], 19: ['B-9'], 20: ['B-12'], 21: ['B-12'],
-         22: ['A-20', 'C-1'], 23: ['A-20'], 24: ['C-1'], 25: ['A-21', 'B-12'], 26: ['C-1']}
+LINKS = {4: ['A-1', 'A-2', 'A-3', 'A-5'], 5: ['A-14', 'A-17'], 6: ['A-8', 'A-9', 'A-10', 'A-11', 'A-14'], 7:
+         ['A-14', 'A-16', 'A-22'], 8: ['A-12', 'A-13', 'A-15'], 9: ['A-13', 'A-15'], 10: ['A-15', 'A-18', 'A-20'],
+         11: ['A-22'], 12: ['A-13', 'A-16', 'A-21'], 13: ['B-7'], 14: ['B-2'], 15: ['B-2', 'B-3'], 16: ['B-4'], 17:
+         ['B-1', 'B-5', 'B-6'], 18: ['B-8', 'B-10'], 19: ['B-7'], 20: ['B-9'], 21: ['B-12'], 22: ['B-12'], 23:
+         ['A-20', 'C-1'], 24: ['A-20'], 25: ['C-1'], 26: ['A-21', 'B-12'], 27: ['C-1']}
 for no, keys in LINKS.items():
     sl = MAIN_SLIDES[no - 1]
     x = 0.5

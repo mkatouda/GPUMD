@@ -223,6 +223,20 @@ upstream（v5.9.1 で確認）には同じ不具合が残っている。**upstre
 | 配布バイナリ | `/home/katouda/bin/GPUMD/bec_rev0/`（`93d203d4` から。変更しない） |
 | 環境 | RTX A6000（sm_86）、CUDA 12.3、float32 ビルド、`make CUDA_ARCH="-arch=sm_86" -j4`（警告は既存の `force/eam/eam_alloy.cu:42` のみ） |
 
+## 付録：D3 高速化の作業の流れ（参考）
+
+本書の対象（DR-005、DR-006、2026-11-11）の前に行った D3 の高速化（DR-001）が、どのような段階とゲートで進んだかを 1 枚にまとめた図である。数値は `docs_ja/dftd` と `specs/`（DES-0001、VER-0001〜0020）の転記で、新たな測定はない。詳細は `docs_ja/dftd/` の 3 章（ベンチマーク）、5 章（実装技法、5.7 節の不採用案）、6 章（検証）。
+
+![D3 高速化の作業の流れ](figures/fig13_d3_workflow.png)
+
+*図 13　D3 高速化の作業の流れ。上段：計測 → 主な律速の解消（Phase 3・4）→ 追加の最適化（Phase 7）→ 最終検証（Stage 3）→ 結果と判断。中段：保留・脱落・不採用になった案とその理由。下段：各段階で繰り返した型（診断 → 数値ゲート → 実装 → 精度・回帰 → 独立レビュー → 採否）。*
+
+- 結果（slope 法、master 基準との比較）：水 81 で 16.2 倍、水 648 で 9.6 倍、Cu 4,000 で 6.5 倍、水 5,184 で 5.4 倍、水 41,472 で 1.36 倍（8.398 → 6.193 ms）。水 41,472 の目標 6.0 ms は未達で、人間の判断で取り下げた [VER-0018]。
+- 状態は DR-001「実装済み、未達・未検証の項目を明記」。AC-3 は雑音の範囲でのみ達成、AC-5 の HIP と sm < 60 は未検証 [docs_ja/dftd 6.7 節]。
+- 「Phase 5 半リスト・別ストリーム」は、実施した記録が見つかっていない案である（記録の確認は `docs_ja/dftd` 5.7 節の著者による）。
+
+---
+
 ## 付録：図の出典
 
 | 図 | 出典 |
@@ -235,5 +249,6 @@ upstream（v5.9.1 で確認）には同じ不具合が残っている。**upstre
 | 8、9 | 依頼元の報告 1 章、3 章 |
 | 10、11 | VER-0030 |
 | 12 | `specs/traceability.yaml` と本書 7 章 |
+| 13 | DES-0001（Phase 0〜7 と各 Outcome）、VER-0002、0004、0012〜0020、`docs_ja/dftd` 5.2・5.7・6.7 節 |
 
-図の再生成：`/home/katouda/miniforge3/envs/py312-gpumd/bin/python docs_ja/workreport/scripts/make_figures.py`（matplotlib、フォント Noto Sans CJK JP）。
+図の再生成：`/home/katouda/miniforge3/envs/py312-gpumd/bin/python docs_ja/workreport/scripts/make_figures.py`（図 1〜12）と `.../make_d3_workflow.py`（図 13）（matplotlib、フォント Noto Sans CJK JP）。
