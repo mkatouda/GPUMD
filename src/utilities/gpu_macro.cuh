@@ -48,7 +48,6 @@
 #define gpuSetDevice hipSetDevice
 #define gpuGetDevice hipGetDevice
 #define gpuGetDeviceCount hipGetDeviceCount
-#define gpuGetDevice hipGetDevice
 #define gpuDeviceProp hipDeviceProp_t
 #define gpuGetDeviceProperties hipGetDeviceProperties
 #define gpuDeviceCanAccessPeer hipDeviceCanAccessPeer
@@ -156,7 +155,6 @@
 #define gpuSetDevice cudaSetDevice
 #define gpuGetDevice cudaGetDevice
 #define gpuGetDeviceCount cudaGetDeviceCount
-#define gpuGetDevice cudaGetDevice
 #define gpuDeviceProp cudaDeviceProp
 #define gpuGetDeviceProperties cudaGetDeviceProperties
 #define gpuDeviceCanAccessPeer cudaDeviceCanAccessPeer
