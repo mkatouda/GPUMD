@@ -18,7 +18,6 @@ MODELS = {
     "_temperature": ("nep_temperature", 1, 0, 1, 1),
     "_charge1": ("qnep1", 0, 1, 2, 1),
     "_charge2": ("qnep2", 0, 1, 2, 1),
-    "_charge3": ("qnep3", 0, 1, 2, 1),
     "_dipole": ("nep_dipole", 0, 0, 1, 1),
     "_polarizability": ("nep_polarizability", 0, 0, 1, 2),
     "_vdw": ("nep_vdw", 0, 1, 1, 1),
@@ -93,9 +92,17 @@ def read_model(filename):
         has_zbl = suffix.startswith("_zbl")
         if has_zbl:
             suffix = suffix[4:]
-        if suffix not in MODELS:
+        if suffix == "_charge3":
+            # fork extension (DR-005): charge3 is converted only with a charge_transfer line
+            with filename.open(encoding="utf-8-sig") as scan:
+                if not any(t[0].lower() == "charge_transfer" for _, t in records(scan)):
+                    raise ValueError(f"{where}: unsupported model '{header[0]}'")
+            model_info = ("qnep3", 0, 1, 2, 1)
+        elif suffix in MODELS:
+            model_info = MODELS[suffix]
+        else:
             raise ValueError(f"{where}: unsupported model '{header[0]}'")
-        name, extra_inputs, extra_outputs, globals_count, ann_count = MODELS[suffix]
+        name, extra_inputs, extra_outputs, globals_count, ann_count = model_info
         tensor = name in ("nep_dipole", "nep_polarizability")
         if has_zbl and tensor:
             raise ValueError(f"{where}: ZBL is not supported for {name}")

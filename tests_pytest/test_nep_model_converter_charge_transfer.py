@@ -175,3 +175,23 @@ def test_restart_with_charge_transfer_refused(tmp_path):
                      '--restart-output', str(tmp_path / 'new.restart'))
     assert r.returncode != 0 and 'charge_transfer' in r.stderr, r.stderr
     assert not dst.exists() and not (tmp_path / 'new.restart').exists()
+
+
+@pytest.mark.parametrize('tag', ['nep4_charge3', 'nep4_zbl_charge3'])
+def test_charge3_without_charge_transfer_rejected_as_before(tmp_path, tag):
+    legacy = mk.make_legacy_text(1, 4.0, 3.5, 4.0, False, charge_mode=3)
+    lines = legacy.splitlines()
+    lines[0] = lines[0].replace('nep4_charge3', tag)
+    if 'zbl' in tag:
+        lines.insert(1, 'zbl 1 2')
+    r, dst = convert(tmp_path, '\n'.join(lines) + '\n')
+    assert r.returncode == 2
+    assert r.stderr.strip().endswith("legacy.txt:1: unsupported model '%s'" % tag), r.stderr
+    assert not dst.exists()
+
+
+def test_charge3_with_charge_transfer_still_converts_to_qnep3(tmp_path):
+    r, dst = convert(tmp_path, mk.make_legacy_text(1, 4.0, 3.5, 4.0, True, charge_mode=3))
+    assert r.returncode == 0, r.stderr
+    _, fields, blocks = parse_new(dst)
+    assert fields['model'] == ['qnep3'] and blocks['phi_parameters#count'] == 15
