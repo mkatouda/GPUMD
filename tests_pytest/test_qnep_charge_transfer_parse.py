@@ -1,4 +1,4 @@
-"""Parser tests for the qNEP `charge_transfer` nep.txt line (DR-005 stage 2b, ADR-0006).
+"""Parser tests for the qNEP `charge_transfer` field and `phi_parameters` block of nep.txt (DR-005 stage 2b, ADR-0006).
 
 Synthetic models only (random weights from VER-0032 make_ct_model.py). A valid charge_transfer
 model parses, prints a summary and the stage-2b warning (forces are not valid yet), and runs;
@@ -42,7 +42,7 @@ def _run(
 
 def _model(**kw):
     return mk.make_model_text(1, kw.get('rc_radial', 4.0), 3.5, kw.get('rc_phi', 4.0),
-                              kw.get('with_ct', True))
+                              kw.get('with_ct', True), charge_mode=kw.get('charge_mode', 2))
 
 
 def _out(r):
@@ -83,39 +83,38 @@ def test_rc_phi_smaller_than_radial_is_accepted(tmp_path):
 def test_rc_phi_larger_than_radial_is_error(tmp_path):
     r = _run(tmp_path, _model(rc_phi=4.5))
     assert r.returncode != 0
-    assert 'rc_phi must not exceed the radial cutoff' in _out(r)
+    assert 'charge_transfer requires 0 < rc_phi <= the radial cutoff' in _out(r)
 
 
 @pytest.mark.parametrize('value', ['0', '-1'])
 def test_rc_phi_nonpositive_is_error(tmp_path, value):
     r = _run(tmp_path, _model().replace('charge_transfer 4', f'charge_transfer {value}'))
-    assert r.returncode != 0 and 'rc_phi must be positive' in _out(r)
+    assert r.returncode != 0 and 'charge_transfer requires 0 < rc_phi' in _out(r)
 
 
 def test_missing_rc_phi_value_is_error(tmp_path):
     r = _run(tmp_path, _model().replace('charge_transfer 4\n', 'charge_transfer\n'))
-    assert r.returncode != 0 and 'This line should be charge_transfer rc_phi' in _out(r)
+    assert r.returncode != 0 and "incorrect number of values in 'charge_transfer'" in _out(r)
 
 
 def test_charge_mode_1_is_error(tmp_path):
-    # the check fires at the charge_transfer line, before any parameter is read
-    text = _model().replace('nep4_charge2', 'nep4_charge1', 1)
-    r = _run(tmp_path, text)
+    # qnep1 shares the qnep2 block layout; the reader refuses charge_transfer for it
+    r = _run(tmp_path, _model(charge_mode=1))
     assert r.returncode != 0
-    assert 'only for charge_mode 2 and 3' in _out(r)
+    assert 'charge_transfer requires qnep2 or qnep3' in _out(r)
 
 
 def test_too_few_phi_coefficients_is_error(tmp_path):
     lines = _model().rstrip('\n').split('\n')
     r = _run(tmp_path, '\n'.join(lines[:-2]) + '\n')
     assert r.returncode != 0
-    assert 'expected 15 phi coefficients' in _out(r)
+    assert "block 'phi_parameters' requires 15 values, found 13" in _out(r)
 
 
 def test_too_many_phi_coefficients_is_error(tmp_path):
     r = _run(tmp_path, _model() + '0.5\n')
     assert r.returncode != 0
-    assert 'parameter-count mismatch' in _out(r)
+    assert "block 'phi_parameters' requires 15 values, found 16" in _out(r)
 
 
 @pytest.mark.parametrize('structure', mk.STRUCTURES)
