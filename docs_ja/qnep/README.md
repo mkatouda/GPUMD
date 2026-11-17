@@ -11,7 +11,7 @@
 | 対象とする要求 | DR-005（qNEP の BEC を分極 P の勾配と整合させる）。状態は **`partial`**（段階 1〜4 の大部分は完了。段階 3b の GPU 検証、全回帰、段階 5 の再学習は未完。05 章） |
 | 動作確認環境 | NVIDIA RTX A6000（sm_86）、CUDA 12.3、float32 ビルド（`make CUDA_ARCH="-arch=sm_86" -j4`） |
 | 検証に使ったデータ | **合成データのみ**（乱数の重みと構造）。物理的な妥当性は未確認（Tier P：試作） |
-| 配布バイナリ | `/home/katouda/bin/GPUMD/bec_rev0/`（コミット `93d203d4` から。`gpumd_replica` は `charge_transfer` を受け付けない版） |
+| 配布バイナリ | `/home/katouda/bin/GPUMD/bec_rev0/`（コミット `93d203d4` から。`gpumd_replica` は `charge_transfer` を受け付けない旧版。上流取り込み後は `gpumd_replica` 自体が無く、`multi_replica` に統合） |
 
 ## 目次
 

@@ -60,7 +60,7 @@ upstream/master（`aa63ffdd`）との差分（`git diff aa63ffdd --stat -- src`�
 
 `src/model/box.cuh:84` の `apply_mic(box, float&...)`（最小イメージ規約）と `src/model/box.cu:80-109` の `Box::get_num_bins`（補助関数 `get_num_bins_one_direction` を含む）も大箱経路が使う共有コードです。
 
-`src/main_replica`（`gpumd_replica`）には D3/D2 のコードがありません（`grep -ril dftd src/main_replica` で該当なし）。`makefile` と CMake は `src/force/*.cu` と `src/force/*/*.cu` を glob で拾うため（`src/makefile:60-61`、`CMakeLists.txt:27-28`）、`src/force/dftd2.cu` も `src/force/dftd3/dftd3.cu` も、新ファイルを追加してもビルド定義の変更は不要です（AGENTS.md「Build」）。サブフォルダの更に深い階層に置くとこの glob では拾われません。
+`gpumd_replica` と `src/main_replica` は 2026-11-18 の上流取り込みで廃止されました（以前は D3/D2 のコードがありませんでした）。replica 動力学は `gpumd` 内の `multi_replica`（`src/force/replica/`、`src/integrate/replica/`）で、そこでは `dftd2`/`dftd3` キーワードは入力エラーで拒否されます。`makefile` と CMake は `src/force/*.cu` と `src/force/*/*.cu` を glob で拾うため（`src/makefile:60-61`、`CMakeLists.txt:27-28`）、`src/force/dftd2.cu` も `src/force/dftd3/dftd3.cu` も、新ファイルを追加してもビルド定義の変更は不要です（AGENTS.md「Build」）。サブフォルダの更に深い階層に置くとこの glob では拾われません。
 
 ## 4.2 NEP / NEP_Charge への組み込み
 

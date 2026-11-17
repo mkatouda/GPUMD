@@ -11,7 +11,7 @@
 | 2b | GPU の電荷・BEC のカーネル（大箱・小箱）。FD と参照との比較 | VER-0032 | 完了 |
 | 2c | 力・ビリアルの参照実装（VER-0033）と GPU（VER-0034）。NVE、電場、閉ループ、モード 3、三斜晶 | VER-0033、VER-0034 | 完了 |
 | 3a | 学習側（`nep`）。A4（`nep` 対 `gpumd`）、変異試験、学習の動作確認 | VER-0035 | 完了 |
-| 3b | `gpumd_replica`（モード 2） | VER-0036 | **コードのみ。GPU 検証は未実施** |
+| 3b | `multi_replica`（`gpumd` 内。旧 `gpumd_replica`） | VER-0036、VER-0037 | コード済み。GPU 検証（エネルギー・力）は VER-0037 ゲート B3 で合格。ビリアルは未検証 |
 | 4 | 文書（`doc/` と本マニュアル）。全回帰 | — | 文書は完了、**全回帰は未実施** |
 | 5 | 再学習（5a：表現力の短い確認、5b：本学習） | — | 依頼元（GPUMD-polymer-apps）側で実施中（05 章） |
 
@@ -119,11 +119,15 @@
 4. **学習の動作確認**：教師（乱数モデル、seed 3）が薄い周期構造 6 個（10・12 原子）にラベルを付け、生徒（`charge_transfer 4`、population 30）が学習。30 世代で損失 21.64 → 9.91、100 世代で 21.64 → 7.72。書き出した `nep.txt` を `nep` で予測すると力 RMSE が `loss.out` と一致（3.41079）、gpumd でも一致。`nep.restart` からの再開は続きから走る（再開後の最初の損失 8.13、新規開始は 21.6）。
 5. **入力検査**（pytest 13 件、9 秒）：A4（qnep2/3、rc_phi 4/3、2・3 型）、`charge_transfer` の値の 5 種のエラー、4 種の組み合わせエラー、動作確認。
 
-## 4.7 `gpumd_replica`（段階 3b、VER-0036）
+## 4.7 replica（`multi_replica`、段階 3b、VER-0036、VER-0037）
+
+（2026-11-18 上流取り込み後: `gpumd_replica` と `src/main_replica` は存在しません。replica 動力学は `gpumd` 内の `multi_replica`（`src/force/replica/`、`src/integrate/replica/`）です。以下の VER-0036 の記述は当時の `src/main_replica` についての履歴で、現在の GPU 検証結果は末尾の項目にあります。）
 
 - コードは書かれ、`src/main_replica` で警告なしにビルドされました（`git clang-format --diff` も差分なし）。旧カーネルの SASS の比較は 3.4 節。
-- **GPU での試験は未実施**です。試験は `tests_pytest/test_replica_charge_transfer.py` に書いてありますが、実行していません。
+- （VER-0036 当時）GPU での試験は未実施でした。試験は `tests_pytest/test_replica_charge_transfer.py` に書いてありましたが、実行していませんでした。
 - 計画した基準：`|ΔE|/N ≤ 1×10⁻⁴`、RMS ΔF ≤ 1×10⁻⁴ eV/Å、RMS ΔW / RMS W ≤ 1×10⁻⁴（`GPUMD_REPLICA_STATE_DUMP` で各レプリカの状態をダンプして `gpumd` の静的計算と比較。厚い n45/L14（rc 3.5、大箱）、薄い n12/L7.5（小箱）、2 レプリカと 4 レプリカ、三斜晶も）。拒否の試験（モード 3、不正な φ ブロック、`rc_phi > rc_radial`）、旧経路の緩い守り（|ΔE|/N ≤ 1×10⁻³、RMS ΔF ≤ 5×10⁻³）も含みます。
+
+- **GPU 検証（VER-0037 ゲート B3、2026-11-18、上流取り込み後の `gpumd`）**：`charge_mode` 2 と 3 の `charge_transfer` で、エネルギーと力が合格。`gpumd` 通常実行に対する自己較正で、床 1.8〜2.0×10⁻⁸、RMS ΔF ≤ 1.1×10⁻⁸ eV/Å（ゲート 1×10⁻⁴）、ΔE/N = 0（ゲート 1×10⁻⁴）。`charge_mode 3` は小さい系のみ。**ビリアルのゲートは未検証**（人間の決定 2026-11-11 c）。replica は BEC を計算せず、`add_efield`、`compute_dpdt`、`dump_xyz bec` を拒否し、qNEP のバッチ積分は無効、可変 ZBL と `charge_transfer` の併用は拒否されます。
 
 ## 4.8 独立レビュー
 

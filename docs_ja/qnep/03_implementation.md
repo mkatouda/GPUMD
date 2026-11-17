@@ -9,7 +9,7 @@
 | `src/main_nep/nep_charge/nep_charge_transfer.cuh`（新規）、`nep_charge.cu` | 学習側（`nep`）のカーネル。gpumd の移植（算術は同じ。型 `NEP_Charge::ParaMB/ANN` が `force/` と `main_nep/` で別で、近傍リストの配置も違うため、ヘッダーの共有は不可能） |
 | `src/main_nep/common/`（`nep_parameters.cu`、`nep_charge_parameters.cu`、`nep_charge_reader.cu`、`nep_io.cu`） | キーワードの解析と検査、パラメータ数、`nep.txt` の入出力、`charge=` ラベルの検査 |
 | `src/utilities/nep_io/`（`nep_model_file*.cu*`、`compact_nep.cu`） | `nep.txt` の新形式 ↔ legacy テキストの変換、化学種の圧縮（φ ブロックのペアの部分選択）。旧経路の不具合を 1 件修正（VER-0035） |
-| `src/main_replica/force/nep_charge_transfer.cuh`（新規）、`nep_charge.cu`、`nep_charge.cuh` | `gpumd_replica` 側。gpumd のヘッダーのコピー（共有しない。BEC のカーネルは移植しない）。モード 2 のみ |
+| `src/main_replica/force/nep_charge_transfer.cuh`（新規）、`nep_charge.cu`、`nep_charge.cuh` | （2026-11-18 以前の構成。`src/main_replica` は上流取り込みで廃止され、現在は `src/force/replica/replica_nep_charge_transfer.cuh`。3.4 節）`gpumd_replica` 側。gpumd のヘッダーのコピー（BEC のカーネルは移植しない） |
 | テスト | `tests_pytest/test_qnep_charge_transfer_{parse,bec,forces,field}.py`、`test_nep_charge_transfer_train.py`、`test_replica_charge_transfer.py`。生成器・参照実装・検証スクリプトは `specs/verification/VER-0029/0032〜0036/scripts/` |
 
 仕様書の置き場所は `specs/`（フォーク専用。upstream への PR には含めない）です。
@@ -45,9 +45,11 @@
 - 長距離は Ewald（α = π / rc_radial、`|k|² < (2πα)²`）で、`gpumd` の `kspace ewald` と同じ設定です（検証のため設定を合わせる必要はありません）。
 - 薄い箱（L < 2 rc）は、学習側の内部の複製を使います（gpumd との一致で確認 [VER-0035]）。
 
-## 3.4 `gpumd_replica`
+## 3.4 `gpumd_replica`（現在は `multi_replica`）
 
-[VER-0036]
+[VER-0036、VER-0037]
+
+（2026-11-18 上流取り込み後: `gpumd_replica` と `src/main_replica` は存在しません。replica 動力学は `gpumd` 内の `multi_replica`（`src/force/replica/`、`src/integrate/replica/`）で、`charge_transfer` の力の経路は `src/force/replica/replica_nep_charge_transfer.cuh` に移植され、`charge_mode` 2 と 3 に対応します。h のコピーは `gpuMemcpyAsync` です。以下の項目は VER-0036 当時の `src/main_replica` の記述（履歴）で、BEC を計算しない・qNEP のバッチ積分は無効・可変 ZBL と併用不可、は現在も同じです。）
 
 - 追加：`ParaMB::{charge_transfer, rc_phi, num_phi_pairs, num_phi_per_pair}`、`ANN::phi_coeff`、`NEP_Charge_Data::{phi_parameters, ct_h, ct_Dt, ct_V}`。パーサーは `cutoff` の直後の `charge_transfer rc_phi`（`charge_mode` 2/3、`0 < rc_phi ≤ rc_radial`、`gpumd` と同じエラー文）と、q_scaler の後の φ ブロック（EOF までを要求）を読みます。バッファは構造体の構築時に確保し、`compute()` では確保しません。
 - 力の経路：`zero_total_charge` を、h のコピー（`copy_from_device_async`、レプリカのストリーム）と `ct_find_charge_*` に置換。BEC カーネル（`find_bec_*`、`scale_bec`）は**省略**。`zero_mean_D_real` を `ct_find_Dt_and_pair_force_*` に置換し、`ct_Dt` を力カーネルの重みにします。

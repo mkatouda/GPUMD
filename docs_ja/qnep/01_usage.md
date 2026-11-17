@@ -80,14 +80,18 @@ run 1000
 | 0 でない `charge=` ラベル | "charge_transfer models are neutral by construction, but a structure has a non-zero charge= label" |
 | 既存の `nep.txt` を読む予測モードで、`nep.in` の `charge_transfer` と `nep.txt` の設定が不一致 | エラー |
 
-`gpumd` / `gpumd_replica`（`nep.txt` を読む側）：`charge_mode` が 2/3 以外、`rc_phi ≤ 0`、`rc_phi > rc_radial`、φ ブロックの個数の過不足はエラーです。`vdw`/`charge_vdw`/spin のモデルは新形式の読み取りで `unhandled field 'charge_transfer'` として拒否されます。
+`gpumd`（`multi_replica` を含む。`nep.txt` を読む側）：`charge_mode` が 2/3 以外、`rc_phi ≤ 0`、`rc_phi > rc_radial`、φ ブロックの個数の過不足はエラーです。`vdw`/`charge_vdw`/spin のモデルは新形式の読み取りで `unhandled field 'charge_transfer'` として拒否されます。
 
-## 1.5 `gpumd_replica`
+（2026-11-18 上流取り込み後: 上流が旧形式（1〜6）の `nep.txt` を廃止したため、`charge_transfer` 行を持つ旧形式のファイル（`nep4[_zbl]_charge2`/`_charge3`）は `potentials/nep/nep_model_converter.py` で変換してから読みます。変換で `energy_reference` は 0 になります（`potentials/nep/nep_model_format.md` 7.1 節）。）
 
-- `qnep2`（`nep4_charge2`）のみ対応です。`charge_mode 3`（`nep4_charge3`）は、`gpumd_replica` が元々知らないモデル名のため既存の検査で拒否されます。
-- `gpumd_replica` では BEC を計算しません（`charge_transfer` モデルでは BEC のカーネルを省略）。
+## 1.5 replica（`multi_replica`）
+
+（2026-11-18 上流取り込み後: `gpumd_replica` 実行ファイルと `src/main_replica` は無くなり、replica 動力学は `gpumd` 内の `multi_replica`（`src/force/replica/`、`src/integrate/replica/`）です。）
+
+- `charge_mode 2`（`nep4_charge2`）と `charge_mode 3`（`nep4_charge3`）の `charge_transfer` に対応します（エネルギーと力）。
+- replica では BEC を計算しません（`charge_transfer` モデルでは BEC のカーネルを省略）。`add_efield`、`compute_dpdt`、`dump_xyz bec` は入力エラーで拒否されます。qNEP のバッチ積分は無効です。
 - 可変 ZBL（flexible ZBL）と `charge_transfer` の併用は、配置が未定義のため拒否されます。
-- **GPU での検証は未実施**です（05 章）。配布済みの `bec_rev0` の `gpumd_replica` は、`charge_transfer` を受け付けない版（3b より前）です。
+- GPU 検証：エネルギーと力は VER-0037 ゲート B3 で合格（ゲート 1×10⁻⁴）。**ビリアルは未検証**です（05 章）。配布済みの `bec_rev0`（コミット `93d203d4`）の `gpumd_replica` は、`charge_transfer` を受け付けない旧バイナリで、歴史的にそのままです。
 
 ## 1.6 利用上の注意
 

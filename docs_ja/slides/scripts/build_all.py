@@ -390,7 +390,7 @@ app('A-20', 'A-20 受入基準の状況: DR-004（D2 QE 型）と DR-006', [
         ['DR-004 AC-4〜6（複製・薄い箱、有限差分・NVE、入力エラー）', '達成（NVE は参考値で系統的なドリフトは見えず。証明ではない）'],
         ['DR-004 AC-7 性能（参考）', 'sm_86 で達成: N ≥ 40,000 で D2 extra < D3 extra。A100 は未測定'],
         ['DR-006 AC-1〜3、AC-5（修正、試験、遷移のない実行の不変）', '達成'],
-        ['DR-006 AC-4（--suite full）', 'HEAD 基準では未実施。HIP は未検証'],
+        ['DR-006 AC-4（--suite full）', 'HEAD 基準では未実施。上流取り込み後のツリーで実施済み（VER-0037 B4）。HIP は未検証'],
     ], [5.4, 3.6], 10),
     ('txt', 'DR-006 の状態は partial。DR-004 の文書は、本マニュアルの 04 章が D2 QE を未反映（upstream マージ後に更新予定）', 10),
 ], 'docs_ja/dftd 06 章 6.7 節（VER-0025、VER-0026、VER-0030）')
@@ -478,12 +478,12 @@ app('B-5', 'B-5 gpumd の 1 ステップの流れ', [
              '新しい総和は double で累算。近傍は動径リストで a 中心の和だけなので、新たな近傍リストや二段の最小イメージは不要。新カーネルは汎用経路のみ'], 12),
 ], 'docs_ja/qnep 03 章 3.1〜3.2 節（VER-0032、VER-0034）')
 
-app('B-6', 'B-6 学習側（nep）と gpumd_replica', [
+app('B-6', 'B-6 学習側（nep）と replica（multi_replica）', [
     ('bul', ['学習側: number_of_variables += pairs × (basis_size_radial + 1)。φ ブロックはベクトルの末尾で、nep.restart に含まれる',
              '流れ: 記述子 → ANN（h）→ ct_find_charge → BEC（項 B + 項 A、scale_bec）→ 長距離（q）→ ct_find_Dt_and_pair_force。算術は gpumd と同じ（型が別のためヘッダーは共有しない）',
              'charge_transfer モデルでは enforce_nep_total_charge と subtract_nep_charge_derivative_mean は走らない。0 でない charge= ラベルは入力エラー',
              '学習側の長距離は Ewald（α = π/rc_radial、|k|² < (2πα)²）。薄い箱（L < 2 rc）は学習側の内部の複製を使う（gpumd との一致で確認、VER-0035）',
-             'gpumd_replica: モード 2 のみ。BEC カーネルは移植せず、zero_total_charge を h のコピーと ct_find_charge_* に置換。バッチ積分には入らない。GPU 検証は未実施（VER-0036）',
+             'replica（旧 gpumd_replica、現在は gpumd 内の multi_replica）: モード 2・3。BEC カーネルは移植せず、zero_total_charge を h のコピーと ct_find_charge_* に置換。バッチ積分には入らない。エネルギー・力の GPU 検証は合格、ビリアルは未検証（VER-0037 B3）',
              'charge_transfer なしのモデルは旧経路を通る。旧カーネルの SASS は 22 本中 20 本が同一（定数バンクの正規化後）'], 12),
 ], 'docs_ja/qnep 03 章 3.3〜3.4 節（VER-0035、VER-0036）')
 
@@ -495,8 +495,8 @@ app('B-7', 'B-7 検証の段階の構成（DES-0005 6 節）', [
         ['2b', 'GPU の電荷・BEC カーネル（大箱・小箱）。FD と参照との比較', 'VER-0032', '完了'],
         ['2c', '力・ビリアルの参照（VER-0033）と GPU（VER-0034）。NVE、電場、閉ループ、モード 3、三斜晶', 'VER-0033/0034', '完了'],
         ['3a', '学習側 nep。A4（nep 対 gpumd）、変異試験、学習の動作確認', 'VER-0035', '完了'],
-        ['3b', 'gpumd_replica（モード 2）', 'VER-0036', 'コードのみ。GPU 検証は未実施'],
-        ['4', '文書（doc/ と本マニュアル）。全回帰', '—', '文書は完了、全回帰は未実施'],
+        ['3b', 'multi_replica（旧 gpumd_replica）', 'VER-0036/0037', 'エネルギー・力の GPU 検証は合格、ビリアルは未検証'],
+        ['4', '文書（doc/ と本マニュアル）。全回帰', '—', '文書は完了、全回帰は上流取り込み後に実施済み（VER-0037 B4）'],
         ['5', '再学習（5a 表現力の短い確認、5b 本学習）', '—', '依頼元側で実施中'],
     ], [0.8, 5.0, 1.5, 1.7], 10),
 ], 'docs_ja/qnep 04 章 4.1 節')
@@ -557,7 +557,7 @@ app('B-12', 'B-12 理論面の限界、代替案、未完了の作業', [
     ('bul', ['q = L h（L はラプラシアン型の演算子、h は局所）の形は、表せる中性の電荷パターンを制限する。実データでの BEC の精度が落ちる可能性（DR-005 A6）。5a の短い学習で確認中',
              'φ の正値性は強制していない。電荷は目標値で学習せず、BEC・エネルギー・力・ビリアルのラベルで学習する',
              '検討した代替案（採用せず、5a が不合格のときに再検討）: ペアのネットワークによる環境依存の φ、ボンド電荷増分のみのモデル（環境依存が弱すぎる）、直接の双極子モデル（nep_dipole）',
-             '未完了: gpumd_replica の GPU 検証、全回帰（人間の合図）、nep 対 gpumd の差の床（gpumd 同士）の測定、直接の P 出力（DES-0005 3b）、HIP ビルド',
+             '未完了: replica のビリアルのゲート（エネルギー・力の GPU 検証と全回帰は VER-0037 で実施済み）、nep 対 gpumd の差の床（gpumd 同士）の測定、直接の P 出力（DES-0005 3b）、HIP ビルド',
              '依頼元側: 5b（10000 世代、seed 1〜3）の結果。C の対角 BEC のずれ（−0.28 e）の見立ては 5b の後',
              '実データの 5a: held-out BEC RMSE 0.159 e（旧 0.112 e、比 1.4、ゲート ≤ 2×）。未収束・1 seed・20 構造のみ'], 12),
 ], 'docs_ja/qnep 02 章 2.6 節、05 章（DES-0005 7 節）')
@@ -581,7 +581,7 @@ app('C-1', 'C-1 記録の対応表（DR / ADR / VER）', [
         ['VER-0030', 'dftd3 のセルバッファ（DR-006）'],
         ['VER-0032〜0036', 'charge_transfer の GPU（BEC、力・ビリアル）、参照（力）、学習側（nep）、replica'],
     ], [2.9, 6.1], 10),
-    ('txt', 'upstream 側の記録: UPSTREAM-0001（極端な配位数）、UPSTREAM-0002（コード読解のみの注意 A〜F）、UPSTREAM-0003（dftd3 のセルバッファ。報告・PR は送っていない）', 10),
+    ('txt', 'upstream 側の記録: UPSTREAM-0001（極端な配位数）、UPSTREAM-0002（コード読解のみの注意 A〜F）、UPSTREAM-0003（dftd3 のセルバッファ。取り下げ済み、上流が c79ed9a4 で修正済み）', 10),
 ], 'specs/（requirements、design、decisions、verification、upstream-issues）、specs/traceability.yaml')
 
 app('C-2', 'C-2 用語・略語', [

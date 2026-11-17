@@ -601,7 +601,7 @@ cost          = N * cells_visited / num_cells  +  3.0 * cells_visited
 | 11 | **AC-4（N = 41,472 で 6.0 ms 以下）は slope 法で未達**（6.19 ms）。人間の判断（2026-11-04）で目標を取り下げ | 記録済み | DR-001 AC-4、VER-0018 |
 | 12 | **速度のしきい値は RTX A6000 での調整**：`TARGET_THREADS_PER_SM = 640`、大箱の 4,125 / 340,000 / 100,000 など。他の GPU は未測定 | 未検証 | `D3:569-575, 901-906` |
 | 13 | **回帰 manifest の `dftd3_single_late` の reason 欄が古い**：「unordered double-precision GPU atomicAdd」とあるが、Phase 7 で D3 から `atomicAdd` が除かれた。manifest は編集していない | 記述の不一致のみ | `manifest.json:4139` 付近 |
-| 14 | **HIP と `gpumd_replica`**：HIP ビルドは未検証（VER-0027 でも `make -f makefile.hip` と `make gnep` は未実行）、`gpumd_replica` に D3/D2 のコードがない | 未検証 | 04 章 4.1、4.7 節、VER-0027 |
+| 14 | **HIP と `gpumd_replica`**：HIP ビルドは未検証（VER-0027 でも `make -f makefile.hip` と `make gnep` は未実行）、`multi_replica`（旧 `gpumd_replica`、2026-11-18 の上流取り込みで `gpumd` に統合）では dftd2/dftd3 は入力エラーで拒否される | 未検証 | 04 章 4.1、4.7 節、VER-0027 |
 | 15 | **AC-5：D3(0) の小箱経路と大箱経路の差**：同じ原子を大箱の分岐に複製したときのビリアルの差が、heavy_cluster で ADR-0002 の上限の 1.14 倍（graphite 0.45、water27 0.02）。BJ（develop のコード）でも 1.72 倍で、ゼロ固有ではない。**大箱の CN カーネルは float のまま**（double にすると悪化したため元に戻した）。原因は特定していない。参照ビリアルが小さく項の相殺が強い系で出うる | 人間が例外として承認（2026-11-06）。上記 3 系以外は未測定 | DR-003 AC-5、VER-0024 5 節、5.1.4 項、06 章 6.10.4 節 |
 | 16 | **D2：PTFE 40,500 原子の力の誤差が上限の 33.0 %**（旧カーネルの値で、R3 前から。ペアごとの float 演算が決めており、累算ではない）。**この余裕は N とともに縮む**。R3 後の採用変種は旧カーネルとの差が上限の 5×10⁻¹⁰ 以下なので、同じ水準が残る。40,500 より大きい系は測定していない | 記録済み。N > 40,500 は未測定 | VER-0026 5 節、5.6.6 項 |
 | 17 | **Z ≥ 87 は D3(0) と D2（両方の表）で非対応**：構造に Z ≥ 87 の原子種があるとエラー（元素名つき）。D3 の BJ は Z ≤ 94。Z = 87〜94 の r0ab、C6 は dftd3-lib（と QE）と simple-dftd3 で異なり、どちらが正しいか決めていない | 設計（DR-003 D5、DR-002 D5、ADR-0004 項目 4）。BJ には適用されない | VER-0023 5 節、5.1.3 項、5.6.5 項 |

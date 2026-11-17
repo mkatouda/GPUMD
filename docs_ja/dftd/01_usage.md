@@ -276,7 +276,7 @@ cp -r examples/gpumd_dftd3 /tmp/gpumd_dftd3 && cd /tmp/gpumd_dftd3
 | 注意 3 | `rc_pot`、`rc_cn` の範囲検査が無く、負値・0・`rc_cn` > `rc_pot` が受理される。小箱判定とセル幅は `rc_pot` だけで決まるため、`rc_cn` > `rc_pot` では配位数の数え落としが起こり得る（推論）[UPSTREAM-0002 E] | `0 < rc_cn ≤ rc_pot` を守る |
 | 注意 4 | 元素記号が一致しないとき `atomic_number` が未初期化のまま使われ、`DFTD3 only supports elements from H to Pu.` が確実には出ない [UPSTREAM-0002 A] | NEP ファイル 1 行目の元素記号の綴りを確認する |
 | 注意 5 | 近傍数が `MN = 10000` を超えても検査がなく、範囲外書き込みが起こり得る（再現はしていない）。`dftd3.rst` にも「検査しない」と記載 [UPSTREAM-0002 D、dftd3.rst] | 水で `rc_pot` を 28 Å 以上にしない（目安。密度が高い系ではより小さくする） |
-| 注意 6 | **（修正済み、DR-006）** 小箱経路から始めた実行で、`npt_*` や `deform` により箱の厚さが `2.5 rc_pot` を超えると、修正前は `force/neighbor.cu:193` の `CUDA Error ... invalid argument` で異常終了していました（セルリスト配列が未確保のため。UPSTREAM-0002 F の疑いを依頼元の報告で確認し、本フォークで再現して修正）。現在は、小箱 → 大箱、大箱 → 小箱、往復のいずれも完走します [UPSTREAM-0003、VER-0030] | 本フォークの `b90c2920` 以降では対策不要です。**それより前のビルドと upstream（v5.9.1 で確認）では、小箱から始めて箱が `2.5 rc_pot` を超え得る NPT・`deform` を `dftd3` 付きで走らせない**（大箱から始めて小箱に縮む実行は元から正常）。upstream へは未報告 |
+| 注意 6 | **（修正済み、DR-006）** 小箱経路から始めた実行で、`npt_*` や `deform` により箱の厚さが `2.5 rc_pot` を超えると、修正前は `force/neighbor.cu:193` の `CUDA Error ... invalid argument` で異常終了していました（セルリスト配列が未確保のため。UPSTREAM-0002 F の疑いを依頼元の報告で確認し、本フォークで再現して修正）。現在は、小箱 → 大箱、大箱 → 小箱、往復のいずれも完走します [UPSTREAM-0003、VER-0030] | 本フォークの `b90c2920` 以降では対策不要です。**それより前のビルドと upstream v5.9.1（確認時点。2026-11-18 の上流 `5c67f365` では `c79ed9a4` で修正済み）では、小箱から始めて箱が `2.5 rc_pot` を超え得る NPT・`deform` を `dftd3` 付きで走らせない**（大箱から始めて小箱に縮む実行は元から正常）。UPSTREAM-0003 は取り下げ済み（上流で修正済み、`c79ed9a4`） |
 | 注意 7 | 配位数項による力の、原子ごとのビリアルへの配分が非対称（相手の D_j のみ）。全ビリアルは正しい [コード、UPSTREAM-0002 G] | 原子ごとのビリアルを使う解析では、この配分に注意する |
 | 注意 8 | 定数 `HartreeBohr6` が CODATA 2018 から求めた値より相対 +8.7×10⁻⁷ 大きい。出典がコードに明記されていない [UPSTREAM-0002 B] | D3 のエネルギーが約 1×10⁻⁶ の相対オーダーで系統的にずれ得る（本フォークの精度許容値 2×10⁻⁶ の約 44%） |
 
@@ -284,7 +284,7 @@ cp -r examples/gpumd_dftd3 /tmp/gpumd_dftd3 && cd /tmp/gpumd_dftd3
 
 - 二体項のみ（ATM 三体項なし）、汎関数は PBE との比較のみ検証、D3 の参照試験に使った元素は H、C、O、Cu のみです [VER-0001]。
 - D2 は中性原子の固定 C6 で、イオン性・金属系は過剰結合になり得ます。熱輸送計算（`compute_hac`、`compute_hnemd`、`compute_shc`）は D2 の既定カットオフで検証していません [dftd2.rst]。
-- 複数 GPU 版 NEP、HIP、`gpumd_replica` は 1.3 節の通り非対応または未検証です。
+- 複数 GPU 版 NEP、HIP、`multi_replica`（dftd2/dftd3 は入力エラーで拒否）は 1.3 節の通り非対応または未検証です。
 - DFT・実験に対する妥当性確認は行っていません（06 章）。
 
 ## 1.11 関連ファイル
@@ -294,4 +294,4 @@ cp -r examples/gpumd_dftd3 /tmp/gpumd_dftd3 && cd /tmp/gpumd_dftd3
 | 公式マニュアルページ（英語） | `doc/gpumd/input_parameters/dftd3.rst`、`dftd2.rst` |
 | 入力例 | `examples/gpumd_dftd3/`、`examples/gpumd_dftd2/` |
 | 要求仕様 | `specs/requirements/DR-001`（D3 高速化）、`DR-002`（D2） |
-| 既知課題 | `specs/upstream-issues/UPSTREAM-0001`、`UPSTREAM-0002`、`UPSTREAM-0003`（小箱 → 大箱の遷移での異常終了。DR-006 で修正済み） |
+| 既知課題 | `specs/upstream-issues/UPSTREAM-0001`、`UPSTREAM-0002`、`UPSTREAM-0003`（小箱 → 大箱の遷移での異常終了。DR-006 で修正済み。UPSTREAM-0003 は 2026-11-18 に取り下げ、上流で修正済み `c79ed9a4`） |

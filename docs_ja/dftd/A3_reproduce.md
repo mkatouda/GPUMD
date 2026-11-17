@@ -188,6 +188,7 @@ CPU のみ（Python、NumPy）、数秒で終わります。いずれも `python
 | 2026-11-07 | `e1036a4e` | DR-004 R3：`dftd2` のペアカーネルを補償付き float 累算（4 セルごとに double へフラッシュ）に。凍結出力は ADR-0005 に基づき一度だけ再生成 |
 | 2026-11-07 | `9068fa61`, `ee6e24af` | docs_ja の D2 累算の記述更新、VER-0026 の R3 の記録、traceability を「実装済み」に |
 | 2026-11-07 | `aba6b28b` | `wt-d2-qe` のマージ（R3） |
-| 2026-11-11 | `b90c2920` | DR-006：`compute_large_box` のセルリスト配列の確保を `cn` と独立にし、小箱 → 大箱の遷移での異常終了（`neighbor.cu:193`）を修正。試験 `test_dftd3_cell_buffers.py`、UPSTREAM-0003（upstream へは未報告）、VER-0030 |
+| 2026-11-11 | `b90c2920` | DR-006：`compute_large_box` のセルリスト配列の確保を `cn` と独立にし、小箱 → 大箱の遷移での異常終了（`neighbor.cu:193`）を修正。試験 `test_dftd3_cell_buffers.py`、UPSTREAM-0003（当時は未報告。2026-11-18 に取り下げ、上流で修正済み `c79ed9a4`）、VER-0030 |
+| 2026-11-18 | `5c67f365` 取り込み | 上流 master の取り込み（VER-0037）。dftd3 はフォーク版を維持（`c79ed9a4` 冗長、`d5bf3f7f`・`5c104c42` 不採用）。UPSTREAM-0003 取り下げ。`gpumd_replica` と `src/main_replica` は廃止（`multi_replica` に統合） |
 
 上の履歴は `git log -- src/force/dftd3/dftd3.cu src/force/dftd2.cu src/force/dftd2para.cuh specs/verification` の件名から抜粋したもので、コミットの内容は未再確認です。詳細は各 VER 記録と `specs/traceability.yaml` を参照してください。

@@ -7,9 +7,9 @@ DR-005 の traceability は **`partial`**（`implemented` ではありません�
 | 項目 | 状態 |
 |---|---|
 | モデル・カーネル（`gpumd`）、学習側（`nep`） | 実装済み・検証済み（合成データ）。04 章 |
-| `gpumd_replica`（モード 2） | コード済み。**GPU 検証は未実施**（04 章 4.7 節） |
+| replica（`gpumd` 内の `multi_replica`、モード 2・3） | エネルギー・力の GPU 検証は合格（VER-0037 B3）。**ビリアルは未検証**、BEC なし（04 章 4.7 節） |
 | 文書（英語 `doc/`、本マニュアル） | 完了（公式の Sphinx ビルドは、変更したページで警告なし。既存の無関係な警告 3 件が別に存在） |
-| 全回帰（`run_regression.py --suite full`） | **未実施**。人間の合図があるまで、また再学習の終了まで開始しない |
+| 全回帰（`run_regression.py --suite full`） | 上流取り込み後のツリーで実施済み（VER-0037 B4。既知の非決定性の集合と同じ件数。詳細は VER-0037） |
 | 再学習（段階 5） | 依頼元（GPUMD-polymer-apps）側で実施中（5.3 節） |
 | 周期系の P そのものの出力（DES-0005 3b） | **未実装** |
 
@@ -45,7 +45,7 @@ DR-005 の traceability は **`partial`**（`implemented` ではありません�
 - 実データでの**表現力と学習の収束は未確認**（5a は途中、5b は実行中）。物理的な精度の主張はしません。
 - 検証はすべて合成データ。float と double の比較は未実施（カーネルは float）。大きな N（> 100 原子）の `nep` の合成試験なし（依頼元の実データでは動作）。
 - `gpumd` での化学種の圧縮（`active`）の `charge_transfer` の `nep.txt` は、φ の部分選択を実装済みだが、実行は未確認。
-- 多 GPU、`gpumd_replica` の GPU 検証、HIP は未検証。`charge_mode 3` は replica 非対応。
+- 多 GPU、HIP、replica のビリアルは未検証（replica のエネルギー・力の GPU 検証は VER-0037 B3 で合格）。replica は BEC を計算せず、qNEP のバッチ積分は無効。
 - 周期系の P そのものの出力は未実装（`thermo` のエネルギーに −E·P は含まれない）。
 - 電荷の目標値での学習、非ゼロの総電荷は不可。可変 ZBL と `charge_transfer` の併用は replica で拒否。`vdw`/`charge_vdw`/spin/`fine_tune` とは併用不可。
 - 疑似散逸が消えるかどうかは、DR-005 の範囲外（BEC が勾配になっても、散逸の原因が他にある可能性がある。依頼元が T3 で確認）。

@@ -42,4 +42,4 @@ BEC_k = s [ qn_k·1 + 0.5 T1_k + 0.5 T2_k ]（s = √ε∞、qn = q − mean(q)�
 | 電場中の MD で BEC を使い、エネルギーと仕事の整合や P の有界性が必要 | `charge_transfer` で**新しく学習する**（既存モデルは流用不可） |
 | 電荷の目標値（`charge=` ラベルが 0 でない構造）で学習したい | 不可（入力エラー。総電荷は常に 0） |
 | 分散力補正（D2/D3）と併用 | 可（`dftd3`/`dftd2` は NEP 側の別機能。`docs_ja/dftd`） |
-| `gpumd_replica` で使う | モード 2（`qnep2`）のみ。ただし GPU 検証は未完（05 章） |
+| replica（`gpumd` の `multi_replica`）で使う | モード 2・3（`qnep2`/`qnep3`）。エネルギー・力の GPU 検証は合格、ビリアルは未検証、BEC なし（05 章） |
