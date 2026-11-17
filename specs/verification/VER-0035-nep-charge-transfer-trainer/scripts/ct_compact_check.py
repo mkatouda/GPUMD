@@ -41,7 +41,7 @@ def check(gpumd, workdir, fmt="new", structure=1, keep=(0, 1), seed=1):
     W = os.path.abspath(workdir)
     os.makedirs(W, exist_ok=True)
     nt = 3
-    text = mk.make_model_text(seed, 4.0, 3.5, 4.0, True, nt=nt, charge_mode=2)
+    text = mk.make_legacy_text(seed, 4.0, 3.5, 4.0, True, nt=nt, charge_mode=2)
     params, q_scaler, phi = mt.legacy_to_new(mk, text, nt, 4.0, True, 2)
     full = os.path.join(W, "full_%s.txt" % fmt)
     if fmt == "legacy":

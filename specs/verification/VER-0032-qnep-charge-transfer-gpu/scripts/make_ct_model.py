@@ -97,6 +97,20 @@ def make_legacy_parts(seed, rc_radial, rc_angular, nt=NUM_TYPES, charge_mode=2):
     return "\n".join(lines) + "\n", phi
 
 
+def make_legacy_text(seed, rc_radial, rc_angular, rc_phi, with_ct=True, nt=NUM_TYPES, charge_mode=2):
+    """Legacy-layout value list (header + one number per line, ct line after `cutoff`, phi last).
+
+    Not a model file any more: only the weight source for VER-0035 legacy_to_new, which
+    re-lays the same numbers out as new-format arrays."""
+    legacy, phi = make_legacy_parts(seed, rc_radial, rc_angular, nt, charge_mode)
+    lines = legacy.rstrip("\n").split("\n")
+    lines[0] = lines[0].replace("nep4_charge2", "nep4_charge%d" % charge_mode, 1)
+    if with_ct:
+        lines.insert(2, "charge_transfer %g" % rc_phi)
+        lines += ["%.15e" % v for v in phi]
+    return "\n".join(lines) + "\n"
+
+
 def make_model_text(seed, rc_radial, rc_angular, rc_phi, with_ct=True, nt=NUM_TYPES, charge_mode=2):
     """New-format (qnep2/qnep3) model text; with_ct adds charge_transfer and phi_parameters."""
     legacy, phi = make_legacy_parts(seed, rc_radial, rc_angular, nt, charge_mode)

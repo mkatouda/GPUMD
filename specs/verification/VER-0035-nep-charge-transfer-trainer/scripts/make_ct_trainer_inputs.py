@@ -60,7 +60,7 @@ def legacy_to_new(mk, text, nt, rc_phi, with_ct, charge_mode):
 
 
 def write_model(path, mk, seed, rc_radial, rc_angular, rc_phi, with_ct=True, nt=2, charge_mode=2):
-    text = mk.make_model_text(seed, rc_radial, rc_angular, rc_phi, with_ct, nt=nt, charge_mode=charge_mode)
+    text = mk.make_legacy_text(seed, rc_radial, rc_angular, rc_phi, with_ct, nt=nt, charge_mode=charge_mode)
     params, q_scaler, phi = legacy_to_new(mk, text, nt, rc_phi, with_ct, charge_mode)
     write_model_arrays(path, mk, params, q_scaler, phi, rc_radial, rc_angular, rc_phi, nt, charge_mode)
 
