@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-"""Write a synthetic charge_transfer qNEP model (nep4_charge2) and small test structures.
+"""Write a synthetic charge_transfer qNEP model (new NEP model format) and small test structures.
 
 DR-005 stage 2b (VER-0032).  Synthetic data only: random reproducible weights, no trained model.
 
-nep.txt layout written (legacy text format read by src/force/nep_charge/nep_charge.cu):
+The legacy text format (nep4_charge2) was removed upstream.  The random weights are still drawn
+in the legacy layout (same RNG sequence and values as before), converted by the upstream
+potentials/nep/nep_model_converter.py (qnep2/qnep3 header, channel-major descriptor order), and
+the two charge_transfer items are added, which the converter does not know:
 
-  nep4_charge2 2 <sym0> <sym1>
-  cutoff rc_radial rc_angular MN_radial MN_angular
-  charge_transfer rc_phi                      <- new optional line, IMMEDIATELY after `cutoff`
-  n_max n_max_radial n_max_angular
-  basis_size basis_size_radial basis_size_angular
-  l_max 4 0 0
-  ANN num_neurons 0
-  then one number per line, in this order:
+  charge_transfer <rc_phi>            field (one line, before the first `@` block)
+  @ phi_parameters <num_pairs*(basis_size_radial+1)>    block, at the end of the file
+
+Reader: src/utilities/nep_io/nep_model_file_charge.cu (qnep2/qnep3 only; 0 < rc_phi <= rc_radial).
+Legacy value order before conversion:
     1. ANN block, num_para_ann = (dim + 3) * num_neurons * num_types + 2 values:
          for each type t: w0[t] (num_neurons*dim), b0[t] (num_neurons), w1[t] (num_neurons*2)
          then sqrt_epsilon_inf (1), b1 (1)
-    2. descriptor coefficients c, num_types^2 * ((n_max_radial+1)*(basis_size_radial+1)
-         + (n_max_angular+1)*(basis_size_angular+1)) values (legacy basis-major order)
+    2. descriptor coefficients c (legacy basis-major order; the converter reorders them)
     3. q_scaler, dim values
-    4. phi block (new, only with the charge_transfer line), at the very end of the file:
-         num_pairs * (basis_size_radial + 1) values, pair-major.
+    4. phi values (drawn last, after q_scaler).
 
 phi pair ordering (symmetric, upper triangle row-major, t1 <= t2):
     p(t1, t2) = t1 * num_types - t1 * (t1 - 1) / 2 + (t2 - t1)
@@ -31,8 +29,11 @@ phi pair ordering (symmetric, upper triangle row-major, t1 <= t2):
 Usage: make_ct_model.py OUTDIR [--seed 1] [--rc-radial 4.0] [--rc-phi 4.0] [--no-ct]
 """
 import argparse
+import importlib.util
 import os
 import sys
+import tempfile
+from pathlib import Path
 
 import numpy as np
 
@@ -54,7 +55,19 @@ def pair_index(t1, t2, nt=NUM_TYPES):
     return t1 * nt - t1 * (t1 - 1) // 2 + (t2 - t1)
 
 
-def make_model_text(seed, rc_radial, rc_angular, rc_phi, with_ct=True, nt=NUM_TYPES, charge_mode=2):
+def _load_converter():
+    for parent in Path(__file__).resolve().parents:
+        path = parent / "potentials" / "nep" / "nep_model_converter.py"
+        if path.exists():
+            spec = importlib.util.spec_from_file_location("nep_model_converter", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+    raise RuntimeError("potentials/nep/nep_model_converter.py not found")
+
+
+def make_legacy_parts(seed, rc_radial, rc_angular, nt=NUM_TYPES, charge_mode=2):
+    """Legacy-layout text (no charge_transfer) and the phi values (drawn after q_scaler)."""
     rng = np.random.default_rng(seed)
     num_L = L_MAX + HAS_Q_222 + HAS_Q_1111
     dim = (N_MAX_RADIAL + 1) + (N_MAX_ANGULAR + 1) * num_L
@@ -69,22 +82,37 @@ def make_model_text(seed, rc_radial, rc_angular, rc_phi, with_ct=True, nt=NUM_TY
     values += list(rng.uniform(-0.5, 0.5, n_c))
     values += list(rng.uniform(0.5, 2.0, dim))  # q_scaler
     num_pairs = nt * (nt + 1) // 2
-    if with_ct:
-        values += list(rng.uniform(0.0, PHI_MAX, num_pairs * (BASIS_RADIAL + 1)))  # phi block
+    phi = list(rng.uniform(0.0, PHI_MAX, num_pairs * (BASIS_RADIAL + 1)))
     lines = [
-        "nep4_charge%d %d %s" % (charge_mode, nt, " ".join(SYMBOLS[:nt])),
+        # the converter has no charge3 tag; qnep1/2/3 share one block layout, so write charge2
+        # here and rename the model after conversion
+        "nep4_charge2 %d %s" % (nt, " ".join(SYMBOLS[:nt])),
         "cutoff %g %g 100 50" % (rc_radial, rc_angular),
-    ]
-    if with_ct:
-        lines.append("charge_transfer %g" % rc_phi)
-    lines += [
         "n_max %d %d" % (N_MAX_RADIAL, N_MAX_ANGULAR),
         "basis_size %d %d" % (BASIS_RADIAL, BASIS_ANGULAR),
         "l_max %d %d %d" % (L_MAX, HAS_Q_222, HAS_Q_1111),
         "ANN %d 0" % NEURONS,
     ]
     lines += ["%.15e" % v for v in values]
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n", phi
+
+
+def make_model_text(seed, rc_radial, rc_angular, rc_phi, with_ct=True, nt=NUM_TYPES, charge_mode=2):
+    """New-format (qnep2/qnep3) model text; with_ct adds charge_transfer and phi_parameters."""
+    legacy, phi = make_legacy_parts(seed, rc_radial, rc_angular, nt, charge_mode)
+    conv = _load_converter()
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "legacy_nep.txt"
+        path.write_text(legacy)
+        text = conv.model_text(conv.read_model(path))
+    text = text.replace("model qnep2\n", "model qnep%d\n" % charge_mode, 1)
+    if with_ct:
+        lines = text.split("\n")
+        i = next(k for k, l in enumerate(lines) if l.startswith("@ "))
+        lines.insert(i, "charge_transfer %g" % rc_phi)
+        text = "\n".join(lines).rstrip("\n") + "\n"
+        text += "@ phi_parameters %d\n" % len(phi) + "".join("%.15e\n" % v for v in phi)
+    return text
 
 
 def make_structure(natoms, box, seed, min_dist=1.6, nt=NUM_TYPES):
@@ -140,7 +168,7 @@ def main(argv=None):
     ap.add_argument("--rc-radial", type=float, default=4.0)
     ap.add_argument("--rc-angular", type=float, default=3.5)
     ap.add_argument("--rc-phi", type=float, default=None)
-    ap.add_argument("--no-ct", action="store_true", help="omit the charge_transfer line and phi block")
+    ap.add_argument("--no-ct", action="store_true", help="omit the charge_transfer field and phi block")
     a = ap.parse_args(argv)
     rc_phi = a.rc_phi if a.rc_phi is not None else a.rc_radial
     os.makedirs(a.outdir, exist_ok=True)

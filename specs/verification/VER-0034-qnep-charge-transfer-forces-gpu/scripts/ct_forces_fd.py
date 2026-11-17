@@ -3,7 +3,7 @@
 of gpumd's own total potential energy (static runs, `time_step 0`, `dump_xyz precision double`).
 
 Model/structures: VER-0032 make_ct_model.py (synthetic random weights).  The "old" reference model is
-the same generator without the charge_transfer line (an ordinary qNEP, nep4_charge2) on the same
+the same generator without the charge_transfer field (an ordinary qNEP, qnep2) on the same
 structures: its FD error is the noise floor (float kernels, FD truncation) to compare with.
 Forces: central FD of the energy, F = -dE/dr, step `delta` (A).  Virial: central FD of the energy
 under the homogeneous strain F = 1 + e E_ab (r -> F r, lattice -> F lattice), W_ab = -dE/de (ab symmetric
@@ -163,7 +163,7 @@ def main(argv=None):
     ap.add_argument("--kspace", default="ewald")
     ap.add_argument("--max-atoms", type=int, default=0)
     ap.add_argument("--old", action="store_true")
-    ap.add_argument("--mode", type=int, default=2, help="charge_mode (nep4_charge2 / nep4_charge3 header)")
+    ap.add_argument("--mode", type=int, default=2, help="charge_mode (qnep2 / qnep3 model field)")
     ap.add_argument("--triclinic", action="store_true")
     ap.add_argument("--nve", type=int, default=0, help="if > 0: NVE run of this many steps instead of FD")
     ap.add_argument("--rc-radial", type=float, default=4.0)
