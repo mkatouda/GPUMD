@@ -3,6 +3,7 @@
 """Convert legacy NEP4 model files and optional restarts to the new NEP format."""
 
 import argparse
+import itertools
 import math
 import os
 from pathlib import Path
@@ -17,6 +18,7 @@ MODELS = {
     "_temperature": ("nep_temperature", 1, 0, 1, 1),
     "_charge1": ("qnep1", 0, 1, 2, 1),
     "_charge2": ("qnep2", 0, 1, 2, 1),
+    "_charge3": ("qnep3", 0, 1, 2, 1),
     "_dipole": ("nep_dipole", 0, 0, 1, 1),
     "_polarizability": ("nep_polarizability", 0, 0, 1, 2),
     "_vdw": ("nep_vdw", 0, 1, 1, 1),
@@ -139,6 +141,21 @@ def read_model(filename):
         for token in values[-2:]:
             integer(token, 0, 2147483647, where)
         fields.append(("cutoff", values))
+        radial_cutoff = float_value(values[0], where)
+
+        # Optional fork extension (DR-005): legacy qNEP charge_transfer files have a
+        # `charge_transfer <rc_phi>` line immediately after `cutoff`.
+        where, tokens = next_record(source, filename)
+        source = itertools.chain([(where, tokens)], source)
+        phi_count = 0
+        if tokens[0].lower() == "charge_transfer":
+            where, values = read_field(source, filename, "charge_transfer", 1, 1)
+            if name not in ("qnep2", "qnep3"):
+                raise ValueError(f"{where}: charge_transfer requires nep4[_zbl]_charge2 or _charge3")
+            rc_phi = float_value(values[0], where)
+            if rc_phi <= 0.0 or rc_phi > radial_cutoff:
+                raise ValueError(f"{where}: charge_transfer requires 0 < rc_phi <= the radial cutoff")
+            fields.append(("charge_transfer", values))
 
         where, values = read_field(source, filename, "n_max", 2, 2)
         nr = integer(values[0], 0, 15, where)
@@ -171,7 +188,10 @@ def read_model(filename):
         parameters = (num_types * ann_size + globals_count) * ann_count
         parameters += num_types**2 * ((nr + 1) * (br + 1) + (na + 1) * (ba + 1))
         zbl_count = 5 * num_types * (num_types + 1) if flexible_zbl else 0
-        expected = parameters + dim + zbl_count
+        if "charge_transfer" in dict(fields):
+            phi_count = num_types * (num_types + 1) // 2 * (br + 1)
+        # legacy value order: parameters, q_scaler, flexible-ZBL parameters (never with phi), phi
+        expected = parameters + dim + zbl_count + phi_count
         data = []
         for where, tokens in source:
             if len(tokens) != 1:
@@ -183,7 +203,9 @@ def read_model(filename):
         if len(data) != expected:
             raise ValueError(
                 f"{filename}: expected {expected} values ({parameters} parameters, "
-                f"{dim} scalers, {zbl_count} ZBL parameters), found {len(data)}"
+                f"{dim} scalers, {zbl_count} ZBL parameters"
+                + (f", {phi_count} phi parameters" if phi_count else "")
+                + f"), found {len(data)}"
             )
         if flexible_zbl:
             for index in range(parameters + dim, expected, 10):
@@ -199,6 +221,7 @@ def read_model(filename):
         "parameters": parameters,
         "dim": dim,
         "zbl_count": zbl_count,
+        "phi_count": phi_count,
         "data": data,
         "references": 0 if tensor else num_types,
     }
@@ -232,6 +255,7 @@ def model_text(model):
         ("parameters", model["parameters"]),
         ("q_scaler", model["dim"]),
         ("zbl_parameters", model["zbl_count"]),
+        ("phi_parameters", model["phi_count"]),
     ):
         if count:
             lines.append(f"@ {name} {count}")
@@ -241,6 +265,11 @@ def model_text(model):
 
 
 def restart_text(filename, model):
+    if model["phi_count"]:
+        raise ValueError(
+            "restart conversion is not supported for charge_transfer models: no legacy "
+            "restart layout with phi parameters exists"
+        )
     references = model["references"]
     lines = ["nep_restart", f"energy_reference {references}" + " 0" * references,
              f"parameters {model['parameters']}"]
@@ -306,8 +335,9 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         epilog=(
-            "Supports standard NEP4, temperature, charge1/2, dipole, polarizability, "
-            "vdW and charge-vdW models. Energy references are set to zero. "
+            "Supports standard NEP4, temperature, charge1/2/3, dipole, polarizability, "
+            "vdW and charge-vdW models, and charge2/3 models with charge_transfer "
+            "(not with restarts or flexible ZBL). Energy references are set to zero. "
             "Writes type-pair descriptors in channel-major order; NEP3 and NEP5 are not supported. "
             "Conversion does not extend native MD support or preserve an old training trajectory."
         ),
