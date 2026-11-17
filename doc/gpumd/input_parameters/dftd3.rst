@@ -6,13 +6,18 @@
 =============
 
 This keyword is used to add the DFT-D3 dispersion correction to NEP.
-It has no effect when any other potential is used.
+It must not be combined with ``nep_spin``, ``nep_vdw``, or ``qnep3_vdw`` models.
 For theoretical background on DFT-D3, see [Grimme2010]_ and [Grimme2011]_.
 
 Syntax
 ------
 
+The syntax is::
+
   dftd3 <functional> <potential_cutoff> <coordination_number_cutoff> [<damping>]
+
+Parameters
+----------
 
 where :attr:`functional` is the exchange-correlation functional used in generating the reference data for training the NEP model, :attr:`potential_cutoff` is the cutoff radius (in units of Angstrom) for the D3 potential, and :attr:`coordination_number_cutoff` is the cutoff radius (in units of Angstrom) for calculating the coordination numbers.
 The optional :attr:`damping` is ``bj`` (Becke-Johnson damping, the default when it is omitted) or ``zero`` (zero damping, D3(0)); it is case sensitive, and any other value, or more than five tokens, is an input error.
@@ -32,8 +37,13 @@ Zero damping is limited to the elements H-Rn (:math:`Z \le 86`): if the structur
 
 Both dampings are two-body only: the three-body (Axilrod-Teller-Muto) term is not implemented. In particular, D3(0) here differs from the default of Quantum ESPRESSO (``dftd3_version = 3`` with ``dftd3_threebody = .true.``) by the three-body term. The lengths used are in Angstrom (:math:`R_0` is tabulated in Angstrom and used without any conversion, as it enters only through :math:`r/R_0`). dftd3-lib converts its bohr values with 0.52917726, which explains differences of about 1.5 parts per million in the damping region from simple-dftd3 and dftd3-lib.
 
-Example
--------
+Output
+------
+
+None.
+
+Examples
+--------
 
 .. code::
 
@@ -156,8 +166,8 @@ Dependence on the coordination number cutoff (potential cutoff 12 Å):
 The NEP evaluation itself takes about 1.6 ms/step for 648 atoms, 1.8 ms/step for 5184 atoms, 6.8 ms/step for 41472 atoms and 1.3 ms/step for 4000 Cu atoms in the same measurement.
 For the cost of the :ref:`dftd2 <kw_dftd2>` correction, see the section "Cost" on its page.
 
-Tips
-----
+Notes
+-----
 
 * It usually requires to test the convergence with respect to the cutoff radii, and a balance between accuracy and efficiency must be achieved. The cost grows with the cube of the potential cutoff, see :ref:`Cost <dftd3_cost>`.
 

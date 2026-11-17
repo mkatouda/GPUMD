@@ -468,15 +468,13 @@ void MC_Ensemble_SGC::compute(
       energy_difference +=
         kappa * K_B * temperature / group_size *
         (group_size * (mu_or_phi[index_new_species] - mu_or_phi[index_old_species]) +
-         2 * (num_atoms_species[index_new_species] - num_atoms_species[index_old_species]) + 1.0);
+         2 * (num_atoms_species[index_new_species] - num_atoms_species[index_old_species]) + 2.0);
     }
 
     std::uniform_real_distribution<float> r2(0, 1);
     float random_number = r2(rng);
     double energy_change = energy_difference;
-    if (!nep_energy.energy_reference.empty()) {
-      energy_change += nep_energy.energy_reference[type_j] - nep_energy.energy_reference[type_i];
-    }
+    energy_change += nep_energy.energy_reference[type_j] - nep_energy.energy_reference[type_i];
     float probability = exp(-energy_change / (K_B * temperature));
 
     if (random_number < probability) {

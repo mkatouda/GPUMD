@@ -311,10 +311,49 @@ bool NEP_Model_File::read_parameters(
          read_block(document, "q_scaler", layout.dim, q_scaler, blocks, error);
 }
 
+bool NEP_Model_File::validate_md(std::string& error, const bool allow_charge_transfer) const
+{
+  error.clear();
+  // charge_transfer (DR-005 / ADR-0006) is implemented only by the qNEP force classes that call
+  // this with allow_charge_transfer = true; every other MD consumer must refuse such a model
+  // instead of silently ignoring the rc_phi field and the phi_parameters block.
+  if (rc_phi > 0.0f && !allow_charge_transfer) {
+    error = "charge_transfer is not supported by this potential or consumer.";
+    return false;
+  }
+  // block order of the legacy converter was parameters, q_scaler, zbl_parameters, phi. Flexible
+  // ZBL exists only for model nep, charge_transfer only for qnep2/qnep3, so the two never coexist;
+  // refuse rather than let the combination become ambiguous if that ever changes.
+  if (rc_phi > 0.0f && !zbl_parameters.empty()) {
+    error = "charge_transfer cannot be combined with flexible ZBL parameters.";
+    return false;
+  }
+  if (num_neurons2 != 0) {
+    error = "Native MD supports only one hidden layer.";
+    return false;
+  }
+  if (zbl_parameters.size() > 550) {
+    error = "Native MD supports flexible ZBL for at most 10 active elements.";
+    return false;
+  }
+  if (
+    max_radial < 1 || max_radial > 819 || max_angular < 1 ||
+    max_angular > std::numeric_limits<int>::max() / 2) {
+    error = "Invalid neighbor capacities for native MD.";
+    return false;
+  }
+  return true;
+}
+
 bool NEP_Model_File::read(std::istream& input, std::string& error)
 {
-  *this = NEP_Model_File();
   NEP_File document;
+  return read(input, document, error);
+}
+
+bool NEP_Model_File::read(std::istream& input, NEP_File& document, std::string& error)
+{
+  *this = NEP_Model_File();
   if (!document.read(input, error)) {
     return false;
   }
