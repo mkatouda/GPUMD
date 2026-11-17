@@ -20,7 +20,7 @@ and their energies, forces, virials, and BEC must not change.
    - No change of the BEC formula, `zero_total_charge`, or `scale_bec` for models without the option.
    - Old models cannot be converted to the new form (a different charge definition); a model with the option must be trained.
 4. In `charge_transfer` models: no `zero_total_charge` and no `zero_mean_D_real`; the BEC kernels use the exact reference-k form of DES-0005 section 3 in all paths
-   (normal, small-box, `main_replica`, training side); `dump_xyz ... bec`, `bec.out`, `compute_dpdt`, `add_efield ... bec` read the same array; no keyword change for those.
+   (normal, small-box, replica (`src/force/replica/`; originally `main_replica`, see the DR-005 revision of 2026-11-18), training side); `dump_xyz ... bec`, `bec.out`, `compute_dpdt`, `add_efield ... bec` read the same array; no keyword change for those.
 5. A binary that does not know the option must fail clearly on a new `nep.txt` (the unknown first-line/extra-line must not be silently ignored): to be checked in stage 3.
 6. Documentation: new keyword page in `doc/nep/input_parameters/`, notes in the `add_efield`, `compute_dpdt`, `dump_xyz` pages (DR-005 A7).
 

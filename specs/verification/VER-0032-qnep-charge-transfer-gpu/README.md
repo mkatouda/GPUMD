@@ -1,5 +1,9 @@
 # VER-0032: charge_transfer qNEP on the GPU (DR-005 stage 2b)
 
+> **Note 2026-11-18 (VER-0037):** the upstream merge (5c67f365) removed `gpumd_replica` and `src/main_replica/` and the legacy nep.txt formats; the statements below about
+> `gpumd_replica`, `main_replica` and the legacy `nep4_charge*` text format are historical. Current state: replica dynamics runs inside `gpumd`; legacy files are converted
+> with `potentials/nep/nep_model_converter.py`.
+
 - Status: steps 0-5 of stage 2b done (generator, parser, charge/BEC kernels in the large-box and small-box paths). Forces/virial/D-weight were added in stage 2c (VER-0034); the stage-2b refusal and its start-up warning described below no longer exist (updated 2026-11-11). Data tier: synthetic (random weights); no external model or data.
 - Requirement DR-005; design DES-0005; ADR-0006; CPU reference VER-0029.
 

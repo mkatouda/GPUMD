@@ -100,6 +100,7 @@ Use :ref:`potential <kw_potential>` with exactly one filename::
 Energy NEP models and charge NEP (qNEP) models are supported.
 Temperature-dependent NEP models are not supported.
 Charge NEP models require periodic boundaries in all three directions.
+qNEP models with :ref:`charge_transfer <kw_charge_transfer>` are supported for energy and forces; the replica run computes no BEC and does not accept ``add_efield``, ``compute_dpdt`` or ``dump_xyz ... bec``. Batched integration is not used for qNEP models.
 GPUs are assigned whole replicas rather than spatial partitions of one system.
 
 .. _replica_kw_time_step:

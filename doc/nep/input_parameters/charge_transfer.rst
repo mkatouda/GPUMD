@@ -59,5 +59,6 @@ Notes
 -----
 
 * For this model type, ``gpumd`` reads the resulting ``nep.txt`` with ``potential nep.txt`` as usual.
-  ``gpumd_replica`` does not support these models.
+  With :ref:`multi_replica <kw_multi_replica>` these models are supported for energy and forces only; a replica run computes no BEC.
+* ``nep.txt`` files of the old format (first line ``nep4_charge2`` or ``nep4_charge3`` with a ``charge_transfer`` line) are no longer read by ``gpumd``; convert them with ``potentials/nep/nep_model_converter.py`` (see ``potentials/nep/nep_model_format.md``). The converter sets ``energy_reference`` to 0.
 * No claim is made here about the physical accuracy of the trained model; the construction guarantees charge neutrality and the consistency between the BEC and the energy-related quantities, not the quality of the fit.

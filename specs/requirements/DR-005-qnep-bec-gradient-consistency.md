@@ -23,8 +23,19 @@ Stage 1 (VER-0028, reproduced the requester's numbers within 5 %) established:
 ## Requirement (target; definition fixed by D1)
 The BEC computed by `gpumd` (`dump_xyz ... bec`, `bec.out`, `compute_dpdt`, `add_efield ... bec`) shall be the
 derivative of one single-valued dipole function P(r) of the model, in all code paths: the normal kernels, the
-small-box kernels, the `main_replica` copies, and the training side (`nep`, `src/main_nep/`), so that `nep` and `gpumd` give the same BEC
+small-box kernels, the replica copies (`src/force/replica/`; see the revision below), and the training side (`nep`, `src/main_nep/`), so that `nep` and `gpumd` give the same BEC
 for the same structure and `nep.txt`.
+
+## Revision 2026-11-18 (human approval: stage C plan of the upstream merge, 2026-11-18)
+Upstream removed the `gpumd_replica` executable and `src/main_replica/`; replica dynamics (`multi_replica`) now runs inside `gpumd`
+(`src/force/replica/`, `src/integrate/replica/`). The requirement for the replica path is therefore:
+- The replica force path for `charge_transfer` models (charge_mode 2 and 3) gives energy and forces consistent with `gpumd` for the same structure and `nep.txt`
+  (gate: VER-0036/VER-0037, displacement identity; the gate values are those recorded there).
+- The replica computes no BEC: `dump_xyz ... bec`, `add_efield` and `compute_dpdt` are not available in `multi_replica` runs (input error), so the BEC clause of this
+  requirement does not apply to the replica path. The replica virial gate is not verified (human decision 2026-11-11 c).
+- Batched integration is not used for qNEP models in the replica.
+- `nep.txt` of the old format (`nep4[_zbl]_charge2/3` with a `charge_transfer` line) is not read by `gpumd`; it is converted with
+  `potentials/nep/nep_model_converter.py` (energy_reference becomes 0 in the conversion).
 
 ## Decisions
 D1 (decided by the human, 2026-11-11): option (a). The target is a model in which the raw charges conserve the total charge locally

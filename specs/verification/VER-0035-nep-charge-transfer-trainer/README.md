@@ -1,5 +1,9 @@
 # VER-0035: charge_transfer qNEP in the NEP trainer (DR-005 stage 3a)
 
+> **Note 2026-11-18 (VER-0037):** the upstream merge (5c67f365) removed `gpumd_replica` and `src/main_replica/` and the legacy nep.txt formats; the statements below about
+> `gpumd_replica`, `main_replica` and the legacy `nep4_charge*` text format are historical. Current state: replica dynamics runs inside `gpumd`; legacy files are converted
+> with `potentials/nep/nep_model_converter.py`.
+
 - Status: implemented and verified 2026-11-11 (RTX A6000, sm_86, CUDA from /usr/local/cuda; float kernels, double accumulation of the ct sums). Type: regression (base binary vs candidate), cross-code consistency (`nep` vs gpumd, A4), mutation checks, training smoke test. Synthetic data only (VER-0032 generator weights/structures, random or teacher-generated labels). Not validation. No file of GPUMD-polymer-apps was used. `main_replica` untouched (stage 3b).
 - Requirement DR-005; design DES-0005 sections 2-6; ADR-0006; kernels VER-0032 (charge/BEC) and VER-0034 (Dt, pair force/virial); formulas VER-0033.
 

@@ -2,7 +2,7 @@
 
 This file provides guidance to coding agents (Claude Code, etc.) when working with code in this repository.
 
-GPUMD is a CUDA/HIP molecular dynamics package (`gpumd`, `nep`, `gpumd_replica`, `tb`, optional `gnep`). `developer/README.md` is the developer guide — read it before adding keywords, potentials, ensembles, or actions. User manual: `doc/`.
+GPUMD is a CUDA/HIP molecular dynamics package (`gpumd`, `nep`, `tb`, optional `gnep`; replica dynamics is part of `gpumd`). `developer/README.md` is the developer guide — read it before adding keywords, potentials, ensembles, or actions. User manual: `doc/`.
 
 ## Scope of these rules
 
@@ -43,7 +43,7 @@ and document the source, settings, and uncertainty of every reference value.
 3. Add a failing test first when practical (`tests_pytest/`, or a new case in
    `tests_regression/manifest.json` for run-level behavior).
 4. Make the smallest conforming change; keep CUDA and HIP paths in sync via
-   `gpu_macro.cuh`, and mirror changes into `main_replica/` copies where applicable.
+   `gpu_macro.cuh`, and mirror changes into the replica copies (`src/force/replica/`) where applicable.
 5. Build warning-clean (`make CUDA_ARCH="-arch=sm_86" -j4`), run clang-format (changed code only, see Build), focused
    pytest, and `run_regression.py --suite full` against the `master` baseline binary.
 6. Check, as applicable: units, energy/force/virial consistency (finite difference),
@@ -146,6 +146,10 @@ Measured 2026-11-02 on RTX A6000 (sm_86), CUDA from `/usr/local/cuda`, built wit
   OUTSIDE this list fails, or if a listed case fails in a way other than small numeric
   differences. Re-measure the list when the GPU, CUDA version, or flags change.
 
+After the upstream merge (5c67f365, 2026-11-18, VER-0037): `run_regression.py --suite full` with MERGE as baseline and candidate gave 220 passed, 37 failed
+(relations 25/25), the same count and the same 14 non-train cases as above; the non-deterministic set is unchanged. Against a `master` (5c67f365) baseline the
+only failures outside that set are the fork-only dftd2 cases and two dftd3 cases that differ by float rounding (upstream's C6 rewrite).
+
 ## Test execution policy
 
 Tests longer than a few minutes are marked `slow` (pytest) and excluded from the
@@ -162,7 +166,7 @@ criterion or BLOCKER/MAJOR review finding is open. Traceability `status` is one 
 
 ## Build and tests
 
-Needs `nvcc` and a GPU. Build from `src/` (outputs `gpumd nep gpumd_replica tb`):
+Needs `nvcc` and a GPU. Build from `src/` (outputs `gpumd nep tb`):
 
 ```bash
 cd src && make CUDA_ARCH="-arch=sm_86" -j4 2>&1 | tail -30
@@ -170,7 +174,7 @@ cd src && make CUDA_ARCH="-arch=sm_86" -j4 2>&1 | tail -30
 
 The default arch (sm_60) fails on CUDA 13.x; run `make clean` after changing arch/flags. Keep
 code warning-clean. HIP: `make -f makefile.hip`; optional `make gnep`; CMake is also available.
-Source-edit details (clang-format scope, CUDA/HIP and `main_replica/` sync) are in
+Source-edit details (clang-format scope, CUDA/HIP and replica-copy sync) are in
 `.claude/rules/gpu-src.md`.
 
 Tests (all need a GPU and built binaries): `tests_pytest/` (main suite; `--update-golden` only

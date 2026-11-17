@@ -62,7 +62,7 @@ where sum q r with unwrapped positions is multivalued. Term B of section 3 alrea
 ## 5. Files to change (stage 2 onwards; none changed yet)
 - `src/force/nep_charge/nep_charge.cu`, `src/force/nep_charge/nep_charge_small_box.cuh` (charge formation, D-weight, BEC passes)
 - `src/force/nep_charge/nep_charge.cuh`, a new `nep_charge_transfer.cuh` (phi evaluation, Laplacian, V_a) [new files in an existing dir need no build edits]
-- `src/main_replica/force/nep_charge.cu`, `nep_charge_small_box.cuh` (mirror)
+- `src/main_replica/force/nep_charge.cu`, `nep_charge_small_box.cuh` (mirror) [2026-11-18: now `src/force/replica/replica_nep_charge*.cu*` and `replica_nep_charge_transfer.cuh`; the replica computes no BEC]
 - `src/main_nep/nep_charge/nep_charge.cu`, `nep_charge_parameters`, `parameter_input.cu`, `common/nep_long_range.cu`, compiled kernels [CHECK whether specialized kernels are needed]
 - `doc/gpumd/input_parameters/{add_efield,compute_dpdt,dump_xyz}.rst`, `doc/nep/input_parameters/` (new keyword page), `specs/traceability.yaml`
 - Tests: new `tests_pytest/test_qnep_charge_transfer.py`, new regression cases only if human agrees; existing cases must be unchanged (A5).

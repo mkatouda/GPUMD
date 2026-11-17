@@ -30,8 +30,8 @@ Standing rules for this repository:
 
 - Build from `src/`: `make CUDA_ARCH="-arch=sm_89" -j4` (run `make clean` after
   changing arch/flags). Keep code warning-clean and clang-format-clean. Keep CUDA and
-  HIP paths in sync via `gpu_macro.cuh`; mirror changes into `src/main_replica/`
-  copies where applicable.
+  HIP paths in sync via `gpu_macro.cuh`; mirror changes into the replica copies
+  under `src/force/replica/` where applicable.
 - Tests: add a failing test first when practical (`tests_pytest/` or a case in
   `tests_regression/manifest.json`). Run only the focused tests of the area you
   changed; run `run_regression.py --suite full` only if the prompt asks.

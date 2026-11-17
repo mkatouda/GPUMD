@@ -119,7 +119,7 @@ Supported potentials
 --------------------
 
 NEP (``nep4``, ``nep4_zbl``, and temperature variants), the charge variants (``nep4_charge*``, ``nep4_zbl_charge*``), and the vdW models ``nep_vdw`` and ``qnep3_vdw``.
-Using ``dftd2`` with any other potential, or with the multi-GPU version of NEP, is an input error. The ``gpumd_replica`` executable does not implement ``dftd2`` (the keyword is not read there and the correction is not applied).
+Using ``dftd2`` with any other potential, or with the multi-GPU version of NEP, is an input error. A :ref:`multi_replica <kw_multi_replica>` run does not implement ``dftd2``; the keyword is rejected there with an input error.
 (``dftd3`` remains unsupported for ``nep_vdw`` and ``qnep3_vdw``.)
 
 Cost

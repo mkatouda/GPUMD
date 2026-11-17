@@ -1,5 +1,9 @@
 # VER-0036: charge_transfer qNEP in gpumd_replica (DR-005 stage 3b)
 
+> **Note 2026-11-18 (VER-0037):** the upstream merge (5c67f365) removed `gpumd_replica` and `src/main_replica/` and the legacy nep.txt formats; the statements below about
+> `gpumd_replica`, `main_replica` and the legacy `nep4_charge*` text format are historical. Current state: replica dynamics runs inside `gpumd`; legacy files are converted
+> with `potentials/nep/nep_model_converter.py`.
+
 - Status: code written and compiled (sm_86, CUDA from /usr/local/cuda, warning-free in `src/main_replica`); **not yet run on the GPU** (all gates below open). Type: regression of gpumd_replica against gpumd on identical configurations (same synthetic nep.txt, VER-0032 generator). Not validation.
 - Requirement DR-005; design DES-0005; ADR-0006; kernels VER-0032/0034 (gpumd side).
 

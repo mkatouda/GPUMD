@@ -44,7 +44,7 @@ currently use the single-GPU implementation in ``gpumd``; see :ref:`Long-range m
 With :ref:`multi_replica <kw_multi_replica>`, complete replicas are assigned to GPUs and the partition-direction parameter is not supported.
 
 qNEP models trained with the :ref:`charge_transfer <kw_charge_transfer>` option are read from ``nep.txt`` with ``potential`` as usual (see :ref:`nep_txt` for the extra line and block in the file).
-They are not supported by ``gpumd_replica``.
+With :ref:`multi_replica <kw_multi_replica>` they are supported for energy and forces; the replica run does not compute the BEC (no ``dump_xyz ... bec``, ``add_efield`` or ``compute_dpdt``).
 
 Output
 ------
