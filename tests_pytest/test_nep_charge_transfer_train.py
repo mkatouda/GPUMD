@@ -9,6 +9,7 @@ exact restart check).
 """
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -30,6 +31,8 @@ import ct_compact_check as compact  # noqa: E402
 import ct_fd_trainer as fdt  # noqa: E402
 import ct_train_smoke as smoke  # noqa: E402
 import make_ct_trainer_inputs as mt  # noqa: E402
+
+CONVERTER = REPO_ROOT / 'potentials' / 'nep' / 'nep_model_converter.py'
 
 BEC_GATE = 5e-6  # e (DR-005 A4 is 1e-5; tightened after review)
 FORCE_GATE = 1e-5  # eV/A
@@ -82,10 +85,29 @@ def test_trainer_forces_virial_vs_finite_difference(tmp_path, structure, label):
 
 
 @pytest.mark.parametrize('fmt, gate', [('new', 1e-6), ('legacy', 1e-5)])
-def test_gpumd_species_compaction_of_charge_transfer_file(tmp_path, fmt, gate):
+def test_gpumd_species_compaction_of_charge_transfer_file(tmp_path, monkeypatch, fmt, gate):
     """3-type charge_transfer model on a 2-species structure (gpumd compacts the file) against the
-    2-type model selected by numpy from the same arrays."""
+    2-type model selected by numpy from the same arrays. gpumd no longer reads the legacy text layout
+    (nep4_charge2 with a charge_transfer line), so the `legacy` case converts the legacy file with
+    potentials/nep/nep_model_converter.py first; gpumd only ever sees the converted new-format file."""
+    run_gpumd = compact.run_gpumd
+    converted = []
+
+    def run_converted(gpumd, d, model_text_path, *args):
+        legacy = Path(model_text_path)
+        if legacy.read_text().startswith('nep4'):
+            new = legacy.with_name(legacy.stem + '_converted.txt')
+            c = subprocess.run([sys.executable, str(CONVERTER), str(legacy), str(new)],
+                               capture_output=True, text=True)
+            assert c.returncode == 0, c.stderr
+            assert new.read_text().startswith('nep ') and '@ phi_parameters 30' in new.read_text()
+            converted.append(new)
+            model_text_path = new
+        return run_gpumd(gpumd, d, model_text_path, *args)
+
+    monkeypatch.setattr(compact, 'run_gpumd', run_converted)
     r = compact.check(str(GPUMD_EXECUTABLE), str(tmp_path), fmt)
+    assert len(converted) == (1 if fmt == 'legacy' else 0)
     assert r['rms_Z'] > 0.05 and r['rms_F'] > 0.1, r
     assert max(r['dq'], r['dF'], r['dZ'], r['dE']) <= gate, r
 
