@@ -1,20 +1,26 @@
-"""charge_transfer qNEP in gpumd_replica: energy, force and virial against gpumd.
+"""charge_transfer qNEP in replica dynamics (multi_replica in gpumd): energy against ordinary gpumd.
 
 Verification document: specs/verification/VER-0036-qnep-charge-transfer-replica/README.md.
 
-gpumd_replica writes no forces by itself; the testing aid GPUMD_REPLICA_STATE_DUMP=<prefix> writes
-<prefix>_replica_<id>.bin (raw doubles: position 3N, velocity 3N, force 3N, potential N, virial 9N,
-component-major) at the end of the run. The test runs a very short REMD run (time_step 0.001 fs,
-1 step, replicas never share state), takes the final positions of every replica from the dump and
-evaluates the same structure and nep.txt with gpumd (static run, time_step 0). Each replica is
-therefore compared with a gpumd evaluation of its own configuration; a single-replica run is not
-possible in REMD (replicas > 1), so the 2-replica and 4-replica runs are the multi-stream cases.
+Replica dynamics no longer has a separate executable or the GPUMD_REPLICA_STATE_DUMP testing aid.
+The test runs a very short REMD run (time_step 0.001 fs, 1 step, replicas never share state),
+reads the final positions and the potential energy of every replica from its restart file
+(`remd_replica_<id>_restart.xyz`: positions and potential_energy with 17 significant digits) and
+evaluates the same structure and nep.txt with ordinary gpumd (static run, time_step 0). Each
+replica is therefore compared with a gpumd evaluation of its own configuration; a single-replica
+run is not possible in REMD (replicas > 1), so the 2-replica and 4-replica runs are the
+multi-stream cases.
 
-Gates (human-approved 2026-11-11): |dE| / N <= 1e-4 eV/atom, RMS dF <= 1e-4 eV/A,
-RMS dW / RMS W <= 1e-4 (W = the six independent components of the total virial).
-Skipped when the VER-0032 generator, gpumd or gpumd_replica is missing. Needs one GPU.
+Gate (human-approved 2026-11-11, unchanged): |dE| / N <= 1e-4 eV/atom.
+NOT CHECKED HERE: forces and virial of the replica code. The restart files and remd_thermo.out
+carry only positions, velocities and the potential energy, so the former force and virial gates
+(RMS dF <= 1e-4 eV/A, RMS dW / RMS W <= 1e-4) cannot be evaluated without a source hook
+(open item reported to the owner). The gpumd reference force and virial RMS are still required to
+be non-vacuous, so that the energy comparison is made on a configuration with real forces.
+Skipped when the VER-0032 generator or gpumd is missing. Needs one GPU.
 """
 import os
+import shlex
 import subprocess
 import sys
 
@@ -34,16 +40,11 @@ sys.path.insert(0, str(VER32))
 import ct_forces_fd as fd  # noqa: E402
 import make_ct_model as mk  # noqa: E402
 
-REPLICA = os.environ.get('GPUMD_REPLICA', str(REPO_ROOT / 'src' / 'gpumd_replica'))
 GPUMD = str(GPUMD_EXECUTABLE)
-if not os.path.exists(REPLICA):
-    pytest.skip('gpumd_replica not built', allow_module_level=True)
 if not os.path.exists(GPUMD):
     pytest.skip('gpumd not built', allow_module_level=True)
 
 TOL_E_PER_ATOM = 1e-4  # eV/atom
-TOL_F_RMS = 1e-4  # eV/A
-TOL_W_REL = 1e-4  # of RMS W
 
 # (structure, rc_radial = rc_phi, label); the thick cell with rc 3.5 uses the large-box kernels,
 # the thin cell (box < 2.5 rc) the small-box kernels
@@ -65,23 +66,19 @@ def _write_replica_input(directory, text, pos, types, lat, replicas, steps=1):
 
 
 def _run_replica(directory, replicas):
-    env = dict(os.environ)
-    env['GPUMD_REPLICA_STATE_DUMP'] = str(directory / 'state')
-    r = subprocess.run([REPLICA], cwd=directory, capture_output=True, text=True, timeout=300, env=env)
+    r = subprocess.run([GPUMD], cwd=directory, capture_output=True, text=True, timeout=300)
     (directory / 'run.log').write_text(r.stdout + r.stderr)
     return r
 
 
 def _read_state(directory, replica, natoms):
-    data = np.fromfile(directory / f'state_replica_{replica}.bin', dtype=np.float64)
-    assert data.size == 19 * natoms, (data.size, natoms)
-    n = natoms
-    pos = data[:3 * n].reshape(3, n).T.copy()
-    force = data[6 * n:9 * n].reshape(3, n).T.copy()
-    energy = float(np.sum(data[9 * n:10 * n]))
-    v = data[10 * n:19 * n].reshape(9, n).sum(axis=1)  # components 0..5: xx yy zz xy xz yz
-    virial = np.array([v[0], v[1], v[2], v[3], v[4], v[5]])
-    return pos, force, energy, virial
+    """positions (N, 3) and potential energy (eV) of a replica at the end of the run."""
+    lines = (directory / f'remd_replica_{replica}_restart.xyz').read_text().splitlines()
+    assert len(lines) == natoms + 2, (len(lines), natoms)
+    fields = dict(field.split('=', 1) for field in shlex.split(lines[1]))
+    assert int(fields['restart_step']) == 1 and int(fields['replica']) == replica
+    pos = np.array([[float(x) for x in row.split()[1:4]] for row in lines[2:]])
+    return pos, float(fields['potential_energy'])
 
 
 def _gpumd_reference(tmp_path, tag, text, pos, types, lat):
@@ -97,13 +94,11 @@ def _rms(x):
 
 def _check_replica_vs_gpumd(tmp_path, directory, text, types, lat, replica, label):
     n = len(types)
-    pos, force, energy, virial = _read_state(directory, replica, n)
+    pos, energy = _read_state(directory, replica, n)
     f_ref, e_ref, w_ref = _gpumd_reference(tmp_path, f'ref_{replica}', text, pos, types, lat)
     assert _rms(f_ref) > 0.05, (label, 'vacuous: gpumd force RMS', _rms(f_ref))
     assert _rms(w_ref) > 0.5, (label, 'vacuous: gpumd virial RMS', _rms(w_ref))
     assert abs(energy - e_ref) / n <= TOL_E_PER_ATOM, (label, replica, energy, e_ref)
-    assert _rms(force - f_ref) <= TOL_F_RMS, (label, replica, _rms(force - f_ref))
-    assert _rms(virial - w_ref) / _rms(w_ref) <= TOL_W_REL, (label, replica, _rms(virial - w_ref) / _rms(w_ref))
 
 
 @pytest.mark.parametrize('structure, rc, label', CASES)
@@ -132,18 +127,21 @@ def test_replica_triclinic_large_and_small_box(tmp_path):
             _check_replica_vs_gpumd(tmp_path / label, d, text, types, lat, replica, f'triclinic {label}')
 
 
-def test_replica_charge_mode3_is_rejected_cleanly(tmp_path):
-    # gpumd_replica supports charge_mode 1 and 2 only (no nep4_charge3), also with charge_transfer
+def test_replica_charge_mode3_matches_gpumd(tmp_path):
+    # replica dynamics reads qnep1/qnep2/qnep3 through the common model reader (the former
+    # separate replica executable refused charge mode 3, so this replaces the old rejection test)
     text, pos, types, lat, _ = fd.setup('thin_n12_L7.5', 1, False, 4.0, 4.0, charge_mode=3)
     d = tmp_path / 'mode3'
     _write_replica_input(d, text, pos, types, lat, 2)
     r = _run_replica(d, 2)
-    assert r.returncode != 0
-    assert 'charge3' in (r.stdout + r.stderr) or 'unsupported' in (r.stdout + r.stderr).lower()
+    assert r.returncode == 0, (r.stdout + r.stderr)[-800:]
+    assert 'charge_transfer' in r.stdout, 'charge_transfer banner missing: model not recognised'
+    for replica in range(2):
+        _check_replica_vs_gpumd(tmp_path, d, text, types, lat, replica, 'mode3')
 
 
 def test_replica_without_charge_transfer_unchanged_path(tmp_path):
-    # The same generator without the charge_transfer line (ordinary qNEP): old code path, must
+    # The same generator without the charge_transfer field (ordinary qNEP): old code path, must
     # still run and agree with gpumd (the old kernels are untouched; this guards the branches).
     text, pos, types, lat, _ = fd.setup('thin_n12_L7.5', 1, True, 4.0, 4.0)
     d = tmp_path / 'old'
@@ -151,26 +149,25 @@ def test_replica_without_charge_transfer_unchanged_path(tmp_path):
     r = _run_replica(d, 2)
     assert r.returncode == 0, (r.stdout + r.stderr)[-800:]
     assert 'charge_transfer' not in r.stdout
-    pos0, force, energy, virial = _read_state(d, 0, len(types))
+    pos0, energy = _read_state(d, 0, len(types))
     f_ref, e_ref, w_ref = _gpumd_reference(tmp_path, 'ref_old', text, pos0, types, lat)
     # the old kernels of the two codes are not guaranteed to agree to the ct gates (float noise of
     # the unchanged kernels is larger); this only guards against gross breakage
     assert abs(energy - e_ref) / len(types) <= 1e-3
-    assert _rms(force - f_ref) <= 5e-3
 
 
 def test_replica_rejects_malformed_phi_block(tmp_path):
     text, pos, types, lat, _ = fd.setup('thin_n12_L7.5', 1, False, 4.0, 4.0)
     lines = text.rstrip('\n').split('\n')
-    for label, bad in (
-        ('missing', '\n'.join(lines[:-1]) + '\n'),
-        ('extra', text + '0.1\n'),
+    for label, bad, message in (
+        ('missing', '\n'.join(lines[:-1]) + '\n', "block 'phi_parameters' requires 15 values, found 14"),
+        ('extra', text + '0.1\n', "block 'phi_parameters' requires 15 values, found 16"),
     ):
         d = tmp_path / label
         _write_replica_input(d, bad, pos, types, lat, 2)
         r = _run_replica(d, 2)
         assert r.returncode != 0, label
-        assert 'charge_transfer' in (r.stdout + r.stderr), (label, (r.stdout + r.stderr)[-400:])
+        assert message in (r.stdout + r.stderr), (label, (r.stdout + r.stderr)[-400:])
     # rc_phi above the radial cutoff
     d = tmp_path / 'rcphi'
     bad = text.replace('charge_transfer 4', 'charge_transfer 4.5')
@@ -178,4 +175,4 @@ def test_replica_rejects_malformed_phi_block(tmp_path):
     _write_replica_input(d, bad, pos, types, lat, 2)
     r = _run_replica(d, 2)
     assert r.returncode != 0
-    assert 'rc_phi must not exceed' in (r.stdout + r.stderr)
+    assert 'charge_transfer requires 0 < rc_phi <= the radial cutoff' in (r.stdout + r.stderr)
