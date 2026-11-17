@@ -1,6 +1,7 @@
 # UPSTREAM-0003: dftd3 aborts (CUDA invalid argument at neighbor.cu:193) when the first call is small-box and the box later grows past 2.5 x cutoff
 
-- Status: recorded 2026-11-11; NOT reported upstream (human decision 2026-11-11: keep the record, report/PR later). Fix in this fork: DR-006.
+- Status: **WITHDRAWN 2026-11-18** (human decision): no report or PR will be sent upstream. Recorded 2026-11-11 and never reported (human decision 2026-11-11: keep the record, report/PR later). Fix in this fork: DR-006.
+- Reason for withdrawal: upstream fixed the same defect independently in `c79ed9a4` ("dftd3: fix allocation when switching to the large-box path", Leo, 2026-11-10, in `upstream/master` 5c67f365; one line in `src/force/dftd3/dftd3.cu`: the allocation test of `compute_large_box` now uses `cell_contents_radial` instead of `cn`). Read from the upstream commit message and diff; not yet re-run against upstream's code. The fork keeps its own DR-006 fix (different code form, same intent); the record is kept for traceability (DR-006, VER-0030, `tests_pytest/test_dftd3_cell_buffers.py`).
 - Fork-only note (do not include in an upstream issue/PR). Reported by a collaborator using this fork (report dated 2026-11-09, measured with fork `8afa074` and upstream v5.9.1 on A100, CUDA 12.6, NEP89); original text: `/home/katouda/work/dielectric-response_pj/tmp/request_to_fork_20261110/REPORT_dftd3_cell_buffers_DRAFT_2026-11-09.md` (it also holds a `reproduction/` directory with model.xyz md5 efb866e4... and run.in).
 - Affected upstream code: `brucefan1983/GPUMD` `src/force/dftd3.cu` (v5.9.1) and the fork `src/force/dftd3/dftd3.cu`; `src/force/neighbor.cu` is identical. Verified by code reading in this fork (2026-11-11); upstream master not re-checked.
 
