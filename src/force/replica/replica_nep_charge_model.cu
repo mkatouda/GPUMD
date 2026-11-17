@@ -1052,7 +1052,12 @@ void NEP_Charge_Replica_Model::compute_large_box(
   if (paramb.charge_transfer) {
     // h = network output; q_a = sum_b phi_ab (h_a - h_b) replaces zero_total_charge. The BEC is
     // not computed for charge_transfer models (nothing in gpumd_replica uses it).
-    nep_data.ct_h.copy_from_device_async(nep_data.charge.data(), N, stream_);
+    CHECK(gpuMemcpyAsync(
+      nep_data.ct_h.data(),
+      nep_data.charge.data(),
+      sizeof(float) * N,
+      gpuMemcpyDeviceToDevice,
+      stream_));
     ct_find_charge_large_box<<<grid_size, BLOCK_SIZE, 0, stream_>>>(
       paramb,
       annmb,
@@ -1328,7 +1333,12 @@ void NEP_Charge_Replica_Model::compute_small_box(
   if (paramb.charge_transfer) {
     // h = network output; q_a = sum_b phi_ab (h_a - h_b) replaces zero_total_charge. The BEC is
     // not computed for charge_transfer models (nothing in gpumd_replica uses it).
-    nep_data.ct_h.copy_from_device_async(nep_data.charge.data(), N, stream_);
+    CHECK(gpuMemcpyAsync(
+      nep_data.ct_h.data(),
+      nep_data.charge.data(),
+      sizeof(float) * N,
+      gpuMemcpyDeviceToDevice,
+      stream_));
     ct_find_charge_small_box<<<grid_size, BLOCK_SIZE, 0, stream_>>>(
       paramb,
       annmb,
