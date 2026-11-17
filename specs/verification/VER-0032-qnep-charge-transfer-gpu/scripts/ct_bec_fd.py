@@ -40,18 +40,28 @@ def basis(r, rc, K):
 
 
 def read_model(path, nt=mk.NUM_TYPES):
-    """phi coefficients (num_pairs, K), sqrt_eps_inf, rc_phi, rc_radial from a legacy nep.txt."""
-    lines = open(path).read().split("\n")
-    rc_radial = float(lines[1].split()[1])
-    rc_phi = float(lines[2].split()[1]) if lines[2].startswith("charge_transfer") else None
-    first = 7 if rc_phi is not None else 6
-    vals = np.array([float(x) for x in lines[first:] if x.strip()])
+    """phi coefficients (num_pairs, K), sqrt_eps_inf, rc_phi, rc_radial from a new-format nep.txt."""
+    fields, blocks, cur = {}, {}, None
+    for line in open(path).read().split("\n"):
+        tok = line.split()
+        if not tok:
+            continue
+        if tok[0] == "@":
+            cur = blocks.setdefault(tok[1].lower(), [])
+        elif cur is not None and len(tok) == 1:
+            cur.append(float(tok[0]))
+        else:
+            cur = None
+            fields[tok[0].lower()] = tok[1:]
+    rc_radial = float(fields["cutoff"][0])
+    rc_phi = float(fields["charge_transfer"][0]) if "charge_transfer" in fields else None
     num_L = mk.L_MAX + mk.HAS_Q_222 + mk.HAS_Q_1111
     dim = (mk.N_MAX_RADIAL + 1) + (mk.N_MAX_ANGULAR + 1) * num_L
-    sqrt_eps = vals[nt * (dim + 3) * mk.NEURONS]
+    # the ANN part of `@ parameters` keeps the legacy order: per type w0, b0, w1; then sqrt_eps, b1
+    sqrt_eps = blocks["parameters"][nt * (dim + 3) * mk.NEURONS]
     K = mk.BASIS_RADIAL + 1
     npair = nt * (nt + 1) // 2
-    phi = vals[-npair * K:].reshape(npair, K) if rc_phi is not None else None
+    phi = np.array(blocks["phi_parameters"]).reshape(npair, K) if rc_phi is not None else None
     return phi, sqrt_eps, rc_phi, rc_radial
 
 
