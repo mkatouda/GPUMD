@@ -16,7 +16,7 @@ python3 tests_regression/run_regression.py \
 
 This selects the simulation part of the full suite. Acceptance of the complete
 regression package also requires the NEP cases; use the combined command in
-the [main README](../README.md) to run all 255 cases and 25 relations.
+the [main README](../README.md) to run all 257 cases and 25 relations.
 
 Paths beginning with `package:` in this directory's `manifest.json` are
 relative to `tests_regression/`. Public potentials and examples use `repo:`.
