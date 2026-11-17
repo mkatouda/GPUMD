@@ -271,10 +271,10 @@ def fig11():
 # ---- 図 12: 進捗 ----
 def fig12():
     rows = [('DR-005 1 診断 (VER-0028)', 2), ('2a numpy 参照 (VER-0029)', 2), ('2b GPU 電荷・BEC (VER-0032)', 2),
-            ('2c 力・ビリアル・電場 (VER-0033/34)', 2), ('3a 学習側 nep (VER-0035)', 2), ('3b replica コード', 1),
-            ('3b replica GPU 検証', 0), ('4 文書 (英/日)', 2), ('4 全回帰 --suite full', 0),
+            ('2c 力・ビリアル・電場 (VER-0033/34)', 2), ('3a 学習側 nep (VER-0035)', 2), ('3b replica コード', 2),
+            ('3b replica GPU 検証（ビリアルは未検証）', 1), ('4 文書 (英/日)', 2), ('4 全回帰 --suite full（取り込み後）', 2),
             ('5a 表現力の短い確認(依頼元)', 1), ('5b 本学習(依頼元)', 1), ('直接 P 出力', 0),
-            ('DR-006 修正・試験・文書', 2), ('DR-006 HEAD基準の全回帰・HIP', 0)]
+            ('DR-006 修正・試験・文書', 2), ('上流取り込み (VER-0037)', 2), ('HIP ビルド', 0)]
     col = {2: '#55a868', 1: '#f0c14b', 0: '#c44e52'}
     txt = {2: '完了', 1: '一部/進行中', 0: '未実施'}
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -284,7 +284,7 @@ def fig12():
     ax.set_yticks(range(len(rows)))
     ax.set_yticklabels([r for r, _ in rows[::-1]], fontsize=8)
     ax.set_xticks([])
-    ax.set_title('作業の進捗 (2026-11-11 時点)', fontsize=10)
+    ax.set_title('作業の進捗 (2026-11-18 時点)', fontsize=10)
     save(fig, 'fig12_status.png')
 
 

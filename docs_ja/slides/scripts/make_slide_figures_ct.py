@@ -238,16 +238,16 @@ def s11():
 
 def s12():
     rows = [('DR-005 1 診断', 2), ('2a numpy 参照', 2), ('2b GPU 電荷・BEC', 2), ('2c 力・ビリアル・電場', 2),
-            ('3a 学習側 nep', 2), ('3b replica コード', 1), ('3b replica GPU 検証', 0), ('4 文書（英・日）', 2),
-            ('4 全回帰 --suite full', 0), ('5a 表現力の確認（依頼元）', 1), ('5b 本学習（依頼元）', 1),
-            ('直接 P 出力', 0), ('DR-006 修正・試験・文書', 2), ('DR-006 HEAD 基準の全回帰・HIP', 0)]
+            ('3a 学習側 nep', 2), ('3b replica コード', 2), ('3b replica GPU 検証（ビリアルは未検証）', 1), ('4 文書（英・日）', 2),
+            ('4 全回帰 --suite full（取り込み後）', 2), ('5a 表現力の確認（依頼元）', 1), ('5b 本学習（依頼元）', 1),
+            ('直接 P 出力', 0), ('DR-006 修正・試験・文書', 2), ('上流取り込み (VER-0037)', 2), ('HIP ビルド', 0)]
     col = {2: '#55a868', 1: '#f0c14b', 0: '#c44e52'}; txt = {2: '完了', 1: '一部/進行中', 0: '未実施'}
     fig, ax = plt.subplots(figsize=(9.5, 6.4))
     for i, (r, s) in enumerate(rows[::-1]):
         ax.barh(i, 1, color=col[s]); ax.text(0.5, i, txt[s], ha='center', va='center', fontsize=12)
     ax.set_yticks(range(len(rows))); ax.set_yticklabels([r for r, _ in rows[::-1]], fontsize=13)
     ax.set_xticks([]); ax.spines['bottom'].set_visible(False); ax.spines['left'].set_visible(False)
-    ax.set_title('作業の進捗（2026-11-11 時点）', fontsize=15)
+    ax.set_title('作業の進捗（2026-11-18 時点）', fontsize=15)
     save(fig, 'S12_status.png')
 
 
