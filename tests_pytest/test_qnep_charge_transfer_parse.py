@@ -94,7 +94,7 @@ def test_rc_phi_nonpositive_is_error(tmp_path, value):
 
 def test_missing_rc_phi_value_is_error(tmp_path):
     r = _run(tmp_path, _model().replace('charge_transfer 4\n', 'charge_transfer\n'))
-    assert r.returncode != 0 and "incorrect number of values in 'charge_transfer'" in _out(r)
+    assert r.returncode != 0 and 'expected field: <name> <values...>' in _out(r)
 
 
 def test_charge_mode_1_is_error(tmp_path):
@@ -106,13 +106,16 @@ def test_charge_mode_1_is_error(tmp_path):
 
 def test_too_few_phi_coefficients_is_error(tmp_path):
     lines = _model().rstrip('\n').split('\n')
-    r = _run(tmp_path, '\n'.join(lines[:-2]) + '\n')
+    # the block header count is kept consistent with the lines so the semantic check is reached
+    text = '\n'.join(lines[:-2]) + '\n'
+    r = _run(tmp_path, text.replace('@ phi_parameters 15', '@ phi_parameters 13'))
     assert r.returncode != 0
     assert "block 'phi_parameters' requires 15 values, found 13" in _out(r)
 
 
 def test_too_many_phi_coefficients_is_error(tmp_path):
-    r = _run(tmp_path, _model() + '0.5\n')
+    text = _model() + '0.5\n'
+    r = _run(tmp_path, text.replace('@ phi_parameters 15', '@ phi_parameters 16'))
     assert r.returncode != 0
     assert "block 'phi_parameters' requires 15 values, found 16" in _out(r)
 

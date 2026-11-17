@@ -207,8 +207,8 @@ def test_replica_rejects_malformed_phi_block(tmp_path):
     text, pos, types, lat, _ = fd.setup('thin_n12_L7.5', 1, False, 4.0, 4.0)
     lines = text.rstrip('\n').split('\n')
     for label, bad, message in (
-        ('missing', '\n'.join(lines[:-1]) + '\n', "block 'phi_parameters' requires 15 values, found 14"),
-        ('extra', text + '0.1\n', "block 'phi_parameters' requires 15 values, found 16"),
+        ('missing', ('\n'.join(lines[:-1]) + '\n').replace('@ phi_parameters 15', '@ phi_parameters 14'), "block 'phi_parameters' requires 15 values, found 14"),
+        ('extra', (text + '0.1\n').replace('@ phi_parameters 15', '@ phi_parameters 16'), "block 'phi_parameters' requires 15 values, found 16"),
     ):
         d = tmp_path / label
         _write_replica_input(d, bad, pos, types, lat, 2)
