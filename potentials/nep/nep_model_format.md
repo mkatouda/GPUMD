@@ -703,3 +703,26 @@ python3 potentials/nep/nep_model_converter.py \
     --restart old_nep.restart \
     --restart-output new_nep.restart
 ```
+
+### 7.1 qNEP files with `charge_transfer` (fork extension, DR-005)
+
+This subsection documents a fork-specific extension of the converter and of the qNEP model format; it is not part of upstream GPUMD.
+
+A qNEP model with `model qnep2` or `model qnep3` may contain the field
+
+```text
+charge_transfer <rc_phi>
+```
+
+and the block `@ phi_parameters <N>` with `N = T (T + 1) / 2 * (basis_size_radial + 1)` values for `T` elements. The pairs `(t1 <= t2)` are stored row-major (`p = t1 * T - t1 (t1 - 1) / 2 + (t2 - t1)`), `basis_size_radial + 1` coefficients per pair. The cutoff must satisfy `0 < rc_phi <= rc_radial`. `qnep1` and all other models reject the field. Flexible ZBL (`zbl_parameters`) cannot be combined with it. The trainer writes the blocks in the order `parameters`, `q_scaler`, `phi_parameters`.
+
+Legacy text files of such models (`nep4_charge2`, `nep4_charge3`, optionally `nep4_zbl_charge2/3` with a non-flexible ZBL line) have the line `charge_transfer <rc_phi>` immediately after the `cutoff` line and, after the `parameters` and `q_scaler` values, the `N` phi values as the last data lines (one number per line). The converter reads this layout and writes the new format:
+
+```bash
+python3 potentials/nep/nep_model_converter.py old_nep.txt new_nep.txt
+```
+
+- `nep4_charge2` and `nep4_charge3` become `qnep2` and `qnep3` (the tag `nep4_charge3` is accepted by the converter for this purpose; it is not an upstream tag).
+- `rc_phi` and the phi values are copied token for token (no re-rounding); the descriptor coefficients are reordered channel-major as for every other legacy model.
+- Refused with a message: `charge_transfer` with `nep4_charge1` or any non-charge model, `rc_phi <= 0` or `rc_phi > rc_radial`, flexible ZBL (`zbl 0 0`; already refused for charge models), a wrong number of data lines, and `--restart` for such a model (legacy restarts with phi parameters never existed; restarts written by the current trainer are already in the new format and need no conversion).
+- Files without the `charge_transfer` line are converted exactly as before.
