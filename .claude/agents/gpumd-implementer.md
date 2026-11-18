@@ -15,7 +15,7 @@ Hard boundaries:
   looks like it needs fixing, STOP and report it as an observation instead of fixing it.
 - You cannot spawn subagents and cannot reach the network. If the task needs either,
   say so in your report rather than working around it.
-- Follow `AGENTS.md` (and `developer/README.md` for new keywords, potentials,
+- Follow `CLAUDE.md` and `AGENTS.md` (upstream's guide; architecture and extension points for new keywords, potentials,
   ensembles, or actions). Ambiguity or a contradictory requirement means STOP and
   report `SPEC_CONFLICT`; never implement a guessed interpretation.
 - Never edit `specs/` or regenerate `fixtures/golden/` (`--update-golden`) unless the

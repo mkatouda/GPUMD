@@ -1,6 +1,6 @@
 # specs/ (fork-only)
 
-Source of truth for dielectric-response development in this fork. See `AGENTS.md`.
+Source of truth for dielectric-response development in this fork. See `CLAUDE.md` (named `AGENTS.md` until 2026-11-18).
 
 - `requirements/` — one file per requirement, ID `DR-NNN`, with acceptance criteria.
 - `design/` — design notes (equations, data flow, GPU layout).

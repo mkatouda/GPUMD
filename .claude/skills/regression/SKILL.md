@@ -5,7 +5,7 @@ disable-model-invocation: true
 ---
 Arguments: optional baseline binary path (default: build of `master`), optional `--suite`.
 
-Stop and ask the human if any step is unclear (SPEC_CONFLICT rules in AGENTS.md apply).
+Stop and ask the human if any step is unclear (SPEC_CONFLICT rules in CLAUDE.md apply).
 
 1. Preconditions
    - `git status` clean of generated files; candidate = freshly built `src/gpumd` (+ `src/nep`)
@@ -23,7 +23,7 @@ Stop and ask the human if any step is unclear (SPEC_CONFLICT rules in AGENTS.md 
    Focused suites (`--suite pppm`, `--case <glob>`) are diagnostics only; acceptance is `full`.
 3. Classify failures
    - Known non-deterministic cases (37) and the reference result (218 passed / 37 failed,
-     relations 25/25) are listed in AGENTS.md, section "Known test results"; that list is canonical.
+     relations 25/25) are listed in CLAUDE.md, section "Known test results"; that list is canonical.
    - SUSPECT = any failing case outside the list, or a listed case failing by more than
      small numeric differences. Inspect only those (report under `tests_regression/reports/`).
    - Never edit tolerances or goldens to make a case pass.

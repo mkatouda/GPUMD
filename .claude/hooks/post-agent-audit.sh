@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PostToolUse hook (matcher: "Agent"): after every subagent call, report git
-# status/diffstat and warn about changes that need human approval per AGENTS.md
+# status/diffstat and warn about changes that need human approval per CLAUDE.md
 # (specs/, fixtures/golden/) or that look like generated outputs.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.." || exit 0
