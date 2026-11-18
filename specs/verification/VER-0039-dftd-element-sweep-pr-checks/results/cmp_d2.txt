@@ -1,0 +1,24 @@
+iso_r6_0       s6 0.75 rc 12 dE_rel 5.0e-08 dF 8.2e-07 (|F|max 1.1e+00) dV_rel 7.9e-08 ok
+iso_r6_0       s6 0.75 rc 30 dE_rel 4.8e-08 dF 8.4e-07 (|F|max 1.1e+00) dV_rel 7.6e-08 ok
+iso_r6_0       s6 1.00 rc 12 dE_rel 5.3e-08 dF 1.1e-06 (|F|max 1.5e+00) dV_rel 7.9e-08 ok
+iso_r6_1       s6 0.75 rc 12 dE_rel 2.6e-08 dF 1.2e-06 (|F|max 1.0e+00) dV_rel 1.3e-07 ok
+iso_r6_2       s6 0.75 rc 12 dE_rel 1.1e-08 dF 9.7e-07 (|F|max 1.2e+00) dV_rel 1.6e-07 ok
+iso_r6_3       s6 0.75 rc 12 dE_rel 2.1e-08 dF 8.7e-07 (|F|max 1.0e+00) dV_rel 9.1e-08 ok
+iso_r6_4       s6 0.75 rc 12 dE_rel 9.1e-09 dF 1.2e-06 (|F|max 1.8e+00) dV_rel 8.2e-08 ok
+iso_r6_5       s6 0.75 rc 12 dE_rel 1.8e-08 dF 1.0e-06 (|F|max 1.1e+00) dV_rel 1.7e-07 ok
+iso_r6_6       s6 0.75 rc 12 dE_rel 2.0e-08 dF 7.1e-07 (|F|max 1.3e+00) dV_rel 1.3e-07 ok
+iso_r6_7       s6 0.75 rc 12 dE_rel 5.4e-09 dF 1.1e-06 (|F|max 1.3e+00) dV_rel 8.5e-08 ok
+iso_r6_8       s6 0.75 rc 12 dE_rel 2.7e-08 dF 1.1e-06 (|F|max 1.3e+00) dV_rel 2.1e-07 ok
+iso_r6_9       s6 0.75 rc 12 dE_rel 1.4e-08 dF 1.1e-06 (|F|max 1.7e+00) dV_rel 1.6e-07 ok
+dense_r4.5_0   s6 0.75 rc 12 dE_rel 3.5e-10 dF 1.2e-06 (|F|max 2.6e+00) dV_rel 1.2e-07 ok
+dense_r4.5_1   s6 0.75 rc 12 dE_rel 1.2e-08 dF 1.9e-06 (|F|max 1.7e+00) dV_rel 1.2e-07 ok
+dense_r4.5_2   s6 0.75 rc 12 dE_rel 2.5e-08 dF 1.5e-06 (|F|max 2.3e+00) dV_rel 7.9e-08 ok
+dense_r4.5_3   s6 0.75 rc 12 dE_rel 1.2e-08 dF 1.5e-06 (|F|max 2.0e+00) dV_rel 1.8e-07 ok
+dense_r4.5_4   s6 0.75 rc 12 dE_rel 2.0e-08 dF 8.1e-07 (|F|max 2.1e+00) dV_rel 1.2e-07 ok
+pbc25_0        s6 0.75 rc 12 dE_rel 2.0e-08 dF 1.0e-06 (|F|max 1.7e+00) dV_rel 1.8e-07 ok
+pbc25_1        s6 0.75 rc 12 dE_rel 2.2e-08 dF 8.7e-07 (|F|max 1.3e+00) dV_rel 1.2e-07 ok
+pbc25_2        s6 0.75 rc 12 dE_rel 3.8e-08 dF 3.0e-06 (|F|max 1.1e+00) dV_rel 4.3e-07 ok
+pbc40_0        s6 0.75 rc 12 dE_rel 2.1e-09 dF 1.4e-06 (|F|max 6.9e-01) dV_rel 1.8e-07 ok
+pbc40_1        s6 0.75 rc 12 dE_rel 1.3e-10 dF 6.3e-07 (|F|max 9.6e-01) dV_rel 2.0e-07 ok
+pbc40_2        s6 0.75 rc 12 dE_rel 2.9e-08 dF 7.7e-07 (|F|max 7.9e-01) dV_rel 1.5e-07 ok
+worst: dE_rel 5.3e-08 dF 3.0e-06 dV_rel 4.3e-07 ; exceeding 0 of 23

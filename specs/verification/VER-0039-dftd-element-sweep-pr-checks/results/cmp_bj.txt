@@ -1,0 +1,22 @@
+iso_r6_0      dE_rel 5.8e-07 dF 1.1e-06 (Re) dV_rel 3.7e-07 ok
+iso_r6_1      dE_rel 5.5e-07 dF 4.0e-06 (Ru) dV_rel 1.5e-06 ok
+iso_r6_2      dE_rel 5.9e-07 dF 5.0e-05 (Mo) dV_rel 7.0e-06 EXCEEDS
+iso_r6_3      dE_rel 5.6e-07 dF 2.5e-06 (Mn) dV_rel 8.2e-07 ok
+iso_r6_4      dE_rel 5.6e-07 dF 8.3e-06 (Co) dV_rel 1.4e-06 ok
+iso_r6_5      dE_rel 5.6e-07 dF 1.9e-06 (Ne) dV_rel 7.9e-07 ok
+iso_r6_6      dE_rel 5.8e-07 dF 8.9e-07 (Ru) dV_rel 4.2e-07 ok
+iso_r6_7      dE_rel 5.6e-07 dF 1.1e-06 (Sn) dV_rel 7.1e-07 ok
+iso_r6_8      dE_rel 5.5e-07 dF 5.2e-07 (C) dV_rel 3.3e-07 ok
+iso_r6_9      dE_rel 5.4e-07 dF 1.2e-05 (Tc) dV_rel 1.2e-06 EXCEEDS
+dense_r4.5_0  dE_rel 4.9e-07 dF 2.3e-07 (At) dV_rel 4.0e-07 ok
+dense_r4.5_1  dE_rel 5.2e-07 dF 1.7e-06 (Ni) dV_rel 2.1e-07 ok
+dense_r4.5_2  dE_rel 5.2e-07 dF 1.9e-07 (Bi) dV_rel 4.0e-07 ok
+dense_r4.5_3  dE_rel 5.1e-07 dF 2.7e-06 (Ni) dV_rel 5.8e-07 ok
+dense_r4.5_4  dE_rel 5.2e-07 dF 7.6e-06 (Ni) dV_rel 9.7e-07 ok
+pbc25_0       dE_rel 6.2e-07 dF 5.3e-07 (Pt) dV_rel 6.2e-07 ok
+pbc25_1       dE_rel 6.2e-07 dF 2.1e-06 (Cr) dV_rel 4.1e-07 ok
+pbc25_2       dE_rel 6.1e-07 dF 1.1e-05 (Se) dV_rel 5.2e-06 EXCEEDS
+pbc40_0       dE_rel 5.6e-07 dF 1.8e-06 (Tc) dV_rel 1.2e-06 ok
+pbc40_1       dE_rel 5.9e-07 dF 1.1e-06 (V) dV_rel 8.8e-07 ok
+pbc40_2       dE_rel 5.9e-07 dF 9.2e-07 (Ni) dV_rel 9.0e-07 ok
+exceeding 3 of 21
