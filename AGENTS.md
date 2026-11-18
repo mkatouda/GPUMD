@@ -150,6 +150,12 @@ After the upstream merge (5c67f365, 2026-11-18, VER-0037): `run_regression.py --
 (relations 25/25), the same count and the same 14 non-train cases as above; the non-deterministic set is unchanged. Against a `master` (5c67f365) baseline the
 only failures outside that set are the fork-only dftd2 cases and two dftd3 cases that differ by float rounding (upstream's C6 rewrite).
 
+`pytest -m "not slow"` after the merge (2026-11-18, VER-0037 addendum): upstream's fixture models are nep.txt format 1, which calorine 4.1 (latest release) cannot
+read: about 760 tests fail or error at setup with `Failed to parse line 6 from .../fixtures/models/*.txt` (the same on upstream `5c67f365`). Use calorine master
+(GitLab materials-modeling/calorine, commit `71cc2c65` or later; install into a scratch directory and set `PYTHONPATH`, do not change the shared env): 1379 passed,
+7 failed, 639 skipped. The 7 failures are `test_io_compute_commands.py::test_command_io[*-compute_msd]` (calorine master renamed the `read_msd` columns to `msdx` ...;
+the test expects `msd_x`), not gpumd results. The skipped count (639, was 480) is not explained yet.
+
 ## Test execution policy
 
 Tests longer than a few minutes are marked `slow` (pytest) and excluded from the
