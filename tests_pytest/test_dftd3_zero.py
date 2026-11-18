@@ -8,7 +8,8 @@ implementation (tests-first). They define the contract of the optional damping t
    (run with `dftd3`) - (same run without), NEP89 underneath, as in test_dftd3_reference.py.
 2. Parser and error behaviour (ADR-0003 items 1-3, DR-003 D1, D4, D5, AC-4, AC-4b).
 3. BJ compatibility (AC-3): `dftd3 pbe 12 6` and `... bj` give output bit-identical to each other and
-   to the frozen output of the pre-change binary (fixtures/dftd3_zero/bj_frozen.json). These use an
+   to the frozen output of the pre-change binary (fixtures/dftd3_zero/bj_frozen.json) within rounding
+   since ADR-0008 (DR-001 AC-1 caps; the frozen values are not regenerated). These use an
    all-zero NEP (output = D3 alone, bit-reproducible); NEP89 itself is not, run to run.
 4. Force and virial consistency with finite differences of the energy (AC-2).
 5. Robustness (AC-5): small-box and large-box path agreement, and no NaN/inf for r << R0.
@@ -291,7 +292,7 @@ def test_dftd3_and_dftd2_mutually_exclusive(d3_line, d2_first, tmp_path, water):
 
 
 # ---------------------------------------------------------------------------------------------
-# 3. BJ compatibility (AC-3): bit-identity with the pre-change binary
+# 3. BJ compatibility (AC-3): agreement with the pre-change binary (since ADR-0008: within rounding)
 # ---------------------------------------------------------------------------------------------
 def dump_lines(workdir):
     """Lines 2.. of dump.xyz (header with energy and virial, then species/positions/forces), without
@@ -299,6 +300,19 @@ def dump_lines(workdir):
     lines = (workdir / 'dump.xyz').read_text().splitlines()[1:]
     lines[0] = re.sub(r' stress="[^"]*"', '', lines[0])
     return lines
+
+
+# Caps of DR-001 AC-1 (ADR-0002): energy and virial relative 2e-6, force 1e-5 eV/A.
+C6_REL_CAP, C6_FORCE_CAP = 2e-6, 1e-5
+
+
+def parse_dump(lines):
+    """(energy, virial (9,), species/positions text per atom, forces (N, 3)) of `dump_lines`."""
+    energy = float(re.search(r'energy=([-0-9.eE+]+)', lines[0]).group(1))
+    virial = np.array(re.search(r'virial="([^"]+)"', lines[0]).group(1).split(), float)
+    rows = [line.split() for line in lines[1:] if line.strip()]
+    forces = np.array([[float(x) for x in row[-3:]] for row in rows])
+    return energy, virial, [' '.join(row[:-3]) for row in rows], forces
 
 
 def d3_block(stdout):
@@ -322,15 +336,25 @@ def frozen_structure(case):
 @pytest.mark.fast
 @pytest.mark.parametrize('name', FROZEN_CASES)
 def test_bj_output_bit_identical_to_pre_change_binary(name, tmp_path):
-    """`dftd3 pbe rc rcn` (no token) reproduces the stored output of the pre-change binary exactly
-    (energy, forces, virial text of the dump with `precision double`; all-zero NEP, so the output is
-    the D3 contribution). The header lines of the pre-change binary stay in the same order (extra
-    lines allowed)."""
+    """`dftd3 pbe rc rcn` (no token) reproduces the stored output of the pre-change binary within
+    rounding (energy, forces, virial of the dump with `precision double`; all-zero NEP, so the output
+    is the D3 contribution). Since ADR-0008 (per-atom normalised C6 weights; human decision
+    2026-11-18, option A) the output is no longer bit-identical: measured differences against the
+    stored values are 6e-10 .. 3e-8 relative in energy, <= 5e-8 eV/A in force, <= 5e-7 eV in virial,
+    two to three orders below the caps of DR-001 AC-1 (energy and virial relative 2e-6, force
+    1e-5 eV/A; not loosened). The stored values are NOT regenerated. Species and positions are
+    still compared as text. The header lines of the pre-change binary stay in the same order
+    (extra lines allowed). The explicit-`bj` test below stays a bit-identity test."""
     case = FROZEN[name]
     cut = case['cutoffs']
     result, _ = run_gpumd(tmp_path, frozen_structure(case), f'dftd3 pbe {cut[0]} {cut[1]}',
                           model=ZERO_NEP)
-    assert dump_lines(tmp_path) == case['D3']
+    e, v, atoms_txt, f = parse_dump(dump_lines(tmp_path))
+    e0, v0, atoms_txt0, f0 = parse_dump(case['D3'])
+    assert atoms_txt == atoms_txt0
+    assert abs(e - e0) <= C6_REL_CAP * abs(e0), (e, e0)
+    assert np.abs(v - v0).max() <= C6_REL_CAP * np.abs(v0).max(), (v, v0)
+    assert np.abs(f - f0).max() <= C6_FORCE_CAP, np.abs(f - f0).max()
     block = d3_block(result.stdout)
     it = iter(block)
     assert all(line in it for line in case['stdout_block']), block   # ordered subsequence

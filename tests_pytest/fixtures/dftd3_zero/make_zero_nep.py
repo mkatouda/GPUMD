@@ -1,4 +1,5 @@
-"""Write zero_nep_H_C_O_Cu.txt: a tiny NEP model (types H C O Cu) whose parameters are all zero.
+"""Write zero_nep_H_C_O_Cu.txt (neighbour capacity 20) and zero_nep_H_C_O_Cu_mn100.txt (capacity 100,
+for dense clusters; ADR-0008 tests): a tiny NEP model (types H C O Cu) whose parameters are all zero.
 
 The model gives exactly zero energy, force and virial, so that the output of a run with `dftd3` is
 the D3 contribution alone and is bit-reproducible (NEP89 forces/energy are not, run to run, on this
@@ -14,10 +15,11 @@ N_ANN = T * (NEURONS * DIM + NEURONS + NEURONS) + 1
 N_DESC = (1 + 1) * (1 + 1) * T * T * 2            # radial + angular, basis_size 1 1
 N = N_ANN + N_DESC
 
-text = f"""nep {T} H C O Cu
+def model(mn):
+    return f"""nep {T} H C O Cu
 format_version 1
 model nep
-cutoff 3 3 20 20
+cutoff 3 3 {mn} {mn}
 n_max 1 1
 basis_size 1 1
 l_max 2 0 0
@@ -28,4 +30,5 @@ energy_reference {' '.join(['0'] * T)}
 @ q_scaler {DIM}
 {chr(10).join(['1'] * DIM)}
 """
-Path(__file__).with_name('zero_nep_H_C_O_Cu.txt').write_text(text)
+Path(__file__).with_name('zero_nep_H_C_O_Cu.txt').write_text(model(20))
+Path(__file__).with_name('zero_nep_H_C_O_Cu_mn100.txt').write_text(model(100))

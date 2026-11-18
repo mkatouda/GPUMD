@@ -156,6 +156,11 @@ read: about 760 tests fail or error at setup with `Failed to parse line 6 from .
 7 failed, 639 skipped. The 7 failures are `test_io_compute_commands.py::test_command_io[*-compute_msd]` (calorine master renamed the `read_msd` columns to `msdx` ...;
 the test expects `msd_x`), not gpumd results. The skipped count (639, was 480) is not explained yet.
 
+After ADR-0008 (dftd3 C6 weights normalised per atom, VER-0038, 2026-11-18): `run_regression.py --suite full` with the pre-change `develop` as baseline gave
+217 passed, 40 failed (relations 25/25); outside the non-deterministic set only `dftd3_single_late` and `dftd3_kspace_one_each` (restart.xyz, relative 3e-12, float
+rounding; against upstream 5c67f365 the difference is smaller, 6e-14) and `qnep_pppm_future_bec` (qNEP PPPM, no D3; pppm float noise). BJ results of `dftd3` now
+agree with the pre-ADR-0008 binary within rounding, not bit for bit (DR-003 AC-3 amended; `test_dftd3_zero.py` compares with the DR-001 AC-1 caps).
+
 ## Test execution policy
 
 Tests longer than a few minutes are marked `slow` (pytest) and excluded from the

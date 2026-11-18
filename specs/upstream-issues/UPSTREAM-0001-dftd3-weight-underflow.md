@@ -1,6 +1,7 @@
 # UPSTREAM-0001: DFT-D3 C6 interpolation: float weight underflow selects a wrong C6 at large coordination numbers
 
-- Status: recorded 2026-11-04; NOT yet reported. The human plans a bug report or a fix PR later (decision 2026-11-04).
+- Status: **WITHDRAWN 2026-11-18** (human decision): no report or PR will be sent upstream. Recorded 2026-11-04 and never reported (decision 2026-11-04: bug report or fix PR later). Fix in this fork: ADR-0008 (VER-0038).
+- Reason for withdrawal: upstream fixed the same defect independently in `5c104c42` ("dftd3: fix C6 interpolation at large coordination numbers", Leo, 2026-11-06, in `upstream/master` 5c67f365): the weights of each atom are normalised separately after shifting the squared CN distances by their minimum (log-sum-exp form, i.e. fix direction 1 below). Measured 2026-11-18 (VER-0038): upstream 5c67f365 agrees with simple-dftd3 1.7.0 on the dense clusters of this record (force 1.8e-7 / 6.7e-8 eV/A). The fork does not adopt the commit verbatim; ADR-0008 applies the same maths to the fork's cached per-atom weight table. The record is kept for traceability.
 - Fork-only note (do not include in an upstream issue/PR): found during DR-001 Phase 7 Stage 3, S1 (VER-0017). Evidence: `specs/verification/VER-0017-dftd3-stage3a/`.
 - Affected upstream code: `brucefan1983/GPUMD` `master`, `src/force/dftd3.cu`, the C6 interpolation in the pair kernels
   (in `master`: lines ~142-179 of the small-box force kernel and the same block in the large-box kernel, ~line 649). Identical in the fork's

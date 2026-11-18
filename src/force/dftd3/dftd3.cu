@@ -56,56 +56,73 @@ const std::string ELEMENTS[NUM_ELEMENTS] = {
 
 // The Gaussian weight of the C6 reference interpolation separates,
 //   L_ij = exp(-4 (cn_1 - cn_ref_i)^2 - 4 (cn_2 - cn_ref_j)^2) = w_1[i] * w_2[j],
-// so the weights w[k] = exp(-4 (cn - cn_ref_k)^2) of every atom are computed once (after its
-// coordination number is known) and the pair loops only multiply and sum. The table holds
-// max_cn weights per atom; weights of reference points beyond num_cn are not read.
+// so the weights of every atom are computed once (after its coordination number is known) and the
+// pair loops only multiply and sum. With d_k = cn - cn_ref_k the stored weight is the normalised
+//   w_k = exp(-4 (d_k^2 - m)) / sum_l exp(-4 (d_l^2 - m)),  m = min_k d_k^2,
+// (sum_k w_k = 1, the shift m only cancels in the ratio), so that the weights cannot underflow
+// for a coordination number far from all reference values and C6 = sum_ij c6_ij w_1[i] w_2[j]
+// needs no division. The table holds max_cn weights per atom; weights of reference points
+// beyond num_cn are zero and not read. See ADR-0008.
 template <typename T>
 static __device__ __forceinline__ void
 store_cn_weights(const int z1, const T cn, const int n1, float* g_cn_weight)
 {
   const int num_cn_1 = num_cn[z1];
+  T m = (T)0;
+  for (int k = 0; k < num_cn_1; ++k) {
+    const T diff = cn - (T)cn_ref[z1 * max_cn + k];
+    const T d2 = diff * diff;
+    m = (k == 0 || d2 < m) ? d2 : m;
+  }
+  T e[max_cn];
+  T sum = (T)0;
   for (int k = 0; k < max_cn; ++k) {
-    float w = 0.0f;
+    e[k] = (T)0;
     if (k < num_cn_1) {
       const T diff = cn - (T)cn_ref[z1 * max_cn + k];
-      w = (float)exp((T)-4 * diff * diff);
+      e[k] = exp((T)-4 * (diff * diff - m));
+      sum += e[k];
     }
-    g_cn_weight[n1 * max_cn + k] = w;
+  }
+  for (int k = 0; k < max_cn; ++k) {
+    g_cn_weight[n1 * max_cn + k] = (float)(e[k] / sum);
   }
 }
 
-// Weights of the central atom n1: w, dw = w * (-8 diff) (derivative of L with respect to its
-// coordination number up to the factor of the other atom), and their sums.
+// Weights of the central atom n1: w (normalised, sum 1) and dw = dw_k/dcn = -8 w_k (d_k - d_mean)
+// with d_mean = sum_k w_k d_k (derivative of the normalised weight with respect to its
+// coordination number; the derivative of the normalisation is included).
 struct CnWeights {
   float w[max_cn];
   float dw[max_cn];
-  float sum_w;
-  float sum_dw;
 };
 
 static __device__ __forceinline__ void
 load_cn_weights(const int z1, const float cn_1, const float* g_cn_weight_1, CnWeights& cw)
 {
   const int num_cn_1 = num_cn[z1];
-  cw.sum_w = 0.0f;
-  cw.sum_dw = 0.0f;
+  float d_mean = 0.0f;
 #pragma unroll
   for (int a = 0; a < max_cn; ++a) {
     float w = 0.0f;
-    float dw = 0.0f;
     if (a < num_cn_1) {
-      const float diff = cn_1 - cn_ref[z1 * max_cn + a];
       w = g_cn_weight_1[a];
-      dw = w * (-8.0f * diff);
+      d_mean += w * (cn_1 - cn_ref[z1 * max_cn + a]);
     }
     cw.w[a] = w;
+  }
+#pragma unroll
+  for (int a = 0; a < max_cn; ++a) {
+    float dw = 0.0f;
+    if (a < num_cn_1) {
+      dw = -8.0f * cw.w[a] * (cn_1 - cn_ref[z1 * max_cn + a] - d_mean);
+    }
     cw.dw[a] = dw;
-    cw.sum_w += w;
-    cw.sum_dw += dw;
   }
 }
 
-// C6 and its derivative with respect to the coordination number of atom 1 for one pair.
+// C6 and its derivative with respect to the coordination number of atom 1 for one pair
+// (the weights are normalised, so C6 = Z and dC6 = dZ).
 static __device__ __forceinline__ void get_c6_factorized(
   const int z1,
   const int z2,
@@ -125,11 +142,9 @@ static __device__ __forceinline__ void get_c6_factorized(
     return;
   }
   float w2[max_cn];
-  float sum_w2 = 0.0f;
 #pragma unroll
   for (int b = 0; b < max_cn; ++b) {
     w2[b] = (b < num_cn_2) ? g_cn_weight_2[b] : 0.0f;
-    sum_w2 += w2[b];
   }
   // g_c6_ref is stored for the pair (z_small, z_large); the first index runs over atom 1's
   // references if z1 < z2 and over atom 2's otherwise.
@@ -153,15 +168,8 @@ static __device__ __forceinline__ void get_c6_factorized(
       dZ += cw.dw[a] * t;
     }
   }
-  float W = cw.sum_w * sum_w2;
-  const float dW = cw.sum_dw * sum_w2;
-  if (W < 1.0e-30f) {
-    c6 = c6_pair[(num_cn_1 - 1) * stride_a + (num_cn_2 - 1) * stride_b];
-  } else {
-    W = 1.0f / W;
-    c6 = Z * W;
-    dc6 = dZ * W - c6 * dW * W;
-  }
+  c6 = Z;
+  dc6 = dZ;
 }
 
 // Zero-damped term of one pair for the power n (6 or 8) and the exponent alpha = n + 8:

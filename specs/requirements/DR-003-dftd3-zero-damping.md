@@ -39,6 +39,7 @@ D5. Elements (decided 2026-11-06 after VER-0023): D3(0) is limited to Z <= 86 (H
 - AC-2: force and virial agree with finite differences of the energy; NVE energy conservation
   is not worse than the BJ path.
 - AC-3: `dftd3 <f> <rc> <rc_cn>` and `... bj` give results bit-identical to the pre-change binary.
+  (Amended 2026-11-18, ADR-0008, human decision: since the per-atom normalised C6 weights the BJ result agrees with the pre-change binary within rounding, not bit for bit; measured differences 6e-10 .. 3e-8 relative in energy, <= 5e-8 eV/A in force, <= 5e-7 eV in virial on the five frozen cases, against the DR-001 AC-1 caps of 2e-6 / 1e-5 eV/A / 2e-6; `test_dftd3_zero.py::test_bj_output_bit_identical_to_pre_change_binary` compares numerically with those caps; the explicit-`bj` vs default test stays bit-identical.)
 - AC-4: unsupported functional for the chosen damping stops with an error naming the damping and
   the functional; no silent fallback to BJ.
 - AC-4b: Z >= 87 with zero damping is an error naming the element(s) (D5).
