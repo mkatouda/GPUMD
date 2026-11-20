@@ -118,19 +118,23 @@ NEP_Charge_Replica_Model::NEP_Charge_Replica_Model(
         "    type %d (%s with Z = %d).\n", n, model.elements[n].c_str(), zbl.atomic_numbers[n]);
   }
 
-  // DR-007: the gpumd reader now accepts flexible ZBL for qnep1/2/3, but the replica kernels below
-  // still have universal ZBL only. Refuse instead of silently dropping the ZBL contribution; this
-  // check is removed together with the replica implementation (DR-007 stage 3).
-  if (model.flexible_zbl) {
-    PRINT_INPUT_ERROR("multi_replica does not support flexible ZBL for charge models yet (DR-007).");
-  }
   zbl.enabled = model.enable_zbl;
+  zbl.flexible = model.flexible_zbl; // DR-007
   paramb.use_typewise_cutoff_zbl = model.use_typewise_cutoff_zbl;
   paramb.typewise_cutoff_zbl_factor = model.typewise_cutoff_zbl_factor;
   if (zbl.enabled) {
     zbl.rc_inner = model.zbl_rc_inner;
     zbl.rc_outer = model.zbl_rc_outer;
-    if (paramb.use_typewise_cutoff_zbl) {
+    if (zbl.flexible) {
+      // DR-007: validate_md limits the block to 550 values (10 active elements)
+      const int num_type_zbl = (paramb.num_types * (paramb.num_types + 1)) / 2;
+      for (int d = 0; d < 10 * num_type_zbl; ++d) {
+        zbl.para[d] = model.zbl_parameters[d];
+      }
+      zbl.num_types = paramb.num_types;
+      if (verbose)
+        printf("    has the flexible ZBL potential\n");
+    } else if (paramb.use_typewise_cutoff_zbl) {
       if (verbose)
         printf("    has the universal ZBL with typewise cutoff with a factor of %g.\n",
           paramb.typewise_cutoff_zbl_factor);
@@ -173,9 +177,6 @@ NEP_Charge_Replica_Model::NEP_Charge_Replica_Model(
     if (paramb.rc_phi > paramb.rc_radial) {
       PRINT_INPUT_ERROR(
         "charge_transfer: rc_phi must not exceed the radial cutoff (DR-005 stage 2b).");
-    }
-    if (!model.zbl_parameters.empty()) {
-      PRINT_INPUT_ERROR("charge_transfer with a flexible ZBL potential is not supported.");
     }
   }
   paramb.n_max_radial = model.n_max_radial;
@@ -833,16 +834,33 @@ static __global__ void find_force_ZBL(
       int zj = zbl.atomic_numbers[type2];
       float a_inv = (pow_zi + pow(float(zj), 0.23f)) * 2.134563f;
       float zizj = K_C_SP * zi * zj;
-      float rc_inner = zbl.rc_inner;
-      float rc_outer = zbl.rc_outer;
-      if (paramb.use_typewise_cutoff_zbl) {
-        // zi and zj start from 1, so need to minus 1 here
-        rc_outer = min(
-          (COVALENT_RADIUS[zi - 1] + COVALENT_RADIUS[zj - 1]) * paramb.typewise_cutoff_zbl_factor,
-          rc_outer);
-        rc_inner = 0.0f;
+      if (zbl.flexible) { // DR-007: per-pair parameters, pair index as in the NEP class
+        int t1, t2;
+        if (type1 < type2) {
+          t1 = type1;
+          t2 = type2;
+        } else {
+          t1 = type2;
+          t2 = type1;
+        }
+        int zbl_index = t1 * zbl.num_types - (t1 * (t1 - 1)) / 2 + (t2 - t1);
+        float ZBL_para[10];
+        for (int i = 0; i < 10; ++i) {
+          ZBL_para[i] = zbl.para[10 * zbl_index + i];
+        }
+        find_f_and_fp_zbl(ZBL_para, zizj, a_inv, d12, d12inv, f, fp);
+      } else {
+        float rc_inner = zbl.rc_inner;
+        float rc_outer = zbl.rc_outer;
+        if (paramb.use_typewise_cutoff_zbl) {
+          // zi and zj start from 1, so need to minus 1 here
+          rc_outer = min(
+            (COVALENT_RADIUS[zi - 1] + COVALENT_RADIUS[zj - 1]) * paramb.typewise_cutoff_zbl_factor,
+            rc_outer);
+          rc_inner = 0.0f;
+        }
+        find_f_and_fp_zbl(zizj, a_inv, rc_inner, rc_outer, d12, d12inv, f, fp);
       }
-      find_f_and_fp_zbl(zizj, a_inv, rc_inner, rc_outer, d12, d12inv, f, fp);
       float f2 = fp * d12inv * 0.5f;
       float f12[3] = {r12[0] * f2, r12[1] * f2, r12[2] * f2};
       float f21[3] = {-r12[0] * f2, -r12[1] * f2, -r12[2] * f2};

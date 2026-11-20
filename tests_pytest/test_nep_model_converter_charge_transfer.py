@@ -159,13 +159,8 @@ def test_refusals(tmp_path, name, edit, message):
     assert not dst.exists()
 
 
-def test_flexible_zbl_with_charge_transfer_refused(tmp_path):
-    L = _edit(lambda L: L)
-    L[0] = L[0].replace('nep4_charge2', 'nep4_zbl_charge2')
-    L.insert(1, 'zbl 0 0')
-    r, dst = convert(tmp_path, '\n'.join(L) + '\n')
-    assert r.returncode != 0 and 'flexible ZBL is only supported for model nep' in r.stderr, r.stderr
-    assert not dst.exists()
+# the former refusal of flexible ZBL together with charge_transfer was lifted by DR-007; see
+# test_nep_model_converter_flexible_zbl.py
 
 
 def test_restart_with_charge_transfer_refused(tmp_path):

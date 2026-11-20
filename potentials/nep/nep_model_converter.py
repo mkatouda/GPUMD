@@ -125,8 +125,11 @@ def read_model(filename):
             inner, outer = [float_value(v, where) for v in values[:2]]
             flexible_zbl = inner == 0.0 and outer == 0.0
             if flexible_zbl:
-                if name != "nep":
-                    raise ValueError(f"{where}: flexible ZBL is only supported for model nep")
+                # DR-007 / ADR-0007: flexible ZBL is also converted for the charge models
+                if name not in ("nep", "qnep1", "qnep2", "qnep3"):
+                    raise ValueError(
+                        f"{where}: flexible ZBL is only supported for models nep and qnep1/2/3"
+                    )
                 if len(values) != 2:
                     raise ValueError(f"{where}: flexible ZBL cannot have a cutoff factor")
             else:
@@ -197,7 +200,8 @@ def read_model(filename):
         zbl_count = 5 * num_types * (num_types + 1) if flexible_zbl else 0
         if "charge_transfer" in dict(fields):
             phi_count = num_types * (num_types + 1) // 2 * (br + 1)
-        # legacy value order: parameters, q_scaler, flexible-ZBL parameters (never with phi), phi
+        # legacy value order: parameters, q_scaler, flexible-ZBL parameters, phi (DR-007: charge
+        # models may combine flexible ZBL with charge_transfer)
         expected = parameters + dim + zbl_count + phi_count
         data = []
         for where, tokens in source:
@@ -215,7 +219,8 @@ def read_model(filename):
                 + f"), found {len(data)}"
             )
         if flexible_zbl:
-            for index in range(parameters + dim, expected, 10):
+            # DR-007: the phi values (charge_transfer) follow the ZBL block and are not ZBL pairs
+            for index in range(parameters + dim, parameters + dim + zbl_count, 10):
                 inner = float_value(data[index], str(filename))
                 outer = float_value(data[index + 1], str(filename))
                 if inner < 0.0 or outer <= inner:
@@ -344,7 +349,8 @@ def main():
         epilog=(
             "Supports standard NEP4, temperature, charge1/2/3, dipole, polarizability, "
             "vdW and charge-vdW models, and charge2/3 models with charge_transfer "
-            "(not with restarts or flexible ZBL). Energy references are set to zero. "
+            "(not with restarts); flexible ZBL (zbl 0 0) is converted for nep and the charge "
+            "models, also together with charge_transfer. Energy references are set to zero. "
             "Writes type-pair descriptors in channel-major order; NEP3 and NEP5 are not supported. "
             "Conversion does not extend native MD support or preserve an old training trajectory."
         ),

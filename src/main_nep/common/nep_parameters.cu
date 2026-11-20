@@ -107,8 +107,13 @@ void NEP_Parameters::read(const ParameterInput& input)
 void NEP_Parameters::finish_reading(
   const ParameterInput& input, const char* model_name, const char* model_description)
 {
-  if (flexible_zbl && this->model_name != "nep") {
-    PRINT_INPUT_ERROR("Flexible ZBL is only supported for model nep.");
+  // DR-007 / ADR-0007: flexible ZBL is also supported by the charge models qnep1/2/3 (the
+  // nep_charge trainer uses the shared ZBL kernels); nep_dipole, nep_polarizability, spin, nep_vdw
+  // and nep_charge_vdw (qnep3_vdw) still reject it
+  if (
+    flexible_zbl && this->model_name != "nep" && this->model_name != "qnep1" &&
+    this->model_name != "qnep2" && this->model_name != "qnep3") {
+    PRINT_INPUT_ERROR("Flexible ZBL is only supported for models nep and qnep1/qnep2/qnep3.");
   }
   set_regularization_defaults();
   check_existing_nep_model(*this);

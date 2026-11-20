@@ -373,8 +373,8 @@ void write_nep_model_parameters(FILE* file, const NEP_Parameters& para, const fl
   const int num_phi = para.number_of_variables_phi;
   write_nep_block(file, "parameters", values.data(), int(values.size()) - num_phi);
   write_nep_block(file, "q_scaler", para.q_scaler_cpu.data(), para.dim);
-  // block order here: parameters, q_scaler, phi_parameters, zbl_parameters; flexible ZBL (model nep
-  // only) and phi (qnep2/qnep3 only) never coexist, and the MD converter refuses the combination
+  // block order here: parameters, q_scaler, phi_parameters, zbl_parameters; the blocks are named,
+  // so readers do not depend on the order (DR-007: flexible ZBL may coexist with phi_parameters)
   if (num_phi > 0) {
     write_nep_block(file, "phi_parameters", values.data() + values.size() - num_phi, num_phi);
   }
