@@ -1,7 +1,7 @@
 # ADR-0008: Per-atom normalised, shift-stabilised C6 reference weights in the fork's `dftd3`
 
 - Status: Accepted (approved by the human on 2026-11-18; text as drafted, with the decisions Q1-Q4 recorded below). Implementation not started; it follows this ADR under the acceptance criteria.
-- Numbering: ADR-0007 is reserved for the DR-007 revision (`/home/katouda/work/dielectric-response_pj/tmp/reply_to_requester_20261118/02_ADR-0007_DRAFT_rev2026-11-18.md`, not placed yet), hence this ADR is 0008.
+- Numbering: ADR-0007 is the flexible-ZBL decision (`ADR-0007-flexible-zbl-charge-models.md`), hence this ADR is 0008.
 - Related: DR-001 (dftd3 speed, the cached `cn_weight` table), DR-003 (zero damping), ADR-0002 (dftd3 optimisation numerics, tolerances), `specs/upstream-issues/UPSTREAM-0001-dftd3-weight-underflow.md` (the recorded defect), VER-0017 (evidence), VER-0037 (merge record; upstream commit `5c104c42` was not adopted there, "to be reconsidered as a separate commit with its own VER").
 - Supersedes in part: DR-003 AC-3 ("`bj` reproduces the previous binary bit for bit") for the C6 interpolation only. See Consequences.
 

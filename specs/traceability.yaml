@@ -49,6 +49,14 @@ requirements:
     verification: [specs/verification/VER-0030-dftd3-cell-buffers, specs/verification/VER-0037-upstream-merge-5c67f365]
     tests: [tests_pytest/test_dftd3_cell_buffers.py]   # AC-1, AC-2, AC-5 met; AC-3 shown by 5 dftd cases; AC-4 partly: full suite vs stale master-base shows 4 extra failures explained (dftd2 keyword absent in baseline; dftd3 bit-identical to unpatched HEAD), full suite vs HEAD baseline and HIP build not done
     status: partial
+  - id: DR-007
+    title: flexible ZBL (zbl 0 0 + per-pair parameters) for charge models qnep1/2/3, including charge_transfer, in nep, gpumd and multi_replica
+    source: specs/requirements/DR-007-flexible-zbl-charge-models.md
+    design: ""
+    adrs: [specs/decisions/ADR-0007-flexible-zbl-charge-models.md]
+    verification: []
+    tests: []   # approved 2026-11-20 (all defaults of the 8 open points); implementation not started
+    status: planned
 # Example entry:
 # - id: DR-001
 #   title: Short requirement title
