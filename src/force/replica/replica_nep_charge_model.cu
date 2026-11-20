@@ -118,6 +118,12 @@ NEP_Charge_Replica_Model::NEP_Charge_Replica_Model(
         "    type %d (%s with Z = %d).\n", n, model.elements[n].c_str(), zbl.atomic_numbers[n]);
   }
 
+  // DR-007: the gpumd reader now accepts flexible ZBL for qnep1/2/3, but the replica kernels below
+  // still have universal ZBL only. Refuse instead of silently dropping the ZBL contribution; this
+  // check is removed together with the replica implementation (DR-007 stage 3).
+  if (model.flexible_zbl) {
+    PRINT_INPUT_ERROR("multi_replica does not support flexible ZBL for charge models yet (DR-007).");
+  }
   zbl.enabled = model.enable_zbl;
   paramb.use_typewise_cutoff_zbl = model.use_typewise_cutoff_zbl;
   paramb.typewise_cutoff_zbl_factor = model.typewise_cutoff_zbl_factor;
