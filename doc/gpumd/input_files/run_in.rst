@@ -132,6 +132,10 @@ Simulation setup
      - Add spring interactions to selected atom groups
      - No
      - No
+   * - :ref:`check_stability <kw_check_stability>`
+     - Stop the run with a diagnostic when it leaves the physical regime
+     - No
+     - No
    * - :ref:`deposit <kw_deposit>`
      - Add atoms periodically during a deposition run
      - No

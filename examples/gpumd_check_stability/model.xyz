@@ -1,0 +1,4 @@
+2
+Lattice="30 0 0 0 30 0 0 0 30" Properties=species:S:1:pos:R:3:vel:R:3 pbc="T T T"
+C 10 10 10 0 0 0
+C 15.2 10 10 0 0 0
