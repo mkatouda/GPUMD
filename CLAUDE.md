@@ -165,6 +165,11 @@ After ADR-0008 (dftd3 C6 weights normalised per atom, VER-0038, 2026-11-18): `ru
 rounding; against upstream 5c67f365 the difference is smaller, 6e-14) and `qnep_pppm_future_bec` (qNEP PPPM, no D3; pppm float noise). BJ results of `dftd3` now
 agree with the pre-ADR-0008 binary within rounding, not bit for bit (DR-003 AC-3 amended; `test_dftd3_zero.py` compares with the DR-001 AC-1 caps).
 
+After flexible ZBL for charge models (DR-007, VER-0040, 2026-11-21): `pytest -m "not slow"` with calorine master: 1461 passed, 7 failed (the same `compute_msd` ones),
+641 skipped; `run_regression.py --suite full` against the pre-change develop: 220 passed, 37 failed, all in the non-deterministic set above. Flexible ZBL for qnep1/2/3 is a
+deliberate divergence from upstream (which restricts it to model `nep`): expect a merge conflict there and keep `test_flexible_zbl_charge_guard.py` passing. AC-8 (v5.9.1
+reference) is open.
+
 ## Test execution policy
 
 Tests longer than a few minutes are marked `slow` (pytest) and excluded from the
