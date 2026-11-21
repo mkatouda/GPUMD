@@ -8,6 +8,9 @@
 This keyword enables one to use typewise cutoff radii for the ZBL part of the :term:`NEP` model.
 The ``nep_dipole`` and ``nep_polarizability`` models do not support ZBL and
 reject this keyword.
+When a ``zbl.in`` file is present (flexible ZBL, see :ref:`zbl <kw_zbl>`), the trainer ignores this keyword,
+because ``zbl.in`` already specifies the cutoffs of every pair.
+A ``nep.txt`` file that combines flexible ZBL (``zbl 0 0``) with a typewise factor is rejected when it is read.
 
 Syntax
 ------

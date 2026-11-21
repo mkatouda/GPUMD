@@ -159,10 +159,6 @@ def test_refusals(tmp_path, name, edit, message):
     assert not dst.exists()
 
 
-# the former refusal of flexible ZBL together with charge_transfer was lifted by DR-007; see
-# test_nep_model_converter_flexible_zbl.py
-
-
 def test_restart_with_charge_transfer_refused(tmp_path):
     legacy = mk.make_legacy_text(3, 4.0, 3.5, 4.0, True)
     (tmp_path / 'legacy.restart').write_text('0 0.1\n' * 10)

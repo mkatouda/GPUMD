@@ -116,9 +116,9 @@ public:
     bool flexible = false; // DR-007: per-pair parameters (zbl 0 0 + zbl_parameters)
     float rc_inner = 1.0f;
     float rc_outer = 2.0f;
-    float para[550];
+    float para[550] = {};
     int atomic_numbers[NUM_ELEMENTS];
-    int num_types;
+    int num_types = 0;
   };
 
   struct ExpandedBox {

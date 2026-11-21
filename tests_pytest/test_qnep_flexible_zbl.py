@@ -482,3 +482,78 @@ def test_more_than_ten_active_elements_is_rejected(tmp_path):
     out = r.stdout + r.stderr
     assert r.returncode != 0, out[-500:]
     assert 'at most 10 active elements' in out, out[-500:]
+
+
+# ---------------------------------------------------------------------------------------------
+# f. warning when a flexible-ZBL outer cutoff exceeds the angular cutoff (rc_angular = 4 A)
+# ---------------------------------------------------------------------------------------------
+def _stdout_of_run(tmp_path, text):
+    sym, pos, lat = batio3_cluster()
+    _counter[0] += 1
+    d = tmp_path / ('run%d' % _counter[0])
+    d.mkdir()
+    (d / 'nep.txt').write_text(text)
+    write_xyz(d / 'model.xyz', sym, pos, lat)
+    (d / 'run.in').write_text('potential nep.txt\nkspace ewald\nensemble nve\ntime_step 0\nrun 1\n')
+    r = subprocess.run([str(GPUMD_EXECUTABLE)], cwd=d, capture_output=True, text=True)
+    assert r.returncode == 0, (r.stdout + r.stderr)[-500:]
+    return r.stdout + r.stderr
+
+
+@pytest.mark.parametrize('outer_max, expect', [(3.9, False), (4.0, False), (4.5, True)])
+def test_outer_cutoff_above_angular_warns(tmp_path, outer_max, expect):
+    base = read_fixture('qnep_mode2_BaTiO3.txt')
+    rc = list(PAIR_RC)
+    rc[3] = (0.8, outer_max)
+    text = model_text(base, 'flex', None, None, pair_params(rc), capacity=(500, 200))
+    out = _stdout_of_run(tmp_path, text)
+    assert ('exceeds the angular cutoff' in out) == expect, out[-600:]
+    if expect:
+        assert 'outer cutoff 4.5 A' in out and 'angular cutoff 4 A' in out
+
+
+# ---------------------------------------------------------------------------------------------
+# g. species compaction: 4-element model, structure with elements 0, 2, 3 only
+# ---------------------------------------------------------------------------------------------
+def _synthetic_model(elements, zbl_values):
+    """Model with all NEP weights zero (energy = ZBL alone), qnep2, fixture-like layout."""
+    nt = len(elements)
+    dim, neurons = 37, 40
+    n_ann = nt * (dim + 3) * neurons + 2
+    n_par = n_ann + nt * nt * (9 * 9 + 7 * 9)
+    lines = ['nep %d %s' % (nt, ' '.join(elements)), 'format_version 1', 'model qnep2', 'zbl 0 0',
+             'cutoff 6 4 120 60', 'n_max 8 6', 'basis_size 8 8', 'l_max 4 0 0', 'ann 40 0',
+             'energy_reference ' + ' '.join(['0'] * nt)]
+    vals = ['0'] * n_par
+    vals[n_ann - 2] = '1.0'  # sqrt_epsilon_inf
+    text = '\n'.join(lines) + '\n@ parameters %d\n' % n_par + '\n'.join(vals) + '\n'
+    text += '@ q_scaler %d\n' % dim + ''.join('1.0\n' for _ in range(dim))
+    text += '@ zbl_parameters %d\n' % len(zbl_values) + ''.join('%.9g\n' % v for v in zbl_values)
+    return text
+
+
+def test_inactive_species_are_compacted(tmp_path):
+    elements4 = ['H', 'C', 'N', 'O']
+    rc4 = [(0.40 + 0.05 * k, 1.20 + 0.06 * k) for k in range(10)]
+    vals4 = pair_params(rc4)
+    keep = [0, 2, 3]
+    vals3 = []
+    for a in range(3):
+        for b in range(a, 3):
+            k = pair_index(keep[a], keep[b], 4)
+            vals3 += vals4[10 * k:10 * k + 10]
+    rng = np.random.default_rng(11)
+    pos = []
+    while len(pos) < 12:
+        p = rng.uniform(0.5, 5.5, 3)
+        if all(np.linalg.norm(p - q) > 0.9 for q in pos):
+            pos.append(p)
+    pos = np.array(pos)
+    sym = [['H', 'N', 'O'][i % 3] for i in range(12)]
+    lat = 6.0 * np.eye(3)
+    r4 = run_static(tmp_path, _synthetic_model(elements4, vals4), sym, pos, lat)
+    r3 = run_static(tmp_path, _synthetic_model(['H', 'N', 'O'], vals3), sym, pos, lat)
+    assert abs(r3['energy']) > 1.0, r3['energy']
+    assert abs(r4['energy'] - r3['energy']) <= EQ_E_REL * abs(r3['energy'])
+    assert np.max(np.abs(r4['forces'] - r3['forces'])) <= EQ_F_ABS
+    assert np.max(np.abs(r4['virial'] - r3['virial'])) <= EQ_W_REL * np.max(np.abs(r3['virial']))

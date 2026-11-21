@@ -153,6 +153,21 @@ NEP_Charge_Replica_Model::NEP_Charge_Replica_Model(
     printf("    radial cutoff = %g A.\n", paramb.rc_radial);
   if (verbose)
     printf("    angular cutoff = %g A.\n", paramb.rc_angular);
+  if (verbose && zbl.enabled && zbl.flexible) {
+    float max_outer = 0.0f;
+    for (int d = 0; d < (paramb.num_types * (paramb.num_types + 1)) / 2; ++d) {
+      if (zbl.para[10 * d + 1] > max_outer) {
+        max_outer = zbl.para[10 * d + 1];
+      }
+    }
+    if (max_outer > paramb.rc_angular) {
+      printf(
+        "Warning: flexible ZBL outer cutoff %g A exceeds the angular cutoff %g A; the ZBL term "
+        "is truncated at the angular cutoff (energy discontinuity).\n",
+        max_outer,
+        paramb.rc_angular);
+    }
+  }
 
   if (verbose)
     printf("    MN_radial = %d.\n", model.max_radial);

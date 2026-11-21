@@ -358,6 +358,19 @@ NEP_Charge::NEP_Charge(
       zbl.para[d] = model.zbl_parameters[d];
     }
     zbl.num_types = paramb.num_types;
+    float max_outer = 0.0f;
+    for (int d = 0; d < num_type_zbl; ++d) {
+      if (zbl.para[10 * d + 1] > max_outer) {
+        max_outer = zbl.para[10 * d + 1];
+      }
+    }
+    if (max_outer > paramb.rc_angular) {
+      printf(
+        "Warning: flexible ZBL outer cutoff %g A exceeds the angular cutoff %g A; the ZBL term "
+        "is truncated at the angular cutoff (energy discontinuity).\n",
+        max_outer,
+        paramb.rc_angular);
+    }
   }
 
   // charge related parameters and data
