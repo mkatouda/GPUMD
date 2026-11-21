@@ -225,7 +225,11 @@ For a typewise cutoff:
 zbl <rc_inner> <rc_outer> <typewise_cutoff_factor>
 ```
 
-Flexible ZBL is supported only for `model nep`. It is indicated by
+Flexible ZBL is supported for `model nep` and for `qnep1`, `qnep2`, and `qnep3`, with or without
+`charge_transfer` (upstream GPUMD accepts it only for `model nep`). It is rejected for
+`nep_dipole`, `nep_polarizability`, NEP-spin, `nep_vdw`, `qnep3_vdw`, and `tnep`. A `nep.txt` file that combines `zbl 0 0` with a typewise factor
+is rejected by the reader (the trainer ignores `use_typewise_cutoff_zbl` when `zbl.in` is present). `gpumd` supports at most 10 active elements (550 values) for the charge models.
+It is indicated by
 
 ```text
 zbl 0 0
@@ -498,7 +502,7 @@ The `q_scaler` block is not part of the trainable `parameters` vector and is not
 
 ### 4.3 `zbl_parameters`
 
-Ordinary NEP models with `zbl 0 0` additionally contain the following block.
+NEP models and `qnep1/2/3` models with `zbl 0 0` additionally contain the following block.
 It is not allowed for other models or without flexible ZBL.
 
 ```text
@@ -714,9 +718,9 @@ A qNEP model with `model qnep2` or `model qnep3` may contain the field
 charge_transfer <rc_phi>
 ```
 
-and the block `@ phi_parameters <N>` with `N = T (T + 1) / 2 * (basis_size_radial + 1)` values for `T` elements. The pairs `(t1 <= t2)` are stored row-major (`p = t1 * T - t1 (t1 - 1) / 2 + (t2 - t1)`), `basis_size_radial + 1` coefficients per pair. The cutoff must satisfy `0 < rc_phi <= rc_radial`. `qnep1` and all other models reject the field. Flexible ZBL (`zbl_parameters`) cannot be combined with it. The trainer writes the blocks in the order `parameters`, `q_scaler`, `phi_parameters`.
+and the block `@ phi_parameters <N>` with `N = T (T + 1) / 2 * (basis_size_radial + 1)` values for `T` elements. The pairs `(t1 <= t2)` are stored row-major (`p = t1 * T - t1 (t1 - 1) / 2 + (t2 - t1)`), `basis_size_radial + 1` coefficients per pair. The cutoff must satisfy `0 < rc_phi <= rc_radial`. `qnep1` and all other models reject the field. It may be combined with flexible ZBL (`zbl 0 0` and the `zbl_parameters` block); the blocks are identified by name, so their order is irrelevant, and the trainer writes them in the order `parameters`, `q_scaler`, `phi_parameters`, `zbl_parameters`.
 
-Legacy text files of such models (`nep4_charge2`, `nep4_charge3`, optionally `nep4_zbl_charge2/3` with a non-flexible ZBL line) have the line `charge_transfer <rc_phi>` immediately after the `cutoff` line and, after the `parameters` and `q_scaler` values, the `N` phi values as the last data lines (one number per line). The converter reads this layout and writes the new format:
+Legacy text files of such models (`nep4_charge2`, `nep4_charge3`, optionally `nep4_zbl_charge2/3` with a ZBL line, flexible or not) have the line `charge_transfer <rc_phi>` immediately after the `cutoff` line and, after the `parameters` and `q_scaler` values, the `N` phi values as the last data lines (one number per line). The converter reads this layout and writes the new format:
 
 ```bash
 python3 potentials/nep/nep_model_converter.py old_nep.txt new_nep.txt
@@ -724,5 +728,5 @@ python3 potentials/nep/nep_model_converter.py old_nep.txt new_nep.txt
 
 - `nep4_charge2` and `nep4_charge3` become `qnep2` and `qnep3` (`nep4_charge3` and `nep4_zbl_charge3` are accepted only if the file has a `charge_transfer` line; without it they are rejected as unsupported, as in upstream).
 - `rc_phi` and the phi values are copied token for token (no re-rounding); the descriptor coefficients are reordered channel-major as for every other legacy model.
-- Refused with a message: `charge_transfer` with `nep4_charge1` or any non-charge model, `rc_phi <= 0` or `rc_phi > rc_radial`, flexible ZBL (`zbl 0 0`; already refused for charge models), a wrong number of data lines, and `--restart` for such a model (legacy restarts with phi parameters never existed; restarts written by the current trainer are already in the new format and need no conversion).
+- Refused with a message: `charge_transfer` with `nep4_charge1` or any non-charge model, `rc_phi <= 0` or `rc_phi > rc_radial`, flexible ZBL (`zbl 0 0`) for any model other than `nep` and `qnep1/2/3`, a cutoff factor with flexible ZBL, a wrong number of data lines, and `--restart` for such a model (legacy restarts with phi parameters never existed; restarts written by the current trainer are already in the new format and need no conversion).
 - Files without the `charge_transfer` line are converted exactly as before.

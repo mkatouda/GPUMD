@@ -245,8 +245,10 @@ bool NEP_Model_File::read_zbl(
   enable_zbl = true;
   flexible_zbl = zbl_rc_inner == 0.0f && zbl_rc_outer == 0.0f;
   if (flexible_zbl) {
-    if (name != "nep") {
-      return fail(error, "Flexible ZBL is only supported for model nep.", field->line);
+    // DR-007 / ADR-0007: flexible ZBL is also accepted for the charge models qnep1/2/3
+    if (name != "nep" && name != "qnep1" && name != "qnep2" && name != "qnep3") {
+      return fail(
+        error, "Flexible ZBL is only supported for models nep and qnep1/qnep2/qnep3.", field->line);
     }
     if (field->values.size() != 2) {
       return fail(error, "flexible ZBL cannot use a typewise cutoff factor.", field->line);
@@ -321,13 +323,8 @@ bool NEP_Model_File::validate_md(std::string& error, const bool allow_charge_tra
     error = "charge_transfer is not supported by this potential or consumer.";
     return false;
   }
-  // block order of the legacy converter was parameters, q_scaler, zbl_parameters, phi. Flexible
-  // ZBL exists only for model nep, charge_transfer only for qnep2/qnep3, so the two never coexist;
-  // refuse rather than let the combination become ambiguous if that ever changes.
-  if (rc_phi > 0.0f && !zbl_parameters.empty()) {
-    error = "charge_transfer cannot be combined with flexible ZBL parameters.";
-    return false;
-  }
+  // DR-007 / ADR-0007: charge_transfer may be combined with flexible ZBL (blocks are named, so
+  // their file order does not matter).
   if (num_neurons2 != 0) {
     error = "Native MD supports only one hidden layer.";
     return false;

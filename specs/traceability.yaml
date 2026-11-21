@@ -54,9 +54,17 @@ requirements:
     source: specs/requirements/DR-007-flexible-zbl-charge-models.md
     design: ""
     adrs: [specs/decisions/ADR-0007-flexible-zbl-charge-models.md]
-    verification: []
-    tests: []   # approved 2026-11-20 (all defaults of the 8 open points); implementation not started
-    status: planned
+    verification: [specs/verification/VER-0040-flexible-zbl-charge-models/README.md]
+    tests:
+      - tests_pytest/test_qnep_flexible_zbl.py
+      - tests_pytest/test_replica_flexible_zbl.py
+      - tests_pytest/test_nep_flexible_zbl_train.py
+      - tests_pytest/test_nep_model_converter_flexible_zbl.py
+      - tests_pytest/test_flexible_zbl_charge_guard.py
+    # AC-1..AC-3, AC-5..AC-7 verified (VER-0040); AC-4 partly (no BEC bit-identity / field-conservation run);
+    # AC-8 open (requester's v5.9.1 files). Deliberate deviation: AC-2b dimer tolerance is conditional
+    # on the last point per pair (human 2026-11-20). HIP and CUDA<12.1 unverified.
+    status: partial
 # Example entry:
 # - id: DR-001
 #   title: Short requirement title

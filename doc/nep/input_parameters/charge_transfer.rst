@@ -31,6 +31,8 @@ Requirements
 * The meaning of the network output changes from :math:`q` to :math:`h`.
   A network trained without this keyword cannot be reused, and the model has to be trained from scratch.
   Models and inputs without the keyword are not affected.
+* The keyword may be combined with the flexible ZBL potential of the charge models (:ref:`zbl <kw_zbl>` with a ``zbl.in`` file).
+  The blocks of ``nep.txt`` are identified by their names, so their order does not matter; the trainer writes ``parameters``, ``q_scaler``, ``phi_parameters``, and ``zbl_parameters``.
 * Target charges are not needed. Because the total charge is always zero, a structure with a nonzero ``charge=`` label in the training data is an error.
 
 Errors
