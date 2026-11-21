@@ -1,0 +1,6 @@
+potential lj.txt
+ensemble nvt_bdp 300 300 20 seed 7
+time_step 1
+dump_thermo 10
+check_stability 10 max_potential_change 1.0 max_force 5
+run 3000

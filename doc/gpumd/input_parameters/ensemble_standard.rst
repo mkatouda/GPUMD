@@ -14,11 +14,11 @@ Syntax
     ensemble nve
     ensemble nvt_ber <T_1> <T_2> <T_coup>
     ensemble nvt_nhc <T_1> <T_2> <T_coup>
-    ensemble nvt_bdp <T_1> <T_2> <T_coup>
+    ensemble nvt_bdp <T_1> <T_2> <T_coup> [seed <n>]
     ensemble nvt_lan <T_1> <T_2> <T_coup>
     ensemble nvt_bao <T_1> <T_2> <T_coup>
     ensemble npt_ber <T_1> <T_2> <T_coup> <pressure_control_parameters>
-    ensemble npt_scr <T_1> <T_2> <T_coup> <pressure_control_parameters>
+    ensemble npt_scr <T_1> <T_2> <T_coup> <pressure_control_parameters> [seed <n>]
 
 Parameters
 ----------
@@ -38,6 +38,8 @@ The NVT methods use the following thermostats:
 
 ``npt_ber`` uses the :ref:`Berendsen barostat <berendsen_barostat>`; ``npt_scr`` uses :ref:`stochastic cell rescaling <stochastic_cell_rescaling>`.
 Both take the same pressure-control parameters, with pressures and estimated elastic moduli in GPa and ``p_coup`` in time steps.
+
+The optional trailing ``seed <n>`` of ``nvt_bdp`` and ``npt_scr`` fixes the random stream of the thermostat (see :ref:`the ensemble overview <ensemble_thermostat_seed>`; it does not make GPU trajectories identical).
 
 .. _standard_pressure_parameters:
 

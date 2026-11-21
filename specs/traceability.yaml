@@ -66,6 +66,22 @@ requirements:
     # AC-8 open (requester's v5.9.1 files). Deliberate deviation: AC-2b dimer tolerance is conditional
     # on the last point per pair (human 2026-11-20). HIP and CUDA<12.1 unverified.
     status: partial
+  - id: DR-008
+    title: run-time stability guard (check_stability: stop and report on temperature, potential-energy change, minimum distance, force, charge)
+    source: specs/requirements/DR-008-run-time-stability-guard.md
+    design: ""
+    adrs: []
+    verification: [specs/verification/VER-0041-stability-guard-and-thermostat-seed/README.md]
+    tests: [tests_pytest/test_check_stability.py]   # AC-1..AC-4, AC-6, AC-7 (except HIP) verified; AC-5 cost on an idle GPU: +1.4 % at 256 atoms (target < 1 % not met), +0.02 % at 39 304 atoms; AC-8 is polymer-apps side; multi-GPU refusal checked only with a patched scratch build
+    status: partial
+  - id: DR-009
+    title: optional seed token for the stochastic thermostats nvt_bdp and npt_scr
+    source: specs/requirements/DR-009-thermostat-seed.md
+    design: ""
+    adrs: []
+    verification: [specs/verification/VER-0041-stability-guard-and-thermostat-seed/README.md]
+    tests: [tests_pytest/test_thermostat_seed.py]   # AC-1..AC-4 verified; HIP unverified
+    status: implemented
 # Example entry:
 # - id: DR-001
 #   title: Short requirement title

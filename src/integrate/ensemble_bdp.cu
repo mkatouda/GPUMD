@@ -20,6 +20,7 @@ The Bussi-Donadio-Parrinello thermostat:
 
 #include "ensemble_bdp.cuh"
 #include "svr_utilities.cuh"
+#include "thermostat_seed.cuh"
 #include "utilities/common.cuh"
 #include "utilities/error.cuh"
 #include "utilities/gpu_macro.cuh"
@@ -30,6 +31,13 @@ The Bussi-Donadio-Parrinello thermostat:
 
 void Ensemble_BDP::initialize_rng()
 {
+  if (seed_ > 0) {
+    // an explicit seed initialises the generator and the Gaussian cache of this file
+    // deterministically; an ensemble line applies to one run, so every run starts its own stream
+    rng = std::mt19937(static_cast<unsigned>(seed_));
+    default_svr_gaussian_cache() = SVR_Gaussian_Cache();
+    return;
+  }
 #ifdef DEBUG
   rng = std::mt19937(12345678);
 #else
@@ -73,8 +81,12 @@ void Ensemble_BDP::parse_heat_groups(
 }
 
 void Ensemble_BDP::parse(
-  const std::vector<std::string>& tokens, const std::vector<Group>& group)
+  const std::vector<std::string>& tokens_input, const std::vector<Group>& group)
 {
+  std::vector<std::string> tokens = tokens_input;
+  if (tokens[1] == "nvt_bdp") {
+    seed_ = extract_thermostat_seed(tokens);
+  }
   const int num_param = tokens.size();
   if (tokens[1] == "nvt_bdp") {
     type = EnsembleType::NVT_BDP;
@@ -107,6 +119,9 @@ void Ensemble_BDP::parse(
     printf("    initial temperature is %g K.\n", temperature1_);
     printf("    final temperature is %g K.\n", temperature2_);
     printf("    tau_T is %g time_step.\n", temperature_coupling);
+    if (seed_ > 0) {
+      printf("    thermostat random seed is %d.\n", seed_);
+    }
     return;
   }
 

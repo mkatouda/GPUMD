@@ -24,6 +24,7 @@ The driver class dealing with measurement.
 #include "add_force.cuh"
 #include "add_random_force.cuh"
 #include "add_spring.cuh"
+#include "check_stability.cuh"
 #include "measure/structure/adf.cuh"
 #include "measure/structure/angular_rdf.cuh"
 #include "compute.cuh"
@@ -276,6 +277,10 @@ bool Measure::parse_action(
     action.reset(new Add_Efield(
       tokens, group, is_nep_charge_potential(first_potential_filename)));
     actions_.emplace_back(std::move(action));
+  } else if (tokens[0] == "check_stability") {
+    std::unique_ptr<Action> action;
+    action.reset(new Check_Stability(tokens, first_potential_filename));
+    actions_.emplace_back(std::move(action));
   } else if (tokens[0] == "mc") {
     std::unique_ptr<Action> action;
     action.reset(new MC(tokens, group, atom, first_potential_filename));
@@ -288,6 +293,16 @@ bool Measure::parse_action(
     return false;
   }
   return true;
+}
+
+bool Measure::has_action(const std::string& name) const
+{
+  for (const auto& action : actions_) {
+    if (action->action_name == name) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void Measure::pre_run(

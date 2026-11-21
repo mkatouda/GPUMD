@@ -318,6 +318,9 @@ void Run::parse_one_keyword(
   if (tokens[0] == "potential") {
     force.parse_potential(tokens, box, atom, run_input);
   } else if (tokens[0] == "minimize") {
+    if (measure.has_action("check_stability")) {
+      PRINT_INPUT_ERROR("check_stability cannot be combined with minimize.");
+    }
     Minimize minimize;
     minimize.parse_minimize(
       tokens,

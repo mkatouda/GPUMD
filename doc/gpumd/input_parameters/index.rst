@@ -129,6 +129,7 @@ See :ref:`run.in <run_in>` for command order and how settings apply to successiv
 
    active
    compute_extrapolation
+   check_stability
    dump_observer
 
 .. rubric:: Output

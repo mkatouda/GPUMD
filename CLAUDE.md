@@ -170,6 +170,10 @@ After flexible ZBL for charge models (DR-007, VER-0040, 2026-11-21): `pytest -m 
 deliberate divergence from upstream (which restricts it to model `nep`): expect a merge conflict there and keep `test_flexible_zbl_charge_guard.py` passing. AC-8 (v5.9.1
 reference) is open.
 
+After `check_stability` (DR-008) and the thermostat `seed` token (DR-009, VER-0041, 2026-11-21): `pytest -m "not slow"` with calorine master: 1538 passed, 7 failed (the same
+`compute_msd` ones), 641 skipped; `run_regression.py --suite full` against the pre-change develop: 220 passed, 37 failed, all in the non-deterministic set above. Both are opt-in
+(no keyword, no change). `check_stability` cost (idle GPU, interval 100, four criteria): +1.4 % at 256 atoms, +0.02 % at 39 304 atoms; HIP is not built.
+
 ## Test execution policy
 
 Tests longer than a few minutes are marked `slow` (pytest) and excluded from the

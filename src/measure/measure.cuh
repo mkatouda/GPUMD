@@ -39,6 +39,8 @@ public:
     Force& force,
     const std::string& first_potential_filename);
 
+  bool has_action(const std::string& name) const;
+
   void pre_run(
     const int number_of_steps,
     const double time_step,
