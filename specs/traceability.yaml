@@ -72,7 +72,7 @@ requirements:
     design: ""
     adrs: []
     verification: [specs/verification/VER-0041-stability-guard-and-thermostat-seed/README.md]
-    tests: [tests_pytest/test_check_stability.py]   # AC-1..AC-4, AC-6, AC-7 (except HIP) verified; AC-5 cost on an idle GPU: +1.4 % at 256 atoms (target < 1 % not met), +0.02 % at 39 304 atoms; AC-8 is polymer-apps side; multi-GPU refusal checked only with a patched scratch build
+    tests: [tests_pytest/test_check_stability.py]   # AC-1..AC-4, AC-6, AC-7 (except HIP) verified; AC-5 cost on an idle GPU: +1.4 % at 256 atoms (target < 1 % not met; accepted as is by the human 2026-11-21), +0.02 % at 39 304 atoms; AC-8 is polymer-apps side; multi-GPU refusal checked only with a patched scratch build
     status: partial
   - id: DR-009
     title: optional seed token for the stochastic thermostats nvt_bdp and npt_scr
