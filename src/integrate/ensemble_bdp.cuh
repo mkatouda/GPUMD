@@ -84,4 +84,5 @@ private:
 
   double temperature1_ = 0.0;
   double temperature2_ = 0.0;
+  int seed_ = 0; // > 0: explicit thermostat seed (DR-009); 0: clock/DEBUG seed
 };

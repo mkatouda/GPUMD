@@ -62,6 +62,29 @@ We require :math:`\tau_p/\Delta t \geq 1` and a good choice is :math:`\tau_p/\De
 
 The elastic constants are in units of GPa.
 
+.. _ensemble_thermostat_seed:
+
+Random seed of the stochastic thermostats
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The stochastic thermostats ``nvt_bdp`` and ``npt_scr`` accept an optional trailing ``seed`` option::
+
+  ensemble nvt_bdp <T_1> <T_2> <T_coup> seed <n>
+  ensemble npt_scr <T_1> <T_2> <T_coup> <pressure_control_parameters> seed <n>
+
+:attr:`<n>` is a positive integer that initializes the random-number generator of the thermostat (and, for ``npt_scr``, of the cell rescaling) deterministically.
+A zero, negative, or non-integer value, a missing value, or a repeated ``seed`` is an input error.
+An ``ensemble`` line applies to a single ``run``, so each ``ensemble ... seed <n>`` line starts its own stream from its seed: the generator and its cached Gaussian number are reset at the start of that run, independently of earlier runs in the same input (also of earlier unseeded runs).
+Two consecutive runs that use the same seed therefore draw the same random numbers; give different seeds to get different streams.
+Without ``seed``, the generator is initialized from the system clock as before (a fixed seed in builds compiled with ``-DDEBUG``); an explicit seed overrides the fixed seed of the ``-DDEBUG`` builds.
+The option is accepted only by ``nvt_bdp`` and ``npt_scr`` of ``gpumd``: ``heat_bdp`` (a parameter-count error), the Langevin-type, PIMD and other ensembles, and the ``nvt_bdp`` of ``multi_replica`` runs (which have their own seed handling) do not accept it.
+
+Reproducibility scope: the seed fixes only the random stream of the thermostat.
+With the same input script, in a fresh process, with the same binary, the thermostat random numbers are identical.
+It does not make the whole trajectory reproducible: the forces are accumulated on the GPU with atomic additions, so the last digits of the forces, and hence the trajectories of an interacting system, can differ from run to run even with the same seed.
+The initial velocities are controlled separately by ``velocity <T> seed <n>`` (see the :ref:`velocity keyword <kw_velocity>`).
+Record the seeds used in a study together with the input files.
+
 Output
 ------
 

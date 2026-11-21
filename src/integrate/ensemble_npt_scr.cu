@@ -23,6 +23,7 @@ J. Chem. Phys. 153, 114107 (2020).
 #include "ensemble_npt_scr.cuh"
 #include "npt_utilities.cuh"
 #include "svr_utilities.cuh"
+#include "thermostat_seed.cuh"
 #include "utilities/common.cuh"
 #include "utilities/error.cuh"
 #include "utilities/gpu_macro.cuh"
@@ -32,6 +33,13 @@ J. Chem. Phys. 153, 114107 (2020).
 
 void Ensemble_NPT_SCR::initialize_rng()
 {
+  if (seed_ > 0) {
+    // an explicit seed initialises the generator and the Gaussian cache of this file
+    // deterministically; an ensemble line applies to one run, so every run starts its own stream
+    rng = std::mt19937(static_cast<unsigned>(seed_));
+    default_svr_gaussian_cache() = SVR_Gaussian_Cache();
+    return;
+  }
 #ifdef DEBUG
   rng = std::mt19937(12345678);
 #else
@@ -39,9 +47,10 @@ void Ensemble_NPT_SCR::initialize_rng()
 #endif
 };
 
-Ensemble_NPT_SCR::Ensemble_NPT_SCR(
-  const std::vector<std::string>& tokens, const Box& box)
+Ensemble_NPT_SCR::Ensemble_NPT_SCR(const std::vector<std::string>& tokens_input, const Box& box)
 {
+  std::vector<std::string> tokens = tokens_input;
+  seed_ = extract_thermostat_seed(tokens);
   const int num_param = tokens.size();
   type = EnsembleType::NPT_SCR;
   if (num_param != 18 && num_param != 12 && num_param != 8) {
@@ -175,6 +184,9 @@ Ensemble_NPT_SCR::Ensemble_NPT_SCR(
     printf("    modulus_xy is %g GPa.\n", elastic_modulus[5]);
   }
   printf("    tau_p is %g time_step.\n", tau_p);
+  if (seed_ > 0) {
+    printf("    thermostat random seed is %d.\n", seed_);
+  }
 
   for (int i = 0; i < num_target_pressure_components; ++i) {
     target_pressure[i] /= PRESSURE_UNIT_CONVERSION;
