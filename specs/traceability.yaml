@@ -61,7 +61,8 @@ requirements:
       - tests_pytest/test_nep_flexible_zbl_train.py
       - tests_pytest/test_nep_model_converter_flexible_zbl.py
       - tests_pytest/test_flexible_zbl_charge_guard.py
-    # AC-1..AC-3, AC-5..AC-7 verified (VER-0040); AC-4 partly (no BEC bit-identity / field-conservation run);
+      - tests_pytest/test_qnep_flexible_zbl_field.py
+    # AC-1..AC-7 verified (VER-0040; AC-4 without a small-box NVE case, see VER-0040);
     # AC-8 open (requester's v5.9.1 files). Deliberate deviation: AC-2b dimer tolerance is conditional
     # on the last point per pair (human 2026-11-20). HIP and CUDA<12.1 unverified.
     status: partial
